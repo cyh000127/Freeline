@@ -7,7 +7,7 @@
 ## 관련 이슈
 
 - 작업 브랜치: `%{source_branch}`
-- Jira 티켓: S14P21A207-
+- Closes S14P21A207-🚨숫자입력🚨
 
 ## 설명
 
