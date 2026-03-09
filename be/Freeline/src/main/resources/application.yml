@@ -5,11 +5,6 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE}
 
-  # Java 21 가상 스레드 활성화
-  threads:
-    virtual:
-      enabled: on
-
   # 파일 업로드 공통 설정
   servlet:
     multipart:
