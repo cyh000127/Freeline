@@ -1,0 +1,74 @@
+package com.freeline.common.response;
+
+import java.time.LocalDateTime;
+
+import org.springframework.http.HttpStatus;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import lombok.Builder;
+
+@Builder
+public record BaseResponse<T>(
+	@JsonIgnore
+	HttpStatus httpStatus,
+	boolean success,
+	T data,
+	ErrorResponse error,
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Seoul")
+	LocalDateTime timestamp
+) {
+
+	/**
+	 * HTTP 200 OK
+	 */
+	public static <T> BaseResponse<T> ok(final T data) {
+		return BaseResponse.<T>builder()
+			.httpStatus(HttpStatus.OK)
+			.success(true)
+			.data(data)
+			.error(null)
+			.timestamp(LocalDateTime.now())
+			.build();
+	}
+
+	/**
+	 * HTTP 201 Created
+	 */
+	public static <T> BaseResponse<T> created(final T data) {
+		return BaseResponse.<T>builder()
+			.httpStatus(HttpStatus.CREATED)
+			.success(true)
+			.data(data)
+			.error(null)
+			.timestamp(LocalDateTime.now())
+			.build();
+	}
+
+	/**
+	 * HTTP 204 No Content
+	 */
+	public static <T> BaseResponse<T> noContent() {
+		return BaseResponse.<T>builder()
+			.httpStatus(HttpStatus.NO_CONTENT)
+			.success(true)
+			.data(null)
+			.error(null)
+			.timestamp(LocalDateTime.now())
+			.build();
+	}
+
+	/**
+	 * Error Response
+	 */
+	public static <T> BaseResponse<T> fail(ErrorResponse error) {
+		return BaseResponse.<T>builder()
+			.httpStatus(error.status())
+			.success(false)
+			.data(null)
+			.error(error)
+			.timestamp(LocalDateTime.now())
+			.build();
+	}
+}
