@@ -1,0 +1,68 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.3' // 안정적인 최신 3.x 버전 권장
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.freeline'
+version = '0.0.1-SNAPSHOT'
+description = 'FreeLine: 대규모 오프라인 행사를 위한 무설치 스마트 웨이팅 솔루션'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // [Core & Web]
+    implementation 'org.springframework.boot:spring-boot-starter-web' // webmvc 포함
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // [Data & Persistence]
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // [Security & Auth]
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6' // JWT 처리용
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+    // [Environment Variables] - 모든 env 변수 분리 관리를 위한 핵심 도구
+    implementation 'io.github.cdimascio:dotenv-kotlin:6.4.1'
+
+    // [Documentation]
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.14'
+
+    // [Monitoring]
+    runtimeOnly "io.micrometer:micrometer-registry-prometheus"
+
+    // [Lombok]
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // [Test] - BDD 스타일 테스트와 가독성 높은 단언문 추가
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
+    testImplementation 'io.rest-assured:rest-assured:5.5.0' // API 테스트 가독성 향상
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
