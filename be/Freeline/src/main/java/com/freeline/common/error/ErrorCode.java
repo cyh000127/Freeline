@@ -29,6 +29,11 @@ public enum ErrorCode {
 	 */
 	ADMIN_NOT_FOUND(HttpStatus.NOT_FOUND, "A-001", "회원을 찾을 수 없습니다."),
 	ADMIN_EMAIL_DUPLICATE(HttpStatus.CONFLICT, "A-002", "이미 존재하는 이메일입니다."),
+
+	/**
+	 * Event Error (E-xxx)
+	 */
+	INVALID_EVENT_PERIOD(HttpStatus.BAD_REQUEST, "E-001", "행사 종료일은 시작일보다 빠를 수 없습니다."),
 	;
 
 	private final HttpStatus httpStatus;

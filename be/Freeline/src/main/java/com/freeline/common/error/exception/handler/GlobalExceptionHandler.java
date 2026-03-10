@@ -1,7 +1,6 @@
 package com.freeline.common.error.exception.handler;
 
 import org.springframework.security.access.AccessDeniedException;
-
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -10,6 +9,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -30,7 +30,10 @@ import lombok.extern.slf4j.Slf4j;
 public class GlobalExceptionHandler {
 
 	@ExceptionHandler(Exception.class)
-	public ResponseEntity<BaseResponse<ErrorResponse>> handleException(Exception ex, HttpServletRequest request) {
+	public ResponseEntity<BaseResponse<ErrorResponse>> handleException(
+		final Exception ex,
+		final HttpServletRequest request
+	) {
 		LoggingUtils.logException("지정되지 않은 예외 발생", ex, request);
 		ErrorResponse response = ErrorResponse.of(ErrorCode.INTERNAL_SERVER_ERROR, request);
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(BaseResponse.fail(response));
@@ -38,18 +41,31 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(BusinessException.class)
 	public ResponseEntity<BaseResponse<ErrorResponse>> handleBusinessException(
-		BusinessException ex,
-		HttpServletRequest request
+		final BusinessException ex,
+		final HttpServletRequest request
 	) {
 		LoggingUtils.logException("BusinessException 발생", ex, request);
 		ErrorResponse response = ErrorResponse.of(ex.getErrorCode(), request);
 		return ResponseEntity.status(ex.getErrorCode().getHttpStatus()).body(BaseResponse.fail(response));
 	}
 
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	public ResponseEntity<BaseResponse<ErrorResponse>> handleMethodArgumentNotValid(
+		final MethodArgumentNotValidException ex,
+		final HttpServletRequest request
+	) {
+		LoggingUtils.logValidationException(ex, request);
+
+		ErrorResponse response = ErrorResponse.of(ErrorCode.INVALID_INPUT, request);
+		response.addValidationErrors(ex.getBindingResult());
+
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(BaseResponse.fail(response));
+	}
+
 	@ExceptionHandler(ConstraintViolationException.class)
 	public ResponseEntity<BaseResponse<ErrorResponse>> handleConstraintViolation(
-		ConstraintViolationException ex,
-		HttpServletRequest request
+		final ConstraintViolationException ex,
+		final HttpServletRequest request
 	) {
 		LoggingUtils.logException("ConstraintViolationException 발생", ex, request);
 		ErrorResponse response = ErrorResponse.of(ErrorCode.INVALID_INPUT, request);
@@ -58,8 +74,8 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	public ResponseEntity<BaseResponse<ErrorResponse>> handleHttpMessageNotReadable(
-		HttpMessageNotReadableException ex,
-		HttpServletRequest request
+		final HttpMessageNotReadableException ex,
+		final HttpServletRequest request
 	) {
 		LoggingUtils.logException("HttpMessageNotReadableException 발생", ex, request);
 		ErrorResponse response = ErrorResponse.of(ErrorCode.INVALID_INPUT, request);
@@ -68,8 +84,8 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(MissingServletRequestParameterException.class)
 	public ResponseEntity<BaseResponse<ErrorResponse>> handleMissingServletRequestParameter(
-		MissingServletRequestParameterException ex,
-		HttpServletRequest request
+		final MissingServletRequestParameterException ex,
+		final HttpServletRequest request
 	) {
 		LoggingUtils.logException("MissingServletRequestParameterException 발생", ex, request);
 		ErrorResponse response = ErrorResponse.of(ErrorCode.INVALID_INPUT, request);
@@ -78,8 +94,8 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
 	public ResponseEntity<BaseResponse<ErrorResponse>> handleMethodArgumentTypeMismatch(
-		MethodArgumentTypeMismatchException ex,
-		HttpServletRequest request
+		final MethodArgumentTypeMismatchException ex,
+		final HttpServletRequest request
 	) {
 		LoggingUtils.logException("MethodArgumentTypeMismatchException 발생", ex, request);
 		ErrorResponse response = ErrorResponse.of(ErrorCode.INVALID_INPUT, request);
@@ -88,8 +104,8 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(HttpRequestMethodNotSupportedException.class)
 	public ResponseEntity<BaseResponse<ErrorResponse>> handleHttpRequestMethodNotSupported(
-		HttpRequestMethodNotSupportedException ex,
-		HttpServletRequest request
+		final HttpRequestMethodNotSupportedException ex,
+		final HttpServletRequest request
 	) {
 		LoggingUtils.logException("HttpRequestMethodNotSupportedException 발생", ex, request);
 		ErrorResponse response = ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED, request);
@@ -98,8 +114,8 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(HttpMediaTypeNotSupportedException.class)
 	public ResponseEntity<BaseResponse<ErrorResponse>> handleHttpMediaTypeNotSupported(
-		HttpMediaTypeNotSupportedException ex,
-		HttpServletRequest request
+		final HttpMediaTypeNotSupportedException ex,
+		final HttpServletRequest request
 	) {
 		LoggingUtils.logException("HttpMediaTypeNotSupportedException 발생", ex, request);
 		ErrorResponse response = ErrorResponse.of(ErrorCode.UNSUPPORTED_MEDIA_TYPE, request);
@@ -108,8 +124,8 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(DataIntegrityViolationException.class)
 	public ResponseEntity<BaseResponse<ErrorResponse>> handleDataIntegrityViolation(
-		DataIntegrityViolationException ex,
-		HttpServletRequest request
+		final DataIntegrityViolationException ex,
+		final HttpServletRequest request
 	) {
 		LoggingUtils.logException("DataIntegrityViolationException 발생", ex, request);
 		ErrorResponse response = ErrorResponse.of(ErrorCode.DATA_INTEGRITY_VIOLATION, request);
@@ -118,8 +134,8 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(DataAccessException.class)
 	public ResponseEntity<BaseResponse<ErrorResponse>> handleDataAccessException(
-		DataAccessException ex,
-		HttpServletRequest request
+		final DataAccessException ex,
+		final HttpServletRequest request
 	) {
 		LoggingUtils.logException("DataAccessException 발생", ex, request);
 		ErrorResponse response = ErrorResponse.of(ErrorCode.INTERNAL_SERVER_ERROR, request);
@@ -128,8 +144,8 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(AccessDeniedException.class)
 	public ResponseEntity<BaseResponse<ErrorResponse>> handleAccessDeniedException(
-		AccessDeniedException ex,
-		HttpServletRequest request
+		final AccessDeniedException ex,
+		final HttpServletRequest request
 	) {
 		LoggingUtils.logException("AccessDeniedException 발생", ex, request);
 		ErrorResponse response = ErrorResponse.of(ErrorCode.ACCESS_DENIED, request);
@@ -138,8 +154,8 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(NoResourceFoundException.class)
 	public ResponseEntity<BaseResponse<ErrorResponse>> handleNoResourceFoundException(
-		NoResourceFoundException ex,
-		HttpServletRequest request
+		final NoResourceFoundException ex,
+		final HttpServletRequest request
 	) {
 		LoggingUtils.logException("NoResourceFoundException 발생", ex, request);
 		ErrorResponse response = ErrorResponse.of(ErrorCode.NOT_FOUND, request);

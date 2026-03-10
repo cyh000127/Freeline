@@ -73,3 +73,5 @@ tmp/
 temp/
 *.log
 *.temp
+be/docs/
+/tree.txt
