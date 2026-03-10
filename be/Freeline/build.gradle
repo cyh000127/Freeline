@@ -1,12 +1,13 @@
 plugins {
     id 'java'
+    id 'checkstyle'
     id 'org.springframework.boot' version '4.0.0'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'com.freeline'
 version = '0.0.1-SNAPSHOT'
-description = 'FreeLine: 대규모 오프라인 행사를 위한 무설치 스마트 웨이팅 솔루션'
+description = 'Freeline backend'
 
 java {
     toolchain {
@@ -25,38 +26,54 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-web' // webmvc 포함
+    implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
-    // [Data & Persistence]
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
     runtimeOnly 'org.postgresql:postgresql'
 
-    // [Security & Auth]
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 
-    // [Documentation]
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.0'
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
-    // [Monitoring]
-    runtimeOnly "io.micrometer:micrometer-registry-prometheus"
-
-    // [Lombok]
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
-    // [Test]
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
-    testImplementation 'org.springframework.kafka:spring-kafka-test'
     testImplementation 'io.rest-assured:rest-assured:5.5.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+checkstyle {
+    toolVersion = '10.20.2'
+    configFile = file('config/checkstyle/checkstyle.xml')
+}
+
+tasks.withType(Checkstyle).configureEach {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('check') {
+    dependsOn 'checkstyleMain', 'checkstyleTest'
 }
 
 tasks.named('test') {
