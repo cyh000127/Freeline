@@ -1,0 +1,13 @@
+services:
+  network-holder:
+    image: alpine:latest
+    container_name: network-holder
+    command: sleep infinity
+    restart: always
+    networks:
+      - infra-public
+
+networks:
+  infra-public:
+    name: infra-public
+    driver: bridge
