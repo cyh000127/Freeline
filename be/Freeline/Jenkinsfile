@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = "freeline-backend"
+        DOCKER_PORT = "8080"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Test & Build (with Testcontainers)') {
+            steps {
+                echo 'Running Tests with Testcontainers (Docker must be accessible to Jenkins)'
+                sh 'chmod +x ./gradlew'
+                // Execution of tests and generation of the build
+                sh './gradlew clean build'
+            }
+        }
+        
+        stage('Docker Build Image') {
+            steps {
+                echo 'Building Docker container...'
+                sh 'docker build -t ${IMAGE_NAME}:${BUILD_ID} -t ${IMAGE_NAME}:latest .'
+            }
+        }
+        
+        stage('Deploy (Docker Run)') {
+            steps {
+                echo 'Deploying to EC2 via Docker...'
+                sh '''
+                docker rm -f ${IMAGE_NAME} || true
+                docker run -d \\
+                  --name ${IMAGE_NAME} \\
+                  -p ${DOCKER_PORT}:8080 \\
+                  -e SPRING_PROFILES_ACTIVE=live \\
+                  ${IMAGE_NAME}:latest
+                '''
+            }
+        }
+    }
+    
+    post {
+        always {
+            sh 'docker image prune -a -f --filter "until=24h" || true'
+        }
+    }
+}
