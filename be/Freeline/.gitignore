@@ -1,0 +1,77 @@
+# [기본 빌드 결과물]
+HELP.md
+.gradle/
+build/
+bin/
+out/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# [보안 및 환경 변수] - 절대 커밋 금지
+.env
+.env.*
+*.env.*
+application-local.yml
+application-live.yml
+application-local.properties
+
+# [도커 및 인프라 데이터] - 로컬 데이터 유출 방지
+postgres_data/
+redis_data/
+kafka_data/
+zookeeper_data/
+docker-compose.test.yml
+.docker/
+
+# [IntelliJ IDEA]
+.idea/
+*.iws
+*.iml
+*.ipr
+.shelf/
+gen/
+
+# [VS Code]
+.vscode/
+*.code-workspace
+.history/
+
+# [Eclipse / STS / NetBeans]
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# [OS / 시스템 파일]
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# [기타 프로젝트 도구]
+node_modules/
+.npm/
+dist/
+tmp/
+temp/
+*.log
+*.temp
+be/docs/
+/tree.txt

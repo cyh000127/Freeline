@@ -577,3 +577,5 @@ $RECYCLE.BIN/
 
 .env
 .env.*
+be/docs/
+/tree.txt
