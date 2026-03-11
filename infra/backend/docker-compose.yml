@@ -1,0 +1,55 @@
+services:
+  freeline-db:
+    image: postgres:18.3
+    container_name: freeline-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-freeline}
+      POSTGRES_USER: ${DB_USERNAME:-freeline}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-freeline}
+    volumes:
+      - freeline-db-data:/var/lib/postgresql/data
+    networks:
+      - infra-public
+
+  freeline-redis:
+    image: redis:8.6-alpine
+    container_name: freeline-redis
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD:-0000}
+    volumes:
+      - freeline-redis-data:/data
+    networks:
+      - infra-public
+
+  freeline-backend:
+    image: freeline-backend:latest
+    container_name: freeline-backend
+    restart: always
+    depends_on:
+      - freeline-db
+      - freeline-redis
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: live
+      DB_HOST: freeline-db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-freeline}
+      DB_USERNAME: ${DB_USERNAME:-freeline}
+      DB_PASSWORD: ${DB_PASSWORD:-freeline}
+      REDIS_HOST: freeline-redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-0000}
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_SECRET_KEY: ${ENCRYPTION_SECRET_KEY}
+    networks:
+      - infra-public
+
+volumes:
+  freeline-db-data:
+  freeline-redis-data:
+
+networks:
+  infra-public:
+    external: true
