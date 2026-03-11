@@ -1,7 +1,12 @@
 <!-- 
-    🚨 **잠깐! 머지 타겟 브랜치를 확인하셨나요?** 🚨
-    ❌ `main` (절대 금지)
-    ⭕️ `develop-be` 또는 `develop-fe` (변경 필수) 
+MR 제목 형식
+[Type] 제목
+
+Type: Feat | Fix | Hotfix | Refactor | Chore | Docs | Build
+
+예)
+[Feat] 사용자 입장 확인 및 SSE 알림 기능 구현
+[Fix] 로그인 토큰 만료 시 리다이렉트 오류 수정
 -->
 
 ## 관련 이슈
