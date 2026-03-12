@@ -33,9 +33,11 @@ public enum ErrorCode {
     /**
      * Event Error (E-xxx)
      */
-    INVALID_EVENT_PERIOD(HttpStatus.BAD_REQUEST, "E-001", "행사 종료일은 시작일보다 빠를 수 없습니다."),
+    INVALID_EVENT_PERIOD(HttpStatus.BAD_REQUEST, "E-001", "행사 종료일이 시작일보다 빠를 수 없습니다."),
     EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "E-002", "존재하지 않는 행사입니다."),
     EVENT_MAP_NOT_FOUND(HttpStatus.NOT_FOUND, "E-003", "존재하지 않는 행사 지도입니다."),
+    MAP_IMAGE_REQUIRED_FOR_OPEN(HttpStatus.BAD_REQUEST, "E-004", "지도 이미지 등록 전에는 OPEN 상태로 변경할 수 없습니다."),
+    CANNOT_DELETE_OPEN_EVENT(HttpStatus.CONFLICT, "E-005", "진행 중(OPEN)인 행사는 바로 삭제할 수 없습니다. 종료 처리 후 삭제해 주세요."),
 
     /**
      * Booth Error (B-xxx)
