@@ -57,6 +57,8 @@ public class BoothService {
     private final BoothWaitingRepository boothWaitingRepository;
     private final EventRepository eventRepository;
 
+    // TODO: 부스 정책 조회/설정 전용 서비스 메서드를 분리하고 BoothPolicyRepository를 직접 사용하는 흐름을 API로 노출한다.
+
     public BoothCreateResDto createBooth(final Long eventId, final BoothCreateReqDto request) {
         validateEventExists(eventId);
         validateOperatingHours(request.openTime(), request.closeTime());

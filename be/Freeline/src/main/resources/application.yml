@@ -40,6 +40,11 @@ cloudflare:
   secret-key: ${CLOUDFLARE_SECRET_KEY:}
   outer-prefix: ${CLOUDFLARE_OUTER_PREFIX:https://pub-2cb3d8449bed4f6bba7e7173f1ce3c8c.r2.dev/}
 
+qr:
+  booth-active-ttl-days: 30
+  reissue-cooldown-seconds: 30
+  scan-lock-seconds: 5
+
 app:
   database:
     reset-on-startup: false

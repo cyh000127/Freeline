@@ -70,6 +70,17 @@ public enum ErrorCode {
      * Goods Error (G-xxx)
      */
     GOODS_NOT_FOUND(HttpStatus.NOT_FOUND, "G-001", "존재하지 않는 굿즈입니다."),
+
+    /**
+     * QR Error (Q-xxx)
+     */
+    QR_NOT_FOUND(HttpStatus.NOT_FOUND, "Q-001", "유효한 QR 정보를 찾을 수 없습니다."),
+    QR_INVALID_PAYLOAD(HttpStatus.BAD_REQUEST, "Q-002", "QR payload 형식이 올바르지 않습니다."),
+    QR_EXPIRED(HttpStatus.BAD_REQUEST, "Q-003", "QR 유효 시간이 만료되었습니다."),
+    QR_SCAN_IN_PROGRESS(HttpStatus.CONFLICT, "Q-004", "동일 사용자에 대한 QR 처리 중입니다."),
+    QR_REISSUE_COOLDOWN(HttpStatus.CONFLICT, "Q-005", "QR 재발급은 잠시 후 다시 시도할 수 있습니다."),
+    QR_WAITING_NOT_CALLED(HttpStatus.BAD_REQUEST, "Q-006", "호출 상태의 대기를 찾을 수 없습니다."),
+    QR_WAITING_EXPIRED(HttpStatus.BAD_REQUEST, "Q-007", "호출 유효 시간이 만료되었습니다."),
     ;
 
     private final HttpStatus httpStatus;

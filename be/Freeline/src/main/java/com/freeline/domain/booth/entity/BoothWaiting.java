@@ -57,6 +57,12 @@ public class BoothWaiting extends BaseEntity {
     @Column(name = "called_at")
     private LocalDateTime calledAt;
 
+    @Column(name = "call_expires_at")
+    private LocalDateTime callExpiresAt;
+
+    @Column(name = "registered_at")
+    private LocalDateTime registeredAt;
+
     @Column(name = "entered_at")
     private LocalDateTime enteredAt;
 
@@ -73,6 +79,14 @@ public class BoothWaiting extends BaseEntity {
 
     public void updateCalledAt(final LocalDateTime calledAt) {
         this.calledAt = calledAt;
+    }
+
+    public void updateCallExpiresAt(final LocalDateTime callExpiresAt) {
+        this.callExpiresAt = callExpiresAt;
+    }
+
+    public void updateRegisteredAt(final LocalDateTime registeredAt) {
+        this.registeredAt = registeredAt;
     }
 
     public void updateEnteredAt(final LocalDateTime enteredAt) {

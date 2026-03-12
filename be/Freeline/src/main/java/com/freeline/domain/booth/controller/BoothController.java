@@ -39,6 +39,9 @@ public class BoothController {
 
     private final BoothService boothService;
 
+    // TODO: 부스 정책 조회 API (`GET /api/v1/booths/{boothId}/policy`)를 추가한다.
+    // TODO: 부스 정책 설정 API (`PATCH /api/v1/booths/{boothId}/policy`)를 추가한다.
+
     @Operation(summary = "부스 등록", description = "특정 행사에 새로운 부스를 등록합니다.")
     @PostMapping("/events/{eventId}")
     public ResponseEntity<BaseResponse<BoothCreateResDto>> createBooth(
