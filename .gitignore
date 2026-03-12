@@ -580,3 +580,5 @@ $RECYCLE.BIN/
 be/Freeline/docs/
 /tree.txt
 docker-compose-local.yml
+fe/sample_app/package-lock.json
+fe/package-lock.json
