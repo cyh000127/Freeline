@@ -19,16 +19,21 @@ import com.freeline.common.error.ErrorCode;
 import com.freeline.domain.boothmap.entity.EventMap;
 import com.freeline.domain.boothmap.repository.EventMapRepository;
 import com.freeline.domain.event.converter.EventConverter;
+import com.freeline.domain.event.converter.EventPolicyConverter;
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
+import com.freeline.domain.event.dto.request.EventPolicyReqDto;
 import com.freeline.domain.event.dto.request.EventUpdateReqDto;
 import com.freeline.domain.event.dto.response.EventDeleteResDto;
 import com.freeline.domain.event.dto.response.EventDetailResDto;
 import com.freeline.domain.event.dto.response.EventListResDto;
+import com.freeline.domain.event.dto.response.EventPolicyResDto;
 import com.freeline.domain.event.dto.response.EventResDto;
 import com.freeline.domain.event.dto.response.EventUpdateResDto;
 import com.freeline.domain.event.entity.Event;
+import com.freeline.domain.event.entity.EventPolicy;
 import com.freeline.domain.event.entity.EventStatus;
 import com.freeline.domain.event.exception.EventException;
+import com.freeline.domain.event.repository.EventPolicyRepository;
 import com.freeline.domain.event.repository.EventRepository;
 
 @Slf4j
@@ -39,6 +44,7 @@ public class EventService {
 
     private final EventRepository eventRepository;
     private final EventMapRepository eventMapRepository;
+    private final EventPolicyRepository eventPolicyRepository;
 
     public EventResDto createEvent(final Long eventAdminId, final EventCreateReqDto request) {
         validateEventPeriod(request.startDate(), request.endDate());
@@ -129,6 +135,40 @@ public class EventService {
                 saved.getStatus());
 
         return EventConverter.toEventUpdateResDto(saved);
+    }
+
+    public EventPolicyResDto upsertEventPolicy(
+            final Long eventAdminId,
+            final Long eventId,
+            final EventPolicyReqDto request
+    ) {
+        final Event event = getAuthorizedEvent(eventAdminId, eventId);
+
+        final EventPolicy eventPolicy = eventPolicyRepository.findByEvent_Id(eventId)
+                .map(existingPolicy -> {
+                    existingPolicy.updatePolicy(
+                            request.defaultStaySec(),
+                            request.defaultMaxWaiting(),
+                            request.defaultCallCount(),
+                            request.defaultCallTtl(),
+                            request.defaultDeferLimit()
+                    );
+                    return existingPolicy;
+                })
+                .orElseGet(() -> {
+                    final EventPolicy newPolicy = EventPolicyConverter.toEntity(event, request);
+                    event.assignPolicy(newPolicy);
+                    return newPolicy;
+                });
+
+        final EventPolicy saved = eventPolicyRepository.saveAndFlush(eventPolicy);
+
+        log.info("[EventPolicy] upsert completed {policyId: {}, eventId: {}, adminId: {}}",
+                saved.getId(),
+                eventId,
+                eventAdminId);
+
+        return EventPolicyConverter.toEventPolicyResDto(saved);
     }
 
     public EventDeleteResDto deleteEvent(

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,10 +22,12 @@ import com.freeline.common.response.BaseResponse;
 import com.freeline.common.response.PageResponse;
 import com.freeline.common.util.ResponseUtils;
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
+import com.freeline.domain.event.dto.request.EventPolicyReqDto;
 import com.freeline.domain.event.dto.request.EventUpdateReqDto;
 import com.freeline.domain.event.dto.response.EventDeleteResDto;
 import com.freeline.domain.event.dto.response.EventDetailResDto;
 import com.freeline.domain.event.dto.response.EventListResDto;
+import com.freeline.domain.event.dto.response.EventPolicyResDto;
 import com.freeline.domain.event.dto.response.EventResDto;
 import com.freeline.domain.event.dto.response.EventUpdateResDto;
 import com.freeline.domain.event.service.EventService;
@@ -82,6 +85,17 @@ public class EventController {
             @RequestBody final EventUpdateReqDto request
     ) {
         final EventUpdateResDto response = eventService.updateEvent(eventAdminId, eventId, validateOnly, request);
+        return ResponseUtils.ok(response);
+    }
+
+    @Operation(summary = "행사 운영 정책 설정 및 수정", description = "행사의 대기열 운영 기본 정책을 생성하거나 수정합니다.")
+    @PutMapping("/{eventId}/policies")
+    public ResponseEntity<BaseResponse<EventPolicyResDto>> upsertEventPolicy(
+            @RequestHeader("X-Event-Admin-Id") final Long eventAdminId,
+            @PathVariable final Long eventId,
+            @Valid @RequestBody final EventPolicyReqDto request
+    ) {
+        final EventPolicyResDto response = eventService.upsertEventPolicy(eventAdminId, eventId, request);
         return ResponseUtils.ok(response);
     }
 
