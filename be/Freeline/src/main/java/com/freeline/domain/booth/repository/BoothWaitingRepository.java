@@ -25,6 +25,12 @@ public interface BoothWaitingRepository extends JpaRepository<BoothWaiting, Long
             final WaitingStatus status
     );
 
+    Optional<BoothWaiting> findFirstByBoothIdAndVisitorIdAndStatusOrderByCalledAtDesc(
+            final Long boothId,
+            final Long visitorId,
+            final WaitingStatus status
+    );
+
     boolean existsByVisitorIdAndBoothIdNotAndStatusIn(
             final Long visitorId,
             final Long boothId,

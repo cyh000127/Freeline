@@ -9,6 +9,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.freeline.common.error.ErrorCode;
+import com.freeline.common.file.dto.FileInfo;
+import com.freeline.common.file.service.FileService;
+import com.freeline.common.file.util.CloudflareStorageUtil;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothGoods;
 import com.freeline.domain.booth.exception.BoothException;
@@ -28,13 +31,18 @@ import com.freeline.domain.goods.repository.GoodsRepository;
 @RequiredArgsConstructor
 public class GoodsService {
 
+    private static final String GOODS_DIRECTORY = "goods";
+
     private final BoothRepository boothRepository;
     private final GoodsRepository goodsRepository;
+    private final FileService fileService;
+    private final CloudflareStorageUtil cloudflareStorageUtil;
 
     public GoodsCreateResDto createGoods(final Long boothId, final GoodsCreateReqDto request) {
         getBoothEntity(boothId);
 
-        final BoothGoods goods = GoodsConverter.toEntity(boothId, request);
+        final FileInfo uploadedFile = fileService.uploadFile(request.imageFile(), GOODS_DIRECTORY);
+        final BoothGoods goods = GoodsConverter.toEntity(boothId, request.name(), uploadedFile.fileUrl());
         final BoothGoods saved = goodsRepository.save(goods);
 
         log.info("[Goods] 생성 완료 {id: {}, boothId: {}}", saved.getId(), saved.getBoothId());
@@ -63,6 +71,7 @@ public class GoodsService {
 
     public void deleteGoods(final Long goodsId) {
         final BoothGoods goods = getGoodsEntity(goodsId);
+        cloudflareStorageUtil.deleteFile(goods.getImagePath());
         goodsRepository.delete(goods);
 
         log.info("[Goods] 삭제 완료 {id: {}, boothId: {}}", goods.getId(), goods.getBoothId());
