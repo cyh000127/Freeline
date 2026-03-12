@@ -11,7 +11,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
+import com.freeline.common.file.dto.FileInfo;
+import com.freeline.common.file.service.FileService;
+import com.freeline.common.file.util.CloudflareStorageUtil;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothGoods;
 import com.freeline.domain.booth.exception.BoothException;
@@ -33,6 +37,12 @@ class GoodsServiceTest {
     @Mock
     private GoodsRepository goodsRepository;
 
+    @Mock
+    private FileService fileService;
+
+    @Mock
+    private CloudflareStorageUtil cloudflareStorageUtil;
+
     @InjectMocks
     private GoodsService goodsService;
 
@@ -50,23 +60,40 @@ class GoodsServiceTest {
                 .id(101L)
                 .boothId(12L)
                 .name("한정판 키링")
-                .imagePath("https://cdn.freeline.com/goods/keyring.png")
+                .imagePath("https://pub-2cb3d8449bed4f6bba7e7173f1ce3c8c.r2.dev/goods/test-image.png")
                 .soldOut(false)
                 .build();
 
+        final MockMultipartFile imageFile = new MockMultipartFile(
+                "imageFile",
+                "keyring.png",
+                "image/png",
+                "goods-image".getBytes()
+        );
+
+        final FileInfo fileInfo = FileInfo.builder()
+                .originalFilename("keyring.png")
+                .fileUrl("https://pub-2cb3d8449bed4f6bba7e7173f1ce3c8c.r2.dev/goods/test-image.png")
+                .objectKey("goods/test-image.png")
+                .fileSize(11L)
+                .contentType("image/png")
+                .build();
+
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(fileService.uploadFile(imageFile, "goods")).thenReturn(fileInfo);
         Mockito.when(goodsRepository.save(ArgumentMatchers.any(BoothGoods.class))).thenReturn(savedGoods);
 
         final GoodsCreateResDto result = goodsService.createGoods(
                 12L,
                 GoodsCreateReqDto.builder()
                         .name("한정판 키링")
-                        .imageUrl("https://cdn.freeline.com/goods/keyring.png")
+                        .imageFile(imageFile)
                         .build()
         );
 
         Assertions.assertThat(result.goodsId()).isEqualTo(101L);
         Assertions.assertThat(result.boothId()).isEqualTo(12L);
+        Assertions.assertThat(result.imageUrl()).isEqualTo("https://pub-2cb3d8449bed4f6bba7e7173f1ce3c8c.r2.dev/goods/test-image.png");
         Mockito.verify(goodsRepository).save(ArgumentMatchers.any(BoothGoods.class));
     }
 
@@ -84,7 +111,7 @@ class GoodsServiceTest {
                 .id(101L)
                 .boothId(12L)
                 .name("한정판 키링")
-                .imagePath("https://cdn.freeline.com/goods/keyring.png")
+                .imagePath("https://pub-2cb3d8449bed4f6bba7e7173f1ce3c8c.r2.dev/goods/test-image.png")
                 .soldOut(false)
                 .build();
 
@@ -95,6 +122,7 @@ class GoodsServiceTest {
 
         Assertions.assertThat(result).hasSize(1);
         Assertions.assertThat(result.get(0).goodsId()).isEqualTo(101L);
+        Assertions.assertThat(result.get(0).imageUrl()).isEqualTo("https://pub-2cb3d8449bed4f6bba7e7173f1ce3c8c.r2.dev/goods/test-image.png");
     }
 
     @Test
@@ -103,7 +131,7 @@ class GoodsServiceTest {
                 .id(101L)
                 .boothId(12L)
                 .name("한정판 키링")
-                .imagePath("https://cdn.freeline.com/goods/keyring.png")
+                .imagePath("https://pub-2cb3d8449bed4f6bba7e7173f1ce3c8c.r2.dev/goods/test-image.png")
                 .soldOut(false)
                 .build();
 
@@ -126,7 +154,7 @@ class GoodsServiceTest {
                 .id(101L)
                 .boothId(12L)
                 .name("한정판 키링")
-                .imagePath("https://cdn.freeline.com/goods/keyring.png")
+                .imagePath("https://pub-2cb3d8449bed4f6bba7e7173f1ce3c8c.r2.dev/goods/test-image.png")
                 .soldOut(false)
                 .build();
 
@@ -134,20 +162,28 @@ class GoodsServiceTest {
 
         goodsService.deleteGoods(101L);
 
+        Mockito.verify(cloudflareStorageUtil).deleteFile("https://pub-2cb3d8449bed4f6bba7e7173f1ce3c8c.r2.dev/goods/test-image.png");
         Mockito.verify(goodsRepository).delete(goods);
     }
 
     @Test
     void 굿즈_생성_실패_부스_없음() {
+        final MockMultipartFile imageFile = new MockMultipartFile(
+                "imageFile",
+                "keyring.png",
+                "image/png",
+                "goods-image".getBytes()
+        );
+
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.empty());
 
         Assertions.assertThatThrownBy(() -> goodsService.createGoods(
-                        12L,
-                        GoodsCreateReqDto.builder()
-                                .name("한정판 키링")
-                                .imageUrl("https://cdn.freeline.com/goods/keyring.png")
-                                .build()
-                )).isInstanceOf(BoothException.class)
+                12L,
+                GoodsCreateReqDto.builder()
+                        .name("한정판 키링")
+                        .imageFile(imageFile)
+                        .build()
+        )).isInstanceOf(BoothException.class)
                 .hasMessage("존재하지 않는 부스입니다.");
     }
 
@@ -156,11 +192,11 @@ class GoodsServiceTest {
         Mockito.when(goodsRepository.findById(101L)).thenReturn(Optional.empty());
 
         Assertions.assertThatThrownBy(() -> goodsService.updateGoodsStatus(
-                        101L,
-                        GoodsStatusUpdateReqDto.builder()
-                                .isSoldOut(true)
-                                .build()
-                )).isInstanceOf(GoodsException.class)
+                101L,
+                GoodsStatusUpdateReqDto.builder()
+                        .isSoldOut(true)
+                        .build()
+        )).isInstanceOf(GoodsException.class)
                 .hasMessage("존재하지 않는 굿즈입니다.");
     }
 }

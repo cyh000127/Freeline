@@ -1,0 +1,6 @@
+cloudflare:
+  endpoint: https://test-account.r2.cloudflarestorage.com
+  bucket: test-bucket
+  access-key: test-access-key
+  secret-key: test-secret-key
+  outer-prefix: https://pub-test.r2.dev/

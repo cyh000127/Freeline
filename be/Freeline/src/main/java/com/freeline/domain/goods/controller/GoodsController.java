@@ -4,9 +4,11 @@ import java.util.List;
 
 import jakarta.validation.Valid;
 
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,10 +39,10 @@ public class GoodsController {
     private final GoodsService goodsService;
 
     @Operation(summary = "굿즈 생성", description = "특정 부스에 새로운 굿즈를 등록합니다.")
-    @PostMapping("/booths/{boothId}")
+    @PostMapping(value = "/booths/{boothId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BaseResponse<GoodsCreateResDto>> createGoods(
             @PathVariable final Long boothId,
-            @Valid @RequestBody final GoodsCreateReqDto request
+            @Valid @ModelAttribute final GoodsCreateReqDto request
     ) {
         final GoodsCreateResDto response = goodsService.createGoods(boothId, request);
         return ResponseUtils.created(response);

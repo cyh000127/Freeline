@@ -57,6 +57,16 @@ public enum ErrorCode {
     BOOTH_EVENT_MISMATCH(HttpStatus.BAD_REQUEST, "B-004", "부스와 행사의 소속 정보가 일치하지 않습니다."),
 
     /**
+     * File Error (F-xxx)
+     */
+    FILE_EMPTY(HttpStatus.BAD_REQUEST, "F-001", "빈 파일은 업로드할 수 없습니다."),
+    FILE_TYPE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "F-002", "허용되지 않는 파일 형식입니다."),
+    FILE_NAME_INVALID(HttpStatus.BAD_REQUEST, "F-003", "유효하지 않은 파일명입니다."),
+    FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F-004", "파일 업로드에 실패했습니다."),
+    FILE_DOWNLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F-005", "파일 조회에 실패했습니다."),
+    FILE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F-006", "파일 삭제에 실패했습니다."),
+
+    /**
      * Goods Error (G-xxx)
      */
     GOODS_NOT_FOUND(HttpStatus.NOT_FOUND, "G-001", "존재하지 않는 굿즈입니다."),

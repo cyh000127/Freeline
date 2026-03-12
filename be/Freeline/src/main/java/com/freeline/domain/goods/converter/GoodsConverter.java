@@ -3,7 +3,6 @@ package com.freeline.domain.goods.converter;
 import lombok.experimental.UtilityClass;
 
 import com.freeline.domain.booth.entity.BoothGoods;
-import com.freeline.domain.goods.dto.request.GoodsCreateReqDto;
 import com.freeline.domain.goods.dto.response.GoodsCreateResDto;
 import com.freeline.domain.goods.dto.response.GoodsListResDto;
 import com.freeline.domain.goods.dto.response.GoodsStatusResDto;
@@ -11,11 +10,11 @@ import com.freeline.domain.goods.dto.response.GoodsStatusResDto;
 @UtilityClass
 public class GoodsConverter {
 
-    public BoothGoods toEntity(final Long boothId, final GoodsCreateReqDto dto) {
+    public BoothGoods toEntity(final Long boothId, final String name, final String imageUrl) {
         return BoothGoods.builder()
                 .boothId(boothId)
-                .name(dto.name())
-                .imagePath(dto.imageUrl())
+                .name(name)
+                .imagePath(imageUrl)
                 .soldOut(false)
                 .build();
     }
