@@ -19,7 +19,7 @@ public enum ErrorCode {
 	INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C-004", "서버 오류가 발생했습니다."),
 	JSON_PARSING_ERROR(HttpStatus.BAD_REQUEST, "C-005", "JSON 파싱 중 오류가 발생했습니다."),
 	TEMPLATE_LOADING_FAILED(HttpStatus.NOT_FOUND, "C-006", "템플릿 로딩에 실패했습니다."),
-	ACCESS_DENIED(HttpStatus.FORBIDDEN, "C-007", "요청한 리소스에 접근할 수 없습니다."),
+	ACCESS_DENIED(HttpStatus.FORBIDDEN, "C-007", "요청한 리소스에 접근할 권한이 없습니다."),
 	METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "C-008", "지원하지 않는 HTTP 메서드입니다."),
 	UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "C-009", "지원하지 않는 미디어 타입입니다."),
 	DATA_INTEGRITY_VIOLATION(HttpStatus.CONFLICT, "C-010", "데이터 무결성 위반입니다."),
@@ -33,7 +33,8 @@ public enum ErrorCode {
 	/**
 	 * Event Error (E-xxx)
 	 */
-	INVALID_EVENT_PERIOD(HttpStatus.BAD_REQUEST, "E-001", "행사 종료일은 시작일보다 빠를 수 없습니다."),
+	INVALID_EVENT_PERIOD(HttpStatus.BAD_REQUEST, "E-001", "행사 종료일이 시작일보다 빠를 수 없습니다."),
+	EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "E-002", "해당 행사를 찾을 수 없습니다."),
 	;
 
 	private final HttpStatus httpStatus;
