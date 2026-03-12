@@ -14,4 +14,3 @@ public enum FrontDomain {
 	private final String url;
 	private final String description;
 }
-

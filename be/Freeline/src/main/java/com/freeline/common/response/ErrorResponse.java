@@ -3,15 +3,15 @@ package com.freeline.common.response;
 import java.util.ArrayList;
 import java.util.List;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 
-import com.freeline.common.error.ErrorCode;
-
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.Builder;
 
+import com.freeline.common.error.ErrorCode;
 @Builder
 public record ErrorResponse(
 	HttpStatus status,

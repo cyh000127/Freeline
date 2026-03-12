@@ -4,11 +4,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import com.freeline.common.response.BaseResponse;
-import com.freeline.common.response.PageResponse;
-
 import lombok.experimental.UtilityClass;
 
+import com.freeline.common.response.BaseResponse;
+import com.freeline.common.response.PageResponse;
 @UtilityClass
 public class ResponseUtils {
 	public <T> ResponseEntity<BaseResponse<T>> ok(T data) {

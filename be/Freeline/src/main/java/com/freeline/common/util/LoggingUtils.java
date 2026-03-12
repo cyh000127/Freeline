@@ -2,10 +2,11 @@ package com.freeline.common.util;
 
 import java.util.stream.Collectors;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
@@ -14,14 +15,14 @@ import lombok.extern.slf4j.Slf4j;
 public class LoggingUtils {
 
 	/**
-	 * 일반 예외를 로깅합니다. Logback의 exception/stacktrace 필드를 활용합니다.
+	 * 일반 예외를 로깅합니다. Logback의 exception/stacktrace 필드를 사용합니다.
 	 *
 	 * @param prefix  로그 메시지 앞에 붙일 식별자
 	 * @param ex      발생한 예외
 	 * @param request 요청 정보
 	 */
 	public void logException(final String prefix, final Exception ex, final HttpServletRequest request) {
-		log.error("{}: {} | 예외 발생 지점 [{} {}]",
+		log.error("{}: {} | 예외 발생 지점[{} {}]",
 			prefix,
 			ex.getMessage(),
 			request.getMethod(),
@@ -36,11 +37,11 @@ public class LoggingUtils {
 	 * @param request 요청 정보
 	 */
 	public void logValidationException(final MethodArgumentNotValidException ex, final HttpServletRequest request) {
-		String errorFields = ex.getBindingResult().getFieldErrors().stream()
+		final String errorFields = ex.getBindingResult().getFieldErrors().stream()
 			.map(LoggingUtils::formatFieldError)
 			.collect(Collectors.joining(", "));
 
-		log.error("유효성 검사 실패 | 예외 발생 지점 [{} {}] | 실패 필드: {}",
+		log.error("유효성 검사 실패 | 예외 발생 지점[{} {}] | 실패 필드: {}",
 			request.getMethod(),
 			request.getRequestURI(),
 			errorFields,

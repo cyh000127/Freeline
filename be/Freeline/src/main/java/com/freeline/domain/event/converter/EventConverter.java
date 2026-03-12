@@ -1,13 +1,15 @@
 package com.freeline.domain.event.converter;
 
+import java.util.List;
+
+import lombok.experimental.UtilityClass;
+
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
+import com.freeline.domain.event.dto.response.EventDetailResDto;
 import com.freeline.domain.event.dto.response.EventListResDto;
 import com.freeline.domain.event.dto.response.EventResDto;
 import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.entity.EventStatus;
-
-import lombok.experimental.UtilityClass;
-
 @UtilityClass
 public class EventConverter {
 
@@ -47,6 +49,30 @@ public class EventConverter {
 			.status(event.getStatus().name())
 			.thumbnailImageUrl(event.getThumbnailImageUrl())
 			.createdAt(event.getCreatedAt())
+			.build();
+	}
+
+	public EventDetailResDto toEventDetailResDto(
+		final Event event,
+		final List<EventDetailResDto.BoothSummaryDto> booths
+	) {
+		return EventDetailResDto.builder()
+			.eventId(event.getId())
+			.eventAdminId(event.getEventAdminId())
+			.name(event.getName())
+			.description(event.getDescription())
+			.authCode(null)
+			.startDate(event.getStartDate())
+			.endDate(event.getEndDate())
+			.openTime(event.getOpenTime())
+			.closeTime(event.getCloseTime())
+			.locationAddress(event.getLocationAddress())
+			.thumbnailImageUrl(event.getThumbnailImageUrl())
+			.mapImageUrl(null)
+			.status(event.getStatus().name())
+			.createdAt(event.getCreatedAt())
+			.updatedAt(event.getUpdatedAt())
+			.booths(booths)
 			.build();
 	}
 }

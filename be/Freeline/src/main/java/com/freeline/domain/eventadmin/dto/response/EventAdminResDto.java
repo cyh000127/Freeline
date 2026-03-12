@@ -2,10 +2,11 @@ package com.freeline.domain.eventadmin.dto.response;
 
 import java.time.LocalDateTime;
 
+import lombok.Builder;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Builder;
 
 @Builder
 public record EventAdminResDto(
@@ -22,5 +23,5 @@ public record EventAdminResDto(
 	@Schema(description = "생성 시각")
 	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Seoul")
 	LocalDateTime createdAt
-) {}
-
+) {
+}

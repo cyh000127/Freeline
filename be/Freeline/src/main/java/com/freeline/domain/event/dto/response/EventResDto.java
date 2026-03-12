@@ -2,10 +2,11 @@ package com.freeline.domain.event.dto.response;
 
 import java.time.LocalDateTime;
 
+import lombok.Builder;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Builder;
 
 @Builder
 public record EventResDto(

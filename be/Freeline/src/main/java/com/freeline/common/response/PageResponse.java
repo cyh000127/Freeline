@@ -5,7 +5,6 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 
 import lombok.Builder;
-
 @Builder
 public record PageResponse<T>(
 	List<T> content,

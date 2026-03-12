@@ -1,8 +1,11 @@
 package com.freeline.domain.event.controller;
 
+import jakarta.validation.Valid;
+
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -10,18 +13,19 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import lombok.RequiredArgsConstructor;
+
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.response.PageResponse;
 import com.freeline.common.util.ResponseUtils;
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
+import com.freeline.domain.event.dto.response.EventDetailResDto;
 import com.freeline.domain.event.dto.response.EventListResDto;
 import com.freeline.domain.event.dto.response.EventResDto;
 import com.freeline.domain.event.service.EventService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 
 @Tag(name = "Event", description = "행사 관리 API")
 @RestController
@@ -51,5 +55,16 @@ public class EventController {
 	) {
 		final Page<EventListResDto> response = eventService.getEvents(eventAdminId, status, page, size);
 		return ResponseUtils.page(response);
+	}
+
+	@Operation(summary = "행사 상세 조회", description = "주최자가 본인이 관리하는 행사 상세 정보를 조회합니다.")
+	@GetMapping("/{eventId}")
+	public ResponseEntity<BaseResponse<EventDetailResDto>> getEventDetail(
+		@RequestHeader("X-Event-Admin-Id") final Long eventAdminId,
+		@PathVariable final Long eventId,
+		@RequestParam(required = false, defaultValue = "false") final Boolean includeBooths
+	) {
+		final EventDetailResDto response = eventService.getEventDetail(eventAdminId, eventId, includeBooths);
+		return ResponseUtils.ok(response);
 	}
 }

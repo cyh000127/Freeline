@@ -10,7 +10,6 @@ import org.springframework.web.filter.CorsFilter;
 
 import com.freeline.common.constant.BackDomain;
 import com.freeline.common.constant.FrontDomain;
-
 @Configuration
 public class CorsConfig {
     private static final List<String> ALLOWED_ORIGINS = List.of(
