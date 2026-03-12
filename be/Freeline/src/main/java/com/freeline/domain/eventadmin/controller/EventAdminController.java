@@ -25,14 +25,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequiredArgsConstructor
 public class EventAdminController {
 
-	private final EventAdminService eventAdminService;
+    private final EventAdminService eventAdminService;
 
-	@Operation(summary = "행사 주최자 회원가입", description = "시스템 총관리자가 행사 주최자 계정을 신규로 등록합니다.")
-	@PostMapping
-	public ResponseEntity<BaseResponse<EventAdminResDto>> createEventAdmin(
-		@Valid @RequestBody final EventAdminCreateReqDto request
-	) {
-		final EventAdminResDto response = eventAdminService.createEventAdmin(request);
-		return ResponseUtils.created(response);
-	}
+    @Operation(summary = "행사 주최자 회원가입", description = "시스템 총관리자가 행사 주최자 계정을 신규로 등록합니다.")
+    @PostMapping
+    public ResponseEntity<BaseResponse<EventAdminResDto>> createEventAdmin(
+            @Valid @RequestBody final EventAdminCreateReqDto request
+    ) {
+        EventAdminResDto response = eventAdminService.createEventAdmin(request);
+        return ResponseUtils.created(response);
+    }
 }

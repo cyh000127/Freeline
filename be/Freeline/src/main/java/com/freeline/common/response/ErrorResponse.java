@@ -12,49 +12,50 @@ import org.springframework.validation.FieldError;
 import lombok.Builder;
 
 import com.freeline.common.error.ErrorCode;
+
 @Builder
 public record ErrorResponse(
-	HttpStatus status,
-	String message,
-	String method,
-	String requestUri,
-	List<FieldErrorDetail> errors
+        HttpStatus status,
+        String message,
+        String method,
+        String requestUri,
+        List<FieldErrorDetail> errors
 ) {
 
-	public static ErrorResponse of(ErrorCode errorCode, HttpServletRequest request) {
-		return ErrorResponse.builder()
-			.status(errorCode.getHttpStatus())
-			.message(errorCode.getMessage())
-			.method(request.getMethod())
-			.requestUri(request.getRequestURI())
-			.errors(new ArrayList<>())
-			.build();
-	}
+    public static ErrorResponse of(ErrorCode errorCode, HttpServletRequest request) {
+        return ErrorResponse.builder()
+                .status(errorCode.getHttpStatus())
+                .message(errorCode.getMessage())
+                .method(request.getMethod())
+                .requestUri(request.getRequestURI())
+                .errors(new ArrayList<>())
+                .build();
+    }
 
-	public static ErrorResponse of(HttpServletRequest request, ErrorCode errorCode, final String errorMessage) {
-		return ErrorResponse.builder()
-			.status(errorCode.getHttpStatus())
-			.message(errorMessage)
-			.method(request.getMethod())
-			.requestUri(request.getRequestURI())
-			.errors(new ArrayList<>())
-			.build();
-	}
+    public static ErrorResponse of(HttpServletRequest request, ErrorCode errorCode, final String errorMessage) {
+        return ErrorResponse.builder()
+                .status(errorCode.getHttpStatus())
+                .message(errorMessage)
+                .method(request.getMethod())
+                .requestUri(request.getRequestURI())
+                .errors(new ArrayList<>())
+                .build();
+    }
 
-	public void addValidationErrors(BindingResult bindingResult) {
-		bindingResult.getFieldErrors().forEach(this::addValidationError);
-	}
+    public void addValidationErrors(BindingResult bindingResult) {
+        bindingResult.getFieldErrors().forEach(this::addValidationError);
+    }
 
-	private void addValidationError(FieldError fieldError) {
-		this.errors.add(
-			FieldErrorDetail.builder()
-				.field(fieldError.getField())
-				.message(fieldError.getDefaultMessage())
-				.build()
-		);
-	}
+    private void addValidationError(FieldError fieldError) {
+        this.errors.add(
+                FieldErrorDetail.builder()
+                        .field(fieldError.getField())
+                        .message(fieldError.getDefaultMessage())
+                        .build()
+        );
+    }
 
-	@Builder
-	public record FieldErrorDetail(String field, String message) {
-	}
+    @Builder
+    public record FieldErrorDetail(String field, String message) {
+    }
 }

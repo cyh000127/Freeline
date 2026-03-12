@@ -8,9 +8,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 public enum BackDomain {
 
-	LOCAL("http://localhost:8080", "백엔드 로컬 서버");
-	// PROD("", "백엔드 운영 서버");
+    LOCAL("http://localhost:8080", "백엔드 로컬 도메인");
+    // PROD("", "백엔드 배포 도메인");
 
-	private final String url;
-	private final String description;
+    private final String url;
+    private final String description;
 }

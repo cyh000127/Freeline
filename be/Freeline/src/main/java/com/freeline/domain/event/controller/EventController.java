@@ -33,38 +33,38 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequiredArgsConstructor
 public class EventController {
 
-	private final EventService eventService;
+    private final EventService eventService;
 
-	@Operation(summary = "행사 생성", description = "주최자가 신규 행사를 생성합니다.")
-	@PostMapping
-	public ResponseEntity<BaseResponse<EventResDto>> createEvent(
-		@RequestHeader("X-Event-Admin-Id") final Long eventAdminId,
-		@Valid @RequestBody final EventCreateReqDto request
-	) {
-		final EventResDto response = eventService.createEvent(eventAdminId, request);
-		return ResponseUtils.created(response);
-	}
+    @Operation(summary = "행사 생성", description = "주최자가 신규 행사를 생성합니다.")
+    @PostMapping
+    public ResponseEntity<BaseResponse<EventResDto>> createEvent(
+            @RequestHeader("X-Event-Admin-Id") final Long eventAdminId,
+            @Valid @RequestBody final EventCreateReqDto request
+    ) {
+        final EventResDto response = eventService.createEvent(eventAdminId, request);
+        return ResponseUtils.created(response);
+    }
 
-	@Operation(summary = "전체 행사 목록 조회", description = "최신 생성일 기준으로 전체 행사 목록을 조회합니다.")
-	@GetMapping
-	public ResponseEntity<PageResponse<EventListResDto>> getEvents(
-		@RequestHeader("X-Event-Admin-Id") final Long eventAdminId,
-		@RequestParam(defaultValue = "ALL") final String status,
-		@RequestParam(defaultValue = "0") final int page,
-		@RequestParam(defaultValue = "10") final int size
-	) {
-		final Page<EventListResDto> response = eventService.getEvents(eventAdminId, status, page, size);
-		return ResponseUtils.page(response);
-	}
+    @Operation(summary = "전체 행사 목록 조회", description = "최신 생성일 기준으로 전체 행사 목록을 조회합니다.")
+    @GetMapping
+    public ResponseEntity<PageResponse<EventListResDto>> getEvents(
+            @RequestHeader("X-Event-Admin-Id") final Long eventAdminId,
+            @RequestParam(defaultValue = "ALL") final String status,
+            @RequestParam(defaultValue = "0") final int page,
+            @RequestParam(defaultValue = "10") final int size
+    ) {
+        final Page<EventListResDto> response = eventService.getEvents(eventAdminId, status, page, size);
+        return ResponseUtils.page(response);
+    }
 
-	@Operation(summary = "행사 상세 조회", description = "주최자가 본인이 관리하는 행사 상세 정보를 조회합니다.")
-	@GetMapping("/{eventId}")
-	public ResponseEntity<BaseResponse<EventDetailResDto>> getEventDetail(
-		@RequestHeader("X-Event-Admin-Id") final Long eventAdminId,
-		@PathVariable final Long eventId,
-		@RequestParam(required = false, defaultValue = "false") final Boolean includeBooths
-	) {
-		final EventDetailResDto response = eventService.getEventDetail(eventAdminId, eventId, includeBooths);
-		return ResponseUtils.ok(response);
-	}
+    @Operation(summary = "행사 상세 조회", description = "주최자가 본인이 관리하는 행사 상세 정보를 조회합니다.")
+    @GetMapping("/{eventId}")
+    public ResponseEntity<BaseResponse<EventDetailResDto>> getEventDetail(
+            @RequestHeader("X-Event-Admin-Id") final Long eventAdminId,
+            @PathVariable final Long eventId,
+            @RequestParam(required = false, defaultValue = "false") final Boolean includeBooths
+    ) {
+        final EventDetailResDto response = eventService.getEventDetail(eventAdminId, eventId, includeBooths);
+        return ResponseUtils.ok(response);
+    }
 }

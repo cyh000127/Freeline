@@ -8,21 +8,22 @@ import lombok.experimental.UtilityClass;
 
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.response.PageResponse;
+
 @UtilityClass
 public class ResponseUtils {
-	public <T> ResponseEntity<BaseResponse<T>> ok(T data) {
-		return ResponseEntity.ok(BaseResponse.ok(data));
-	}
+    public <T> ResponseEntity<BaseResponse<T>> ok(T data) {
+        return ResponseEntity.ok(BaseResponse.ok(data));
+    }
 
-	public <T> ResponseEntity<BaseResponse<T>> created(T data) {
-		return ResponseEntity.status(HttpStatus.CREATED).body(BaseResponse.created(data));
-	}
+    public <T> ResponseEntity<BaseResponse<T>> created(T data) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(BaseResponse.created(data));
+    }
 
-	public <T> ResponseEntity<BaseResponse<T>> noContent() {
-		return ResponseEntity.status(HttpStatus.NO_CONTENT).body(BaseResponse.noContent());
-	}
+    public <T> ResponseEntity<BaseResponse<T>> noContent() {
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).body(BaseResponse.noContent());
+    }
 
-	public <T> ResponseEntity<PageResponse<T>> page(Page<T> page) {
-		return ResponseEntity.ok(PageResponse.of(page));
-	}
+    public <T> ResponseEntity<PageResponse<T>> page(Page<T> page) {
+        return ResponseEntity.ok(PageResponse.of(page));
+    }
 }

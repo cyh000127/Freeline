@@ -11,6 +11,9 @@
         <!-- 와일드카드 import 금지 (예: import java.util.*;) -->
         <module name="AvoidStarImport"/>
 
+        <!-- static import 금지 -->
+        <module name="AvoidStaticImport"/>
+
         <!-- import 순서 강제 -->
         <!-- java -> javax -> jakarta -> org -> lombok -> com -->
         <module name="ImportOrder">

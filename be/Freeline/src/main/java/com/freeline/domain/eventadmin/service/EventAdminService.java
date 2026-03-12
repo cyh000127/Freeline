@@ -21,20 +21,20 @@ import com.freeline.domain.eventadmin.repository.EventAdminRepository;
 @RequiredArgsConstructor
 public class EventAdminService {
 
-	private final EventAdminRepository eventAdminRepository;
-	private final PasswordEncoder passwordEncoder;
+    private final EventAdminRepository eventAdminRepository;
+    private final PasswordEncoder passwordEncoder;
 
-	public EventAdminResDto createEventAdmin(final EventAdminCreateReqDto request) {
-		if (eventAdminRepository.existsByEmail(request.email())) {
-			throw new EventAdminException(ErrorCode.ADMIN_EMAIL_DUPLICATE);
-		}
+    public EventAdminResDto createEventAdmin(final EventAdminCreateReqDto request) {
+        if (eventAdminRepository.existsByEmail(request.email())) {
+            throw new EventAdminException(ErrorCode.ADMIN_EMAIL_DUPLICATE);
+        }
 
-		final String encodedPassword = passwordEncoder.encode(request.password());
-		final EventAdmin eventAdmin = EventAdminConverter.toEntity(request, encodedPassword);
-		final EventAdmin saved = eventAdminRepository.save(eventAdmin);
+        final String encodedPassword = passwordEncoder.encode(request.password());
+        final EventAdmin eventAdmin = EventAdminConverter.toEntity(request, encodedPassword);
+        final EventAdmin saved = eventAdminRepository.save(eventAdmin);
 
-		log.info("[EventAdmin] 생성 완료 {id: {}, email: {}}", saved.getId(), saved.getEmail());
+        log.info("[EventAdmin] 생성 완료 {id: {}, email: {}}", saved.getId(), saved.getEmail());
 
-		return EventAdminConverter.toEventAdminResDto(saved);
-	}
+        return EventAdminConverter.toEventAdminResDto(saved);
+    }
 }

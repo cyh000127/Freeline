@@ -12,7 +12,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableConfigurationProperties
 public class FreelineApplication {
 
-	public static void main(final String[] args) {
-		SpringApplication.run(FreelineApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(FreelineApplication.class, args);
+    }
+
 }

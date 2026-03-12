@@ -5,7 +5,7 @@ import com.freeline.common.error.exception.BusinessException;
 
 public class EventException extends BusinessException {
 
-	public EventException(final ErrorCode errorCode) {
-		super(errorCode);
-	}
+    public EventException(final ErrorCode errorCode) {
+        super(errorCode);
+    }
 }
