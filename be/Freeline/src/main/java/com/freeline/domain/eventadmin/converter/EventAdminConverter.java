@@ -1,11 +1,10 @@
 package com.freeline.domain.eventadmin.converter;
 
+import lombok.experimental.UtilityClass;
+
 import com.freeline.domain.eventadmin.dto.request.EventAdminCreateReqDto;
 import com.freeline.domain.eventadmin.dto.response.EventAdminResDto;
 import com.freeline.domain.eventadmin.entity.EventAdmin;
-
-import lombok.experimental.UtilityClass;
-
 @UtilityClass
 public class EventAdminConverter {
 

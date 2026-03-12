@@ -8,6 +8,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+
 import com.freeline.common.constant.BackDomain;
 
 import io.swagger.v3.oas.models.Components;
@@ -16,8 +19,6 @@ import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
-import lombok.AccessLevel;
-import lombok.RequiredArgsConstructor;
 
 @Configuration
 @RequiredArgsConstructor(access = AccessLevel.PROTECTED)
@@ -26,18 +27,18 @@ public class SwaggerConfig {
 	@Bean
 	public OpenAPI customOpenApi() {
 
-		SecurityScheme accessTokenAuth = new SecurityScheme()
+		final SecurityScheme accessTokenAuth = new SecurityScheme()
 			.type(SecurityScheme.Type.HTTP)
 			.scheme("bearer")
 			.bearerFormat("JWT")
 			.in(SecurityScheme.In.HEADER)
 			.name("Authorization");
 
-		SecurityRequirement securityRequirement = new SecurityRequirement()
+		final SecurityRequirement securityRequirement = new SecurityRequirement()
 			.addList("accessTokenAuth")
 			.addList("refreshTokenAuth");
 
-		Server server = new Server();
+		final Server server = new Server();
 		server.setUrl(BackDomain.LOCAL.getUrl());
 		server.setDescription(BackDomain.LOCAL.getDescription());
 
@@ -53,7 +54,7 @@ public class SwaggerConfig {
 
 	@Bean
 	@Primary
-	public SwaggerUiConfigProperties swaggerUiConfigProperties(SwaggerUiConfigProperties props) {
+	public SwaggerUiConfigProperties swaggerUiConfigProperties(final SwaggerUiConfigProperties props) {
 		props.setPersistAuthorization(true);
 		return props;
 	}

@@ -1,10 +1,12 @@
 package com.freeline.domain.eventadmin.dto.request;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+
 import lombok.Builder;
+
+import io.swagger.v3.oas.annotations.media.Schema;
 
 @Builder
 public record EventAdminCreateReqDto(
@@ -19,8 +21,8 @@ public record EventAdminCreateReqDto(
 	@Size(min = 8, message = "비밀번호는 8자 이상이어야 합니다.")
 	String password,
 
-	@Schema(description = "관리자 이름", example = "최홍권")
+	@Schema(description = "관리자 이름", example = "최현권")
 	@Size(max = 50, message = "이름은 50자 이하여야 합니다.")
 	String name
-) {}
-
+) {
+}

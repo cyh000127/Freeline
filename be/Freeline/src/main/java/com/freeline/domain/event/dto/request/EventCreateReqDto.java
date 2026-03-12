@@ -3,10 +3,12 @@ package com.freeline.domain.event.dto.request;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+
 import lombok.Builder;
+
+import io.swagger.v3.oas.annotations.media.Schema;
 
 @Builder
 public record EventCreateReqDto(
@@ -35,8 +37,8 @@ public record EventCreateReqDto(
 	@NotNull(message = "운영 종료 시간은 필수입니다.")
 	LocalTime closeTime,
 
-	@Schema(description = "행사장 주소", example = "서울특별시 강남구 테헤란로 123")
-	@NotBlank(message = "행사장 주소는 필수입니다.")
+	@Schema(description = "행사 주소", example = "서울특별시 강남구 테헤란로 123")
+	@NotBlank(message = "행사 주소는 필수입니다.")
 	String locationAddress,
 
 	@Schema(description = "썸네일 이미지 URL", example = "https://example.com/images/event-thumbnail.png")
