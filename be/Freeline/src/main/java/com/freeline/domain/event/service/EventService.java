@@ -3,6 +3,7 @@ package com.freeline.domain.event.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -23,12 +24,16 @@ import com.freeline.domain.event.converter.EventPolicyConverter;
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
 import com.freeline.domain.event.dto.request.EventPolicyReqDto;
 import com.freeline.domain.event.dto.request.EventUpdateReqDto;
+import com.freeline.domain.event.dto.response.BoothCongestionDto;
+import com.freeline.domain.event.dto.response.DashboardSummaryDto;
+import com.freeline.domain.event.dto.response.EventDashboardResDto;
 import com.freeline.domain.event.dto.response.EventDeleteResDto;
 import com.freeline.domain.event.dto.response.EventDetailResDto;
 import com.freeline.domain.event.dto.response.EventListResDto;
 import com.freeline.domain.event.dto.response.EventPolicyResDto;
 import com.freeline.domain.event.dto.response.EventResDto;
 import com.freeline.domain.event.dto.response.EventUpdateResDto;
+import com.freeline.domain.event.dto.response.TopWaitingBoothDto;
 import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.entity.EventPolicy;
 import com.freeline.domain.event.entity.EventStatus;
@@ -91,6 +96,44 @@ public class EventService {
         return EventConverter.toEventDetailResDto(
                 event,
                 Boolean.TRUE.equals(includeBooths) ? Collections.emptyList() : null
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public EventDashboardResDto getEventDashboard(final Long eventAdminId, final Long eventId) {
+        final Event event = getAuthorizedEvent(eventAdminId, eventId);
+
+        if (event.getStatus() != EventStatus.OPEN) {
+            throw new EventException(ErrorCode.EVENT_NOT_OPEN_FOR_DASHBOARD);
+        }
+
+        // TODO: Replace with actual DB queries after Booth and Waiting domains are implemented.
+        final DashboardSummaryDto summary = DashboardSummaryDto.builder()
+                .totalWaitingTeams(156)
+                .totalCompletedTeams(430)
+                .averageWaitingTime(45)
+                .activeBoothsCount(12)
+                .build();
+        final BoothCongestionDto boothCongestion = BoothCongestionDto.builder()
+                .smooth(8)
+                .normal(3)
+                .congested(1)
+                .build();
+        final List<TopWaitingBoothDto> topWaitingBooths = List.of(
+                TopWaitingBoothDto.builder()
+                        .boothId(15L)
+                        .name("인기 굿즈존")
+                        .waitingTeams(45)
+                        .expectedWaitMin(90)
+                        .build()
+        );
+
+        return EventConverter.toEventDashboardResDto(
+                event,
+                summary,
+                boothCongestion,
+                topWaitingBooths,
+                LocalDateTime.now()
         );
     }
 

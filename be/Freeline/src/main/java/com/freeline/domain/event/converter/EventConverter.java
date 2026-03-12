@@ -6,11 +6,15 @@ import java.util.List;
 import lombok.experimental.UtilityClass;
 
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
+import com.freeline.domain.event.dto.response.BoothCongestionDto;
+import com.freeline.domain.event.dto.response.DashboardSummaryDto;
+import com.freeline.domain.event.dto.response.EventDashboardResDto;
 import com.freeline.domain.event.dto.response.EventDeleteResDto;
 import com.freeline.domain.event.dto.response.EventDetailResDto;
 import com.freeline.domain.event.dto.response.EventListResDto;
 import com.freeline.domain.event.dto.response.EventResDto;
 import com.freeline.domain.event.dto.response.EventUpdateResDto;
+import com.freeline.domain.event.dto.response.TopWaitingBoothDto;
 import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.entity.EventStatus;
 
@@ -104,6 +108,23 @@ public class EventConverter {
                 .createdAt(event.getCreatedAt())
                 .updatedAt(event.getUpdatedAt())
                 .booths(booths)
+                .build();
+    }
+
+    public EventDashboardResDto toEventDashboardResDto(
+            final Event event,
+            final DashboardSummaryDto summary,
+            final BoothCongestionDto boothCongestion,
+            final List<TopWaitingBoothDto> topWaitingBooths,
+            final LocalDateTime lastUpdated
+    ) {
+        return EventDashboardResDto.builder()
+                .eventId(event.getId())
+                .eventStatus(event.getStatus().name())
+                .summary(summary)
+                .boothCongestion(boothCongestion)
+                .topWaitingBooths(topWaitingBooths)
+                .lastUpdated(lastUpdated)
                 .build();
     }
 }

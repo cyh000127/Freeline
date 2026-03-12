@@ -19,10 +19,10 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C-004", "서버 오류가 발생했습니다."),
     JSON_PARSING_ERROR(HttpStatus.BAD_REQUEST, "C-005", "JSON 파싱 중 오류가 발생했습니다."),
     TEMPLATE_LOADING_FAILED(HttpStatus.NOT_FOUND, "C-006", "템플릿 로딩에 실패했습니다."),
-    ACCESS_DENIED(HttpStatus.FORBIDDEN, "C-007", "요청한 리소스에 접근할 수 없습니다."),
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "C-007", "요청한 리소스에 접근할 권한이 없습니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "C-008", "지원하지 않는 HTTP 메서드입니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "C-009", "지원하지 않는 미디어 타입입니다."),
-    DATA_INTEGRITY_VIOLATION(HttpStatus.CONFLICT, "C-010", "데이터 무결성 위반입니다."),
+    DATA_INTEGRITY_VIOLATION(HttpStatus.CONFLICT, "C-010", "데이터 무결성 제약을 위반했습니다."),
 
     /**
      * Admin Error (A-xxx)
@@ -37,7 +37,16 @@ public enum ErrorCode {
     EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "E-002", "존재하지 않는 행사입니다."),
     EVENT_MAP_NOT_FOUND(HttpStatus.NOT_FOUND, "E-003", "존재하지 않는 행사 지도입니다."),
     MAP_IMAGE_REQUIRED_FOR_OPEN(HttpStatus.BAD_REQUEST, "E-004", "지도 이미지 등록 전에는 OPEN 상태로 변경할 수 없습니다."),
-    CANNOT_DELETE_OPEN_EVENT(HttpStatus.CONFLICT, "E-005", "진행 중(OPEN)인 행사는 바로 삭제할 수 없습니다. 종료 처리 후 삭제해 주세요."),
+    CANNOT_DELETE_OPEN_EVENT(
+            HttpStatus.CONFLICT,
+            "E-005",
+            "진행 중(OPEN)인 행사는 바로 삭제할 수 없습니다. 종료 처리 후 삭제해 주세요."
+    ),
+    EVENT_NOT_OPEN_FOR_DASHBOARD(
+            HttpStatus.BAD_REQUEST,
+            "E-006",
+            "진행 중(OPEN)인 행사만 대시보드를 조회할 수 있습니다."
+    ),
 
     /**
      * Booth Error (B-xxx)
