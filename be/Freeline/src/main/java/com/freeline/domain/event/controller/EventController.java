@@ -4,7 +4,9 @@ import jakarta.validation.Valid;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,9 +21,12 @@ import com.freeline.common.response.BaseResponse;
 import com.freeline.common.response.PageResponse;
 import com.freeline.common.util.ResponseUtils;
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
+import com.freeline.domain.event.dto.request.EventUpdateReqDto;
+import com.freeline.domain.event.dto.response.EventDeleteResDto;
 import com.freeline.domain.event.dto.response.EventDetailResDto;
 import com.freeline.domain.event.dto.response.EventListResDto;
 import com.freeline.domain.event.dto.response.EventResDto;
+import com.freeline.domain.event.dto.response.EventUpdateResDto;
 import com.freeline.domain.event.service.EventService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -65,6 +70,29 @@ public class EventController {
             @RequestParam(required = false, defaultValue = "false") final Boolean includeBooths
     ) {
         final EventDetailResDto response = eventService.getEventDetail(eventAdminId, eventId, includeBooths);
+        return ResponseUtils.ok(response);
+    }
+
+    @Operation(summary = "행사 수정", description = "행사 정보와 상태를 부분 수정합니다.")
+    @PatchMapping("/{eventId}")
+    public ResponseEntity<BaseResponse<EventUpdateResDto>> updateEvent(
+            @RequestHeader("X-Event-Admin-Id") final Long eventAdminId,
+            @PathVariable final Long eventId,
+            @RequestParam(required = false, defaultValue = "false") final Boolean validateOnly,
+            @RequestBody final EventUpdateReqDto request
+    ) {
+        final EventUpdateResDto response = eventService.updateEvent(eventAdminId, eventId, validateOnly, request);
+        return ResponseUtils.ok(response);
+    }
+
+    @Operation(summary = "행사 삭제", description = "행사를 삭제합니다.")
+    @DeleteMapping("/{eventId}")
+    public ResponseEntity<BaseResponse<EventDeleteResDto>> deleteEvent(
+            @RequestHeader("X-Event-Admin-Id") final Long eventAdminId,
+            @PathVariable final Long eventId,
+            @RequestParam(required = false, defaultValue = "false") final Boolean cascade
+    ) {
+        final EventDeleteResDto response = eventService.deleteEvent(eventAdminId, eventId, cascade);
         return ResponseUtils.ok(response);
     }
 }

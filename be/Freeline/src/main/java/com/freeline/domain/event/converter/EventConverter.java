@@ -1,13 +1,16 @@
 package com.freeline.domain.event.converter;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import lombok.experimental.UtilityClass;
 
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
+import com.freeline.domain.event.dto.response.EventDeleteResDto;
 import com.freeline.domain.event.dto.response.EventDetailResDto;
 import com.freeline.domain.event.dto.response.EventListResDto;
 import com.freeline.domain.event.dto.response.EventResDto;
+import com.freeline.domain.event.dto.response.EventUpdateResDto;
 import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.entity.EventStatus;
 
@@ -38,6 +41,33 @@ public class EventConverter {
                 .eventId(event.getId())
                 .status(event.getStatus().name())
                 .createdAt(event.getCreatedAt())
+                .build();
+    }
+
+    public EventUpdateResDto toEventUpdateResDto(final Event event) {
+        return EventUpdateResDto.builder()
+                .eventId(event.getId())
+                .status(event.getStatus().name())
+                .updatedAt(event.getUpdatedAt())
+                .build();
+    }
+
+    public EventUpdateResDto toEventUpdateResDto(
+            final Long eventId,
+            final EventStatus status,
+            final LocalDateTime updatedAt
+    ) {
+        return EventUpdateResDto.builder()
+                .eventId(eventId)
+                .status(status.name())
+                .updatedAt(updatedAt)
+                .build();
+    }
+
+    public EventDeleteResDto toEventDeleteResDto(final Long eventId, final LocalDateTime deletedAt) {
+        return EventDeleteResDto.builder()
+                .eventId(eventId)
+                .deletedAt(deletedAt)
                 .build();
     }
 

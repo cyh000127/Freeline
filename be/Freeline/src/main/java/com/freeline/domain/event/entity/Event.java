@@ -64,27 +64,39 @@ public class Event extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private EventStatus status;
 
-    public void updateEventInfo(
+    public void update(
             final String name,
-            final String description,
             final LocalDate startDate,
             final LocalDate endDate,
             final LocalTime openTime,
             final LocalTime closeTime,
             final String locationAddress,
-            final String thumbnailImageUrl
+            final String thumbnailImageUrl,
+            final EventStatus status
     ) {
-        this.name = name;
-        this.description = description;
-        this.startDate = startDate;
-        this.endDate = endDate;
-        this.openTime = openTime;
-        this.closeTime = closeTime;
-        this.locationAddress = locationAddress;
-        this.thumbnailImageUrl = thumbnailImageUrl;
-    }
-
-    public void updateStatus(final EventStatus status) {
-        this.status = status;
+        if (name != null) {
+            this.name = name;
+        }
+        if (startDate != null) {
+            this.startDate = startDate;
+        }
+        if (endDate != null) {
+            this.endDate = endDate;
+        }
+        if (openTime != null) {
+            this.openTime = openTime;
+        }
+        if (closeTime != null) {
+            this.closeTime = closeTime;
+        }
+        if (locationAddress != null) {
+            this.locationAddress = locationAddress;
+        }
+        if (thumbnailImageUrl != null) {
+            this.thumbnailImageUrl = thumbnailImageUrl;
+        }
+        if (status != null) {
+            this.status = status;
+        }
     }
 }
