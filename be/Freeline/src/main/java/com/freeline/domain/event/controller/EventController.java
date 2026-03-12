@@ -24,6 +24,7 @@ import com.freeline.common.util.ResponseUtils;
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
 import com.freeline.domain.event.dto.request.EventPolicyReqDto;
 import com.freeline.domain.event.dto.request.EventUpdateReqDto;
+import com.freeline.domain.event.dto.response.EventDashboardResDto;
 import com.freeline.domain.event.dto.response.EventDeleteResDto;
 import com.freeline.domain.event.dto.response.EventDetailResDto;
 import com.freeline.domain.event.dto.response.EventListResDto;
@@ -73,6 +74,16 @@ public class EventController {
             @RequestParam(required = false, defaultValue = "false") final Boolean includeBooths
     ) {
         final EventDetailResDto response = eventService.getEventDetail(eventAdminId, eventId, includeBooths);
+        return ResponseUtils.ok(response);
+    }
+
+    @Operation(summary = "행사 운영 대시보드 조회", description = "실시간 행사 운영 현황 대시보드를 조회합니다.")
+    @GetMapping("/{eventId}/dashboard")
+    public ResponseEntity<BaseResponse<EventDashboardResDto>> getEventDashboard(
+            @RequestHeader("X-Event-Admin-Id") final Long eventAdminId,
+            @PathVariable final Long eventId
+    ) {
+        final EventDashboardResDto response = eventService.getEventDashboard(eventAdminId, eventId);
         return ResponseUtils.ok(response);
     }
 

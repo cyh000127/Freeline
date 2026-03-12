@@ -29,6 +29,7 @@ import com.freeline.domain.boothmap.repository.EventMapRepository;
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
 import com.freeline.domain.event.dto.request.EventPolicyReqDto;
 import com.freeline.domain.event.dto.request.EventUpdateReqDto;
+import com.freeline.domain.event.dto.response.EventDashboardResDto;
 import com.freeline.domain.event.dto.response.EventDeleteResDto;
 import com.freeline.domain.event.dto.response.EventDetailResDto;
 import com.freeline.domain.event.dto.response.EventListResDto;
@@ -124,7 +125,8 @@ class EventServiceTest {
         Assertions.assertThat(result.getContent()).hasSize(1);
         Assertions.assertThat(result.getContent().getFirst().eventId()).isEqualTo(1L);
         Assertions.assertThat(result.getContent().getFirst().status()).isEqualTo(EventStatus.DRAFT.name());
-        Assertions.assertThat(result.getContent().getFirst().thumbnailImageUrl()).isEqualTo("https://cdn.freeline.com/thumb.jpg");
+        Assertions.assertThat(result.getContent().getFirst().thumbnailImageUrl())
+                .isEqualTo("https://cdn.freeline.com/thumb.jpg");
         Mockito.verify(eventRepository).findAll(pageable);
     }
 
@@ -200,6 +202,51 @@ class EventServiceTest {
         Assertions.assertThatThrownBy(() -> eventService.getEventDetail(5L, 102L, false))
                 .isInstanceOfSatisfying(EventException.class, ex ->
                         Assertions.assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
+    }
+
+    @Test
+    void getEventDashboard_success() {
+        final Event event = createEvent(102L, 5L, EventStatus.OPEN);
+        Mockito.when(eventRepository.findById(102L)).thenReturn(Optional.of(event));
+
+        final EventDashboardResDto result = eventService.getEventDashboard(5L, 102L);
+
+        Assertions.assertThat(result.eventId()).isEqualTo(102L);
+        Assertions.assertThat(result.eventStatus()).isEqualTo(EventStatus.OPEN.name());
+        Assertions.assertThat(result.summary().totalWaitingTeams()).isEqualTo(156);
+        Assertions.assertThat(result.summary().totalCompletedTeams()).isEqualTo(430);
+        Assertions.assertThat(result.summary().averageWaitingTime()).isEqualTo(45);
+        Assertions.assertThat(result.summary().activeBoothsCount()).isEqualTo(12);
+        Assertions.assertThat(result.boothCongestion().smooth()).isEqualTo(8);
+        Assertions.assertThat(result.boothCongestion().normal()).isEqualTo(3);
+        Assertions.assertThat(result.boothCongestion().congested()).isEqualTo(1);
+        Assertions.assertThat(result.topWaitingBooths()).hasSize(1);
+        Assertions.assertThat(result.topWaitingBooths().getFirst().boothId()).isEqualTo(15L);
+        Assertions.assertThat(result.topWaitingBooths().getFirst().name()).isEqualTo("인기 굿즈존");
+        Assertions.assertThat(result.topWaitingBooths().getFirst().waitingTeams()).isEqualTo(45);
+        Assertions.assertThat(result.topWaitingBooths().getFirst().expectedWaitMin()).isEqualTo(90);
+        Assertions.assertThat(result.lastUpdated()).isNotNull();
+    }
+
+    @Test
+    void getEventDashboard_failWhenAccessDenied() {
+        final Event event = createEvent(102L, 7L, EventStatus.OPEN);
+        Mockito.when(eventRepository.findById(102L)).thenReturn(Optional.of(event));
+
+        Assertions.assertThatThrownBy(() -> eventService.getEventDashboard(5L, 102L))
+                .isInstanceOfSatisfying(EventException.class, ex ->
+                        Assertions.assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
+    }
+
+    @Test
+    void getEventDashboard_failWhenEventNotOpen() {
+        final Event event = createEvent(102L, 5L, EventStatus.READY);
+        Mockito.when(eventRepository.findById(102L)).thenReturn(Optional.of(event));
+
+        Assertions.assertThatThrownBy(() -> eventService.getEventDashboard(5L, 102L))
+                .isInstanceOfSatisfying(EventException.class, ex ->
+                        Assertions.assertThat(ex.getErrorCode())
+                                .isEqualTo(ErrorCode.EVENT_NOT_OPEN_FOR_DASHBOARD));
     }
 
     @Test
