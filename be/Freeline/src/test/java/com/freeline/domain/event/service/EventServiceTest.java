@@ -6,6 +6,10 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -23,15 +27,19 @@ import com.freeline.common.error.ErrorCode;
 import com.freeline.domain.boothmap.entity.EventMap;
 import com.freeline.domain.boothmap.repository.EventMapRepository;
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
+import com.freeline.domain.event.dto.request.EventPolicyReqDto;
 import com.freeline.domain.event.dto.request.EventUpdateReqDto;
 import com.freeline.domain.event.dto.response.EventDeleteResDto;
 import com.freeline.domain.event.dto.response.EventDetailResDto;
 import com.freeline.domain.event.dto.response.EventListResDto;
+import com.freeline.domain.event.dto.response.EventPolicyResDto;
 import com.freeline.domain.event.dto.response.EventResDto;
 import com.freeline.domain.event.dto.response.EventUpdateResDto;
 import com.freeline.domain.event.entity.Event;
+import com.freeline.domain.event.entity.EventPolicy;
 import com.freeline.domain.event.entity.EventStatus;
 import com.freeline.domain.event.exception.EventException;
+import com.freeline.domain.event.repository.EventPolicyRepository;
 import com.freeline.domain.event.repository.EventRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,6 +50,9 @@ class EventServiceTest {
 
     @Mock
     private EventMapRepository eventMapRepository;
+
+    @Mock
+    private EventPolicyRepository eventPolicyRepository;
 
     @InjectMocks
     private EventService eventService;
@@ -285,6 +296,121 @@ class EventServiceTest {
     }
 
     @Test
+    void upsertEventPolicy_successWhenCreate() {
+        final Event event = createEvent(401L, 5L, EventStatus.DRAFT);
+        final LocalDateTime updatedAt = LocalDateTime.of(2026, 3, 12, 11, 0);
+        final EventPolicyReqDto request = EventPolicyReqDto.builder()
+                .defaultStaySec(300)
+                .defaultMaxWaiting(100)
+                .defaultCallCount(5)
+                .defaultCallTtl(60)
+                .defaultDeferLimit(2)
+                .build();
+
+        Mockito.when(eventRepository.findById(401L)).thenReturn(Optional.of(event));
+        Mockito.when(eventPolicyRepository.findByEvent_Id(401L)).thenReturn(Optional.empty());
+        Mockito.when(eventPolicyRepository.saveAndFlush(Mockito.any(EventPolicy.class))).thenAnswer(invocation -> {
+            final EventPolicy saved = invocation.getArgument(0);
+            setField(saved, "id", 1L);
+            setBaseEntityField(saved, "updatedAt", updatedAt);
+            return saved;
+        });
+
+        final EventPolicyResDto result = eventService.upsertEventPolicy(5L, 401L, request);
+
+        Assertions.assertThat(result.policyId()).isEqualTo(1L);
+        Assertions.assertThat(result.eventId()).isEqualTo(401L);
+        Assertions.assertThat(result.updatedAt()).isEqualTo(updatedAt);
+        Assertions.assertThat(event.getPolicy()).isNotNull();
+        Assertions.assertThat(event.getPolicy().getDefaultStaySec()).isEqualTo(300);
+        Assertions.assertThat(event.getPolicy().getDefaultMaxWaiting()).isEqualTo(100);
+        Assertions.assertThat(event.getPolicy().getDefaultCallCount()).isEqualTo(5);
+        Assertions.assertThat(event.getPolicy().getDefaultCallTtl()).isEqualTo(60);
+        Assertions.assertThat(event.getPolicy().getDefaultDeferLimit()).isEqualTo(2);
+        Mockito.verify(eventPolicyRepository).saveAndFlush(Mockito.any(EventPolicy.class));
+    }
+
+    @Test
+    void upsertEventPolicy_successWhenUpdate() {
+        final Event event = createEvent(402L, 5L, EventStatus.OPEN);
+        final EventPolicy existingPolicy = createEventPolicy(11L, event, 180, 80, 3, 30, 1);
+        final LocalDateTime updatedAt = LocalDateTime.of(2026, 3, 12, 11, 30);
+        final EventPolicyReqDto request = EventPolicyReqDto.builder()
+                .defaultStaySec(240)
+                .defaultMaxWaiting(120)
+                .defaultCallCount(4)
+                .defaultCallTtl(45)
+                .defaultDeferLimit(3)
+                .build();
+
+        Mockito.when(eventRepository.findById(402L)).thenReturn(Optional.of(event));
+        Mockito.when(eventPolicyRepository.findByEvent_Id(402L)).thenReturn(Optional.of(existingPolicy));
+        Mockito.when(eventPolicyRepository.saveAndFlush(existingPolicy)).thenAnswer(invocation -> {
+            setBaseEntityField(existingPolicy, "updatedAt", updatedAt);
+            return existingPolicy;
+        });
+
+        final EventPolicyResDto result = eventService.upsertEventPolicy(5L, 402L, request);
+
+        Assertions.assertThat(result.policyId()).isEqualTo(11L);
+        Assertions.assertThat(result.eventId()).isEqualTo(402L);
+        Assertions.assertThat(result.updatedAt()).isEqualTo(updatedAt);
+        Assertions.assertThat(existingPolicy.getDefaultStaySec()).isEqualTo(240);
+        Assertions.assertThat(existingPolicy.getDefaultMaxWaiting()).isEqualTo(120);
+        Assertions.assertThat(existingPolicy.getDefaultCallCount()).isEqualTo(4);
+        Assertions.assertThat(existingPolicy.getDefaultCallTtl()).isEqualTo(45);
+        Assertions.assertThat(existingPolicy.getDefaultDeferLimit()).isEqualTo(3);
+        Mockito.verify(eventPolicyRepository).saveAndFlush(existingPolicy);
+    }
+
+    @Test
+    void upsertEventPolicy_failWhenAccessDenied() {
+        final Event event = createEvent(403L, 7L, EventStatus.DRAFT);
+        final EventPolicyReqDto request = EventPolicyReqDto.builder()
+                .defaultStaySec(300)
+                .defaultMaxWaiting(50)
+                .defaultCallCount(5)
+                .defaultCallTtl(60)
+                .defaultDeferLimit(2)
+                .build();
+
+        Mockito.when(eventRepository.findById(403L)).thenReturn(Optional.of(event));
+
+        Assertions.assertThatThrownBy(() -> eventService.upsertEventPolicy(5L, 403L, request))
+                .isInstanceOfSatisfying(EventException.class, ex ->
+                        Assertions.assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
+
+        Mockito.verify(eventPolicyRepository, Mockito.never()).findByEvent_Id(Mockito.anyLong());
+        Mockito.verify(eventPolicyRepository, Mockito.never()).saveAndFlush(Mockito.any(EventPolicy.class));
+    }
+
+    @Test
+    void eventPolicyRequest_failValidation() {
+        final EventPolicyReqDto request = EventPolicyReqDto.builder()
+                .defaultStaySec(0)
+                .defaultMaxWaiting(-1)
+                .defaultCallCount(-1)
+                .defaultCallTtl(-1)
+                .defaultDeferLimit(-1)
+                .build();
+
+        final Set<ConstraintViolation<EventPolicyReqDto>> violations = Validation.buildDefaultValidatorFactory()
+                .getValidator()
+                .validate(request);
+
+        Assertions.assertThat(violations).hasSize(5);
+        Assertions.assertThat(violations)
+                .extracting(violation -> violation.getPropertyPath().toString())
+                .containsExactlyInAnyOrder(
+                        "defaultStaySec",
+                        "defaultMaxWaiting",
+                        "defaultCallCount",
+                        "defaultCallTtl",
+                        "defaultDeferLimit"
+                );
+    }
+
+    @Test
     void deleteEvent_success() {
         final Event event = createEvent(301L, 5L, EventStatus.CLOSED);
         Mockito.when(eventRepository.findById(301L)).thenReturn(Optional.of(event));
@@ -333,11 +459,41 @@ class EventServiceTest {
                 .build();
     }
 
-    private void setBaseEntityField(final Event event, final String fieldName, final LocalDateTime value) {
+    private EventPolicy createEventPolicy(
+            final Long policyId,
+            final Event event,
+            final Integer defaultStaySec,
+            final Integer defaultMaxWaiting,
+            final Integer defaultCallCount,
+            final Integer defaultCallTtl,
+            final Integer defaultDeferLimit
+    ) {
+        return EventPolicy.builder()
+                .id(policyId)
+                .event(event)
+                .defaultStaySec(defaultStaySec)
+                .defaultMaxWaiting(defaultMaxWaiting)
+                .defaultCallCount(defaultCallCount)
+                .defaultCallTtl(defaultCallTtl)
+                .defaultDeferLimit(defaultDeferLimit)
+                .build();
+    }
+
+    private void setBaseEntityField(final Object target, final String fieldName, final LocalDateTime value) {
         try {
-            final Field field = event.getClass().getSuperclass().getDeclaredField(fieldName);
+            final Field field = target.getClass().getSuperclass().getDeclaredField(fieldName);
             field.setAccessible(true);
-            field.set(event, value);
+            field.set(target, value);
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
+
+    private void setField(final Object target, final String fieldName, final Object value) {
+        try {
+            final Field field = target.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(target, value);
         } catch (ReflectiveOperationException ex) {
             throw new IllegalStateException(ex);
         }
