@@ -577,5 +577,6 @@ $RECYCLE.BIN/
 
 .env
 .env.*
-be/docs/
+be/Freeline/docs/
 /tree.txt
+docker-compose-local.yml

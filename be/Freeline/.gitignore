@@ -14,7 +14,7 @@ out/
 
 # [蹂댁븞 諛??섍꼍 蹂?? - ?덈? 而ㅻ컠 湲덉?
 .env
-.env.*
+.local.env
 *.env.*
 application-local.properties
 
@@ -71,5 +71,6 @@ tmp/
 temp/
 *.log
 *.temp
-be/docs/
+be/Freeline/docs
 /tree.txt
+docker-compose-local.yml
