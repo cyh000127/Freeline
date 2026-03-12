@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import com.freeline.common.entity.BaseEntity;
+
 @Entity
 @Table(name = "event_admins")
 @Getter
@@ -22,25 +23,25 @@ import com.freeline.common.entity.BaseEntity;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class EventAdmin extends BaseEntity {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "id")
-	private Long id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
+    private Long id;
 
-	@Column(name = "email", nullable = false, length = 120, unique = true)
-	private String email;
+    @Column(name = "email", nullable = false, length = 120, unique = true)
+    private String email;
 
-	@Column(name = "password", nullable = false, length = 255)
-	private String password;
+    @Column(name = "password", nullable = false, length = 255)
+    private String password;
 
-	@Column(name = "name", length = 50)
-	private String name;
+    @Column(name = "name", length = 50)
+    private String name;
 
-	public void updateName(final String name) {
-		this.name = name;
-	}
+    public void updateName(final String name) {
+        this.name = name;
+    }
 
-	public void updatePassword(final String password) {
-		this.password = password;
-	}
+    public void updatePassword(final String password) {
+        this.password = password;
+    }
 }

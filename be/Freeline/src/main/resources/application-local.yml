@@ -7,15 +7,13 @@ spring:
     username: ${DB_USERNAME:freeline}
     password: ${DB_PASSWORD:freeline}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-init-sql: "SET TIME ZONE 'Asia/Seoul'"
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:0000}
-  flyway:
-    url: ${spring.datasource.url}
-    user: ${spring.datasource.username}
-    password: ${spring.datasource.password}
 
 jwt:
   secret: ${JWT_SECRET:your_local_secret_key_for_freeline_min_32_chars}

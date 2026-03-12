@@ -1,0 +1,22 @@
+package com.freeline.domain.booth.dto.response;
+
+import lombok.Builder;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Builder
+public record BoothGoodsResDto(
+
+        @Schema(description = "굿즈 ID", example = "101")
+        Long goodsId,
+
+        @Schema(description = "굿즈 이름", example = "키링")
+        String name,
+
+        @Schema(description = "굿즈 이미지 URL", example = "https://cdn.freeline.com/goods/keyring.png")
+        String imageUrl,
+
+        @Schema(description = "품절 여부", example = "false")
+        boolean isSoldOut
+) {
+}
