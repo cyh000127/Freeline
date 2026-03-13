@@ -7,5 +7,5 @@ public enum WaitingStatus {
     ENTERED,
     EXITED,
     EXPIRED,
-    CANCELLED
+    CANCELED
 }

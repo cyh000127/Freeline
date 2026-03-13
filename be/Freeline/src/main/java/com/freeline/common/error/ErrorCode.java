@@ -55,6 +55,8 @@ public enum ErrorCode {
     INVALID_BOOTH_OPERATING_HOURS(HttpStatus.BAD_REQUEST, "B-002", "부스 종료 시간은 시작 시간보다 늦어야 합니다."),
     INVALID_BOOTH_MAP_AREA(HttpStatus.BAD_REQUEST, "B-003", "부스 지도 영역 값이 올바르지 않습니다."),
     BOOTH_EVENT_MISMATCH(HttpStatus.BAD_REQUEST, "B-004", "부스와 행사의 소속 정보가 일치하지 않습니다."),
+    MAX_WAITING_EXCEEDED(HttpStatus.FORBIDDEN, "B-005", "최대 활성 대기 개수(3개)를 초과할 수 없습니다."),
+    ALREADY_WAITING_FOR_BOOTH(HttpStatus.CONFLICT, "B-006", "이미 해당 부스에 진행 중인 대기가 존재합니다."),
 
     /**
      * File Error (F-xxx)
