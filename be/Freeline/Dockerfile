@@ -13,6 +13,11 @@ RUN ./gradlew bootJar -x test --no-daemon
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY --from=builder /app/build/libs/*.jar app.jar
+
+# ENV TZ=Asia/Seoul
+# RUN apk add --no-cache tzdata
+
+COPY --from=builder /app/build/libs/*-SNAPSHOT.jar app.jar
+
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

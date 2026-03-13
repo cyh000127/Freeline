@@ -1,54 +1,78 @@
 services:
   freeline-db:
-    image: postgres:18.3
+    image: postgres:18.3-alpine
     container_name: freeline-db
     restart: always
     environment:
-      POSTGRES_DB: ${DB_NAME:-freeline}
-      POSTGRES_USER: ${DB_USERNAME:-freeline}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-freeline}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - freeline-db-data:/var/lib/postgresql/data
     networks:
       - infra-public
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   freeline-redis:
-    image: redis:8.6-alpine
+    image: redis:8.6.1-alpine
     container_name: freeline-redis
     restart: always
-    command: redis-server --requirepass ${REDIS_PASSWORD:-0000}
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - freeline-redis-data:/data
     networks:
       - infra-public
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   freeline-backend:
     image: freeline-backend:latest
     container_name: freeline-backend
     restart: always
     depends_on:
-      - freeline-db
-      - freeline-redis
+      freeline-db:
+        condition: service_healthy
+      freeline-redis:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
-      SPRING_PROFILES_ACTIVE: live
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+
       DB_HOST: freeline-db
       DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-freeline}
-      DB_USERNAME: ${DB_USERNAME:-freeline}
-      DB_PASSWORD: ${DB_PASSWORD:-freeline}
+      DB_NAME: ${DB_NAME}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+
       REDIS_HOST: freeline-redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-0000}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
       JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_TOKEN_EXPIRATION: ${JWT_ACCESS_TOKEN_EXPIRATION}
+      JWT_REFRESH_TOKEN_EXPIRATION: ${JWT_REFRESH_TOKEN_EXPIRATION}
       ENCRYPTION_SECRET_KEY: ${ENCRYPTION_SECRET_KEY}
+
+      CLOUDFLARE_ACCESS_KEY: ${CLOUDFLARE_ACCESS_KEY}
+      CLOUDFLARE_BUCKET: ${CLOUDFLARE_BUCKET}
+      CLOUDFLARE_ENDPOINT: ${CLOUDFLARE_ENDPOINT}
+      CLOUDFLARE_OUTER_PREFIX: ${CLOUDFLARE_OUTER_PREFIX}
+      CLOUDFLARE_SECRET_KEY: ${CLOUDFLARE_SECRET_KEY}
     networks:
       - infra-public
 
 volumes:
   freeline-db-data:
   freeline-redis-data:
+
 
 networks:
   infra-public:
