@@ -70,6 +70,10 @@ public class BoothWaiting extends BaseEntity {
     private LocalDateTime exitedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "booth_id", insertable = false, updatable = false)
+    private Booth booth;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "visitor_id", insertable = false, updatable = false)
     private Visitor visitor;
 
