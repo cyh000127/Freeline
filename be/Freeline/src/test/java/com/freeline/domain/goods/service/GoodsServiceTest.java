@@ -178,12 +178,12 @@ class GoodsServiceTest {
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.empty());
 
         Assertions.assertThatThrownBy(() -> goodsService.createGoods(
-                12L,
-                GoodsCreateReqDto.builder()
-                        .name("한정판 키링")
-                        .imageFile(imageFile)
-                        .build()
-        )).isInstanceOf(BoothException.class)
+                        12L,
+                        GoodsCreateReqDto.builder()
+                                .name("한정판 키링")
+                                .imageFile(imageFile)
+                                .build()
+                )).isInstanceOf(BoothException.class)
                 .hasMessage("존재하지 않는 부스입니다.");
     }
 
@@ -192,11 +192,11 @@ class GoodsServiceTest {
         Mockito.when(goodsRepository.findById(101L)).thenReturn(Optional.empty());
 
         Assertions.assertThatThrownBy(() -> goodsService.updateGoodsStatus(
-                101L,
-                GoodsStatusUpdateReqDto.builder()
-                        .isSoldOut(true)
-                        .build()
-        )).isInstanceOf(GoodsException.class)
+                        101L,
+                        GoodsStatusUpdateReqDto.builder()
+                                .isSoldOut(true)
+                                .build()
+                )).isInstanceOf(GoodsException.class)
                 .hasMessage("존재하지 않는 굿즈입니다.");
     }
 }

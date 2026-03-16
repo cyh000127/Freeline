@@ -3,12 +3,13 @@ package com.freeline.domain.auth.service;
 import java.security.SecureRandom;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
-import org.springframework.transaction.annotation.Transactional;
+
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 
@@ -37,15 +38,18 @@ import io.jsonwebtoken.Claims;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
-    private final AuthProperties authProperties;
     private static final long EMAIL_VERIFY_TTL = 10; // 추가
-
+    private final AuthProperties authProperties;
     private final OrganizerRepository organizerRepository;
     private final BoothManagerRepository boothManagerRepository;
     private final PinUserRepository pinUserRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final StringRedisTemplate redisTemplate;
+    /**
+     * 이메일 인증 코드 발송
+     */
+    private final JavaMailSender mailSender;
 
     /**
      * 이메일 인증 코드 생성
@@ -56,11 +60,6 @@ public class AuthService {
         int code = random.nextInt(900000) + 100000;
         return String.valueOf(code);
     }
-
-    /**
-     * 이메일 인증 코드 발송
-     */
-    private final JavaMailSender mailSender;
 
     public void sendVerificationCode(String email) {
 

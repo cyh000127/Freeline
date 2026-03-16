@@ -22,9 +22,6 @@ import com.freeline.common.security.JwtProvider;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtProvider jwtProvider;
-    private final StringRedisTemplate redisTemplate;
-
     // Swagger 및 기본 접근 허용 경로
     private static final String[] WHITELIST = {
             "/swagger-ui/**",
@@ -34,6 +31,8 @@ public class SecurityConfig {
             "/error",
             "/"
     };
+    private final JwtProvider jwtProvider;
+    private final StringRedisTemplate redisTemplate;
 
     @Bean
     public SecurityFilterChain filterChain(final HttpSecurity http) throws Exception {

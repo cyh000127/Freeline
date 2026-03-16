@@ -106,6 +106,14 @@ public enum ErrorCode {
     QR_REISSUE_COOLDOWN(HttpStatus.CONFLICT, "Q-005", "QR 재발급은 잠시 후 다시 시도할 수 있습니다."),
     QR_WAITING_NOT_CALLED(HttpStatus.BAD_REQUEST, "Q-006", "호출 상태의 대기를 찾을 수 없습니다."),
     QR_WAITING_EXPIRED(HttpStatus.BAD_REQUEST, "Q-007", "호출 유효 시간이 만료되었습니다."),
+
+    /**
+     * Push Notification Error (P-xxx)
+     */
+    PUSH_NOTIFICATION_TOKEN_NOT_FOUND(HttpStatus.NOT_FOUND, "P-001", "저장된 FCM 토큰을 찾을 수 없습니다."),
+    PUSH_NOTIFICATION_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "P-002", "FCM 발송 설정이 아직 준비되지 않았습니다."),
+    PUSH_NOTIFICATION_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "P-003", "푸시 알림 발송에 실패했습니다."),
+    PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH(HttpStatus.BAD_REQUEST, "P-004", "현재 대기 상태에서는 해당 알림을 보낼 수 없습니다."),
     ;
 
     private final HttpStatus httpStatus;

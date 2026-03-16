@@ -129,8 +129,12 @@ com.freeline
 
 ```java
 ResponseUtils.ok(data)       // 200 OK
-ResponseUtils.created(data)  // 201 Created
-ResponseUtils.noContent()    // 204 No Content
+ResponseUtils.
+
+created(data)  // 201 Created
+ResponseUtils.
+
+noContent()    // 204 No Content
 ```
 
 **JSON 구조:**
@@ -224,10 +228,10 @@ public void updateName(final String name) {
 - 도메인 컨트롤러의 하위 경로는 자신의 도메인 세그먼트 뒤에서만 확장
 - 다른 도메인 식별자가 필요해도 경로 시작은 현재 도메인으로 고정
 - 예시:
-  - Booth `/api/v1/booths/events/{eventId}`
-  - BoothMap `/api/v1/boothmaps/events/{eventId}`
-  - Goods `/api/v1/goods/booths/{boothId}`
-  - EventAdmin `/api/v1/event-admins`
+    - Booth `/api/v1/booths/events/{eventId}`
+    - BoothMap `/api/v1/boothmaps/events/{eventId}`
+    - Goods `/api/v1/goods/booths/{boothId}`
+    - EventAdmin `/api/v1/event-admins`
 
 ## Transaction Management
 
@@ -240,12 +244,13 @@ public void updateName(final String name) {
 
 - 도메인별 Exception은 `BusinessException`을 상속
 - ErrorCode 네이밍 컨벤션:
-  - Common: `C-xxx`
-  - Admin: `A-xxx`
-  - Event: `E-xxx`
-  - Booth: `B-xxx`
-  - File: `F-xxx`
-  - Goods: `G-xxx`
+    - Common: `C-xxx`
+    - Admin: `A-xxx`
+    - Event: `E-xxx`
+    - Booth: `B-xxx`
+    - File: `F-xxx`
+    - Goods: `G-xxx`
+    - PushNotification: `P-xxx`
 
 ## Database
 
@@ -257,6 +262,27 @@ public void updateName(final String name) {
 - 기본 JPA 설정은 `ddl-auto: none`
 - 필요할 때만 `JPA_DDL_AUTO` 환경변수로 `validate` 또는 `update`를 지정
 - 기존 DB 위에서 실행할 때는 엔티티-스키마 불일치로 부팅이 막히지 않도록 자동 검증을 기본 비활성화
+
+## Firebase / FCM Key Rules
+
+- Firebase 서비스 계정 JSON 파일은 Git에 절대 커밋하지 않음
+- 로컬 개발에서는 프로젝트 루트의 `secrets/` 디렉토리 또는 프로젝트 바깥 비공개 경로에만 저장
+- 권장 파일명 예시: `service-account.json`, `freeline-firebase-service-account.json`
+- Firebase 키는 파일 내용을 직접 코드에 넣지 않고 경로만 환경변수로 주입
+- 환경변수:
+    - `FIREBASE_PROJECT_ID`
+    - `FIREBASE_SERVICE_ACCOUNT_PATH`
+- `application.yml`에서는 위 환경변수만 참조하고, 실제 JSON 경로/내용을 하드코딩하지 않음
+- 운영 환경에서는 서버 내 비공개 경로에 JSON 파일을 두고 경로만 주입
+- 서비스 계정 JSON이 한 번이라도 Git에 올라갔다면 즉시 폐기 후 새 키를 발급받아야 함
+
+예시:
+
+```yml
+firebase:
+  project-id: ${FIREBASE_PROJECT_ID:}
+  service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:}
+```
 
 **로컬 환경 DB:**
 
@@ -311,13 +337,15 @@ public void updateName(final String name) {
 - IDE에서 SonarQube for IDE 또는 SonarLint를 사용할 때 `Freeline.md`는 로컬 분석 제외 파일로 설정한다.
 - Connected Mode를 사용하는 경우 SonarQube 서버의 프로젝트 exclusion에도 `**/Freeline.md`를 추가한다.
 - `.md` 파일이 Java 코드처럼 분석되면 IntelliJ의 `Editor -> File Types`에서 `*.md`가 Markdown으로 연결되어 있는지 먼저 확인한다.
-- 필수 환경변수는 `CLOUDFLARE_ENDPOINT`, `CLOUDFLARE_BUCKET`, `CLOUDFLARE_ACCESS_KEY`, `CLOUDFLARE_SECRET_KEY`, `CLOUDFLARE_OUTER_PREFIX`이다.
+- 필수 환경변수는 `CLOUDFLARE_ENDPOINT`, `CLOUDFLARE_BUCKET`, `CLOUDFLARE_ACCESS_KEY`, `CLOUDFLARE_SECRET_KEY`,
+  `CLOUDFLARE_OUTER_PREFIX`이다.
 - Cloudflare 관련 기능은 테스트 환경에서도 애플리케이션이 뜰 수 있도록 `src/test/resources/application.yml`에 더미 설정을 둔다.
 - 업로드/조회/삭제 실패는 공통 파일 에러코드(`F-xxx`)로 처리한다.
 - Cloudflare 업로드 경로 규칙:
-  - 부스 관련 사진: `freeline/booth`
-  - 상품 관련 사진: `freeline/goods`
-  - 지도 관련 사진: `freeline/map`
+    - 부스 관련 사진: `freeline/booth`
+    - 상품 관련 사진: `freeline/goods`
+    - 지도 관련 사진: `freeline/map`
+
 ## Security Configuration
 
 - 현재 상태: 인증 미구현 (모든 요청 `permitAll()`)

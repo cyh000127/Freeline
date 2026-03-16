@@ -18,6 +18,13 @@ out/
 *.env.*
 application-local.properties
 
+# Firebase service account key
+*service-account*.json
+*firebase*private*.json
+*firebase*credential*.json
+**/firebase/*.json
+secrets/
+
 # [?꾩빱 諛??명봽???곗씠?? - 濡쒖뺄 ?곗씠???좎텧 諛⑹?
 postgres_data/
 redis_data/

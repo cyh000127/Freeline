@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS booths
 CREATE TABLE IF NOT EXISTS booth_policies
 (
     id                BIGSERIAL PRIMARY KEY,
-    booth_id          BIGINT NOT NULL,
+    booth_id          BIGINT    NOT NULL,
     stay_time         INT,
     max_waiting_count INT,
     call_count        INT,
@@ -131,25 +131,27 @@ CREATE TABLE IF NOT EXISTS visitors
 CREATE TABLE IF NOT EXISTS booth_waiting
 (
     id              BIGSERIAL PRIMARY KEY,
-    booth_id        BIGINT       NOT NULL,
-    visitor_id      BIGINT       NOT NULL,
-    status          VARCHAR(30)  NOT NULL DEFAULT 'WAITING',
-    waiting_number  INT          NOT NULL,
-    defer_count     INT          NOT NULL DEFAULT 0,
-    requested_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    booth_id        BIGINT      NOT NULL,
+    visitor_id      BIGINT      NOT NULL,
+    status          VARCHAR(30) NOT NULL DEFAULT 'WAITING',
+    waiting_number  INT         NOT NULL,
+    defer_count     INT         NOT NULL DEFAULT 0,
+    requested_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     called_at       TIMESTAMP,
     call_expires_at TIMESTAMP,
     registered_at   TIMESTAMP,
     entered_at      TIMESTAMP,
     exited_at       TIMESTAMP,
-    created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_waiting_booth FOREIGN KEY (booth_id) REFERENCES booths (id) ON DELETE CASCADE,
     CONSTRAINT fk_waiting_visitor FOREIGN KEY (visitor_id) REFERENCES visitors (id) ON DELETE CASCADE
 );
 
-ALTER TABLE booth_waiting ADD COLUMN IF NOT EXISTS call_expires_at TIMESTAMP;
-ALTER TABLE booth_waiting ADD COLUMN IF NOT EXISTS registered_at TIMESTAMP;
+ALTER TABLE booth_waiting
+    ADD COLUMN IF NOT EXISTS call_expires_at TIMESTAMP;
+ALTER TABLE booth_waiting
+    ADD COLUMN IF NOT EXISTS registered_at TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS booth_qr
 (
@@ -169,6 +171,21 @@ CREATE TABLE IF NOT EXISTS booth_qr
 
 CREATE INDEX IF NOT EXISTS idx_booth_qr_booth_status ON booth_qr (booth_id, status);
 CREATE INDEX IF NOT EXISTS idx_booth_waiting_booth_visitor_status ON booth_waiting (booth_id, visitor_id, status);
+
+CREATE TABLE IF NOT EXISTS fcm_token
+(
+    id         BIGSERIAL PRIMARY KEY,
+    visitor_id BIGINT       NOT NULL,
+    device_id  VARCHAR(255) NOT NULL,
+    fcm_token  VARCHAR(500) NOT NULL,
+    platform   VARCHAR(20)  NOT NULL,
+    created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_fcm_token_visitor FOREIGN KEY (visitor_id) REFERENCES visitors (id) ON DELETE CASCADE,
+    CONSTRAINT uq_fcm_token_device_id UNIQUE (device_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_fcm_token_visitor_id ON fcm_token (visitor_id);
 
 CREATE TABLE IF NOT EXISTS booth_map_areas
 (

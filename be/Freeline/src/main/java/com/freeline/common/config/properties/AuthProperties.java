@@ -1,7 +1,8 @@
 package com.freeline.common.config.properties;
 
-import lombok.Getter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+
+import lombok.Getter;
 
 @Getter
 @ConfigurationProperties(prefix = "auth")

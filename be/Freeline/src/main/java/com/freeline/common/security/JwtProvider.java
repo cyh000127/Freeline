@@ -71,7 +71,7 @@ public class JwtProvider {
                 .signWith(key)
                 .compact();
     }
-    
+
     public Claims getClaims(String token) {
 
         return Jwts.parser()
