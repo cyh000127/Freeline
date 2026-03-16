@@ -14,7 +14,19 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:0000}
-
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+auth:
+  email-code-expire-minutes: ${EMAIL_CODE_EXPIRE_MINUTES}
 jwt:
   secret: ${JWT_SECRET:your_local_secret_key_for_freeline_min_32_chars}
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
