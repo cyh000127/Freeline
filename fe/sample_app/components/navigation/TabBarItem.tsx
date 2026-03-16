@@ -14,10 +14,9 @@ export default function TabBarItem({
   icon,
 }: TabBarItemProps) {
   return (
-    <Pressable style={styles.item} onPress={onPress}>
+    <Pressable style={[styles.item, isActive && styles.activeItem]} onPress={onPress}>
       <View style={styles.iconWrapper}>{icon}</View>
       <Text style={[styles.label, isActive && styles.activeLabel]}>{label}</Text>
-      {isActive && <View style={styles.activeIndicator} />}
     </Pressable>
   );
 }
@@ -25,11 +24,15 @@ export default function TabBarItem({
 const styles = StyleSheet.create({
   item: {
     flex: 1,
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
     gap: 4,
-    position: 'relative',
+    borderRadius: 999,
+    backgroundColor: 'transparent',
+  },
+  activeItem: {
+    backgroundColor: '#A09EAB',
   },
   iconWrapper: {
     height: 20,
@@ -38,19 +41,11 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 11,
-    color: '#9A9AA5',
-    fontWeight: '500',
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   activeLabel: {
-    color: '#4A3F7A',
+    color: '#FFFFFF',
     fontWeight: '700',
-  },
-  activeIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    width: 24,
-    height: 3,
-    borderRadius: 999,
-    backgroundColor: '#6E5CD3',
   },
 });

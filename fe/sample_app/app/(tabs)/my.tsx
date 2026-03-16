@@ -1,28 +1,47 @@
-import { View, Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import BottomTabBar from '@/components/navigation/BottomTabBar';
+import BottomTabBar, { TabKey } from '@/components/navigation/BottomTabBar';
 
-const TAB_ROUTES = {
-  home: '/home',
-  reservation: '/reservation',
-  map: '/map',
-  my: '/my',
-  search: '/search',
-} as const;
+const TAB_ROUTES: Record<TabKey, '/home' | '/reservation' | '/map' | '/my' | '/search'> =
+  {
+    home: '/home',
+    reservation: '/reservation',
+    map: '/map',
+    my: '/my',
+    search: '/search',
+  };
 
 export default function My() {
   const router = useRouter();
 
   return (
-    <View style={{ flex: 1 }}>
-      <View style={{ flex: 1 }}>
-        <Text>MY</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>MY</Text>
       </View>
 
       <BottomTabBar
         activeTab="my"
         onTabPress={(tab) => router.replace(TAB_ROUTES[tab])}
       />
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F0F2F5',
+  },
+  content: {
+    flex: 1,
+    padding: 20,
+    paddingBottom: 120,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#111111',
+  },
+});

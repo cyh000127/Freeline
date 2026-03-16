@@ -1,36 +1,111 @@
+import { useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { View, TextInput, Text, Pressable } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import RegisterScreenLayout from '@/components/register/RegisterScreenLayout';
 
-export default function NicknameInputScreen() {
+export default function NicknameScreen() {
   const router = useRouter();
+  const [nickname, setNickname] = useState('');
+
+  const trimmed = useMemo(() => nickname.trim(), [nickname]);
+  const isValid = useMemo(() => /^[가-힣]{1,8}$/.test(trimmed), [trimmed]);
+  const showError = trimmed.length > 0 && !isValid;
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
-      <Text style={{ fontSize: 22, marginBottom: 20, textAlign: 'center' }}>
-        닉네임을 설정해주세요.
-      </Text>
+    <RegisterScreenLayout>
+      <Text style={styles.title}>닉네임을 설정해주세요.</Text>
 
       <TextInput
-        placeholder="닉네임"
-        style={{
-          borderWidth: 1,
-          borderColor: '#ddd',
-          borderRadius: 8,
-          padding: 12,
-        }}
+        value={nickname}
+        onChangeText={setNickname}
+        placeholder=""
+        placeholderTextColor="#B9BAC6"
+        style={[styles.input, showError && styles.inputError]}
+        maxLength={8}
+        autoCorrect={false}
+        autoCapitalize="none"
       />
 
+      <View style={styles.helperRow}>
+        <Text style={styles.helperIcon}>ⓘ</Text>
+        <Text style={[styles.helperText, showError && styles.helperError]}>
+          {showError ? '완성된 한글 1~8자만 사용할 수 있어요.' : '한글만 가능, 최대 8자'}
+        </Text>
+      </View>
+
       <Pressable
-        style={{
-          marginTop: 20,
-          backgroundColor: '#3C355F',
-          padding: 14,
-          borderRadius: 8,
-        }}
-        onPress={() => router.push('./confirm')}
+        style={[styles.button, !isValid && styles.buttonDisabled]}
+        disabled={!isValid}
+        onPress={() =>
+          router.push({
+            pathname: '/register/confirm',
+            params: { nickname: trimmed },
+          })
+        }
       >
-        <Text style={{ color: 'white', textAlign: 'center' }}>확인</Text>
+        <Text style={styles.buttonText}>확인</Text>
       </Pressable>
-    </View>
+    </RegisterScreenLayout>
   );
 }
+
+const styles = StyleSheet.create({
+  title: {
+    fontFamily: 'Pretendard',
+    fontSize: 18,
+    lineHeight: 26,
+    fontWeight: '800',
+    color: '#111111',
+    textAlign: 'center',
+    marginBottom: 22,
+  },
+  input: {
+    height: 40,
+    backgroundColor: '#F8F8F9',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  inputError: {
+    borderColor: '#D9534F',
+  },
+  helperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  helperIcon: {
+    fontSize: 12,
+    color: '#A3A4B2',
+    marginRight: 6,
+  },
+  helperText: {
+    fontFamily: 'Pretendard',
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#A3A4B2',
+    fontWeight: '600',
+  },
+  helperError: {
+    color: '#D9534F',
+  },
+  button: {
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#302C55',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.45,
+  },
+  buttonText: {
+    fontFamily: 'Pretendard',
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+});
