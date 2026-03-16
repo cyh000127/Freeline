@@ -18,19 +18,25 @@ import io.jsonwebtoken.security.Keys;
 public class JwtProvider {
 
     private final SecretKey key;
+    private final long accessTokenExpiration;
+    private final long refreshTokenExpiration;
 
-    public JwtProvider(@Value("${jwt.secret}") String secret) {
+    public JwtProvider(
+            @Value("${jwt.secret}") String secret,
+            @Value("${jwt.access-token-expiration}") long accessTokenExpiration,
+            @Value("${jwt.refresh-token-expiration}") long refreshTokenExpiration) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes());
+        this.accessTokenExpiration = accessTokenExpiration;
+        this.refreshTokenExpiration = refreshTokenExpiration;
     }
 
     public String createToken(Long id, String role) {
 
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + 1000 * 60 * 60);
+        Date expiry = new Date(now.getTime() + accessTokenExpiration);
 
         Map<String, Object> claims = new HashMap<>();
 
-        claims.put("id", id);
         claims.put("role", role);
 
         return Jwts.builder()
@@ -61,8 +67,7 @@ public class JwtProvider {
 
         Date now = new Date();
 
-        // 7일
-        Date expiry = new Date(now.getTime() + 1000L * 60 * 60 * 24 * 7);
+        Date expiry = new Date(now.getTime() + refreshTokenExpiration);
 
         return Jwts.builder()
                 .setSubject(String.valueOf(id))

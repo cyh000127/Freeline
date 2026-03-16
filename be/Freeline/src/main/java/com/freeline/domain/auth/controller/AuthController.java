@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import lombok.RequiredArgsConstructor;
 
+import com.freeline.common.response.BaseResponse;
+import com.freeline.common.util.ResponseUtils;
 import com.freeline.domain.auth.dto.BoothLoginReqDto;
 import com.freeline.domain.auth.dto.ChangePasswordReqDto;
 import com.freeline.domain.auth.dto.EmailVerifyReqDto;
@@ -29,7 +31,10 @@ import com.freeline.domain.auth.dto.SignupResDto;
 import com.freeline.domain.auth.dto.UpdateMyInfoReqDto;
 import com.freeline.domain.auth.service.AuthService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "Auth", description = "인증/인가 API")
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -40,153 +45,164 @@ public class AuthController {
     /**
      * 이메일 인증 코드 발송
      */
+    @Operation(summary = "이메일 인증 코드 발송")
     @PostMapping("/email/send")
-    public ResponseEntity<?> sendCode(
-            @RequestParam String email
+    public ResponseEntity<BaseResponse<Void>> sendCode(
+            @RequestParam final String email
     ) {
         authService.sendVerificationCode(email);
-        return ResponseEntity.ok().build();
+        return ResponseUtils.ok(null);
     }
 
     /**
      * 이메일 인증 코드 검증
      */
+    @Operation(summary = "이메일 인증 코드 검증")
     @PostMapping("/email/verify")
-    public ResponseEntity<Void> verifyCode(
-            @Valid @RequestBody EmailVerifyReqDto req
+    public ResponseEntity<BaseResponse<Void>> verifyCode(
+            @Valid @RequestBody final EmailVerifyReqDto req
     ) {
         authService.verifyCode(req);
-        return ResponseEntity.ok().build();
+        return ResponseUtils.ok(null);
     }
 
     /**
      * 행사 주최자 회원가입
      */
+    @Operation(summary = "행사 주최자 회원가입")
     @PostMapping("/signup")
-    public ResponseEntity<SignupResDto> signup(
-            @Valid @RequestBody SignupReqDto req
+    public ResponseEntity<BaseResponse<SignupResDto>> signup(
+            @Valid @RequestBody final SignupReqDto req
     ) {
-        return ResponseEntity.ok(authService.signup(req));
+        return ResponseUtils.created(authService.signup(req));
     }
 
     /**
      * 행사 주최자 로그인
      */
+    @Operation(summary = "행사 주최자 로그인")
     @PostMapping("/login")
-    public ResponseEntity<LoginResDto> login(
-            @Valid @RequestBody LoginReqDto req
+    public ResponseEntity<BaseResponse<LoginResDto>> login(
+            @Valid @RequestBody final LoginReqDto req
     ) {
 
         LoginResDto response = authService.organizerLogin(req);
 
-        return ResponseEntity.ok(response);
+        return ResponseUtils.ok(response);
     }
 
     /**
      * Refresh Token (JWT 재발급)
      */
+    @Operation(summary = "Refresh Token (JWT 재발급)")
     @PostMapping("/refresh")
-    public ResponseEntity<LoginResDto> refresh(
-            @RequestBody RefreshTokenReqDto req
+    public ResponseEntity<BaseResponse<LoginResDto>> refresh(
+            @RequestBody final RefreshTokenReqDto req
     ) {
-        return ResponseEntity.ok(authService.refresh(req.getRefreshToken()));
+        return ResponseUtils.ok(authService.refresh(req.refreshToken()));
     }
 
 
     /**
      * 행사주최자 내정보 조회
      */
+    @Operation(summary = "행사주최자 내정보 조회")
     @GetMapping("/me")
-    public ResponseEntity<MyInfoResDto> me(Authentication authentication) {
-        System.out.println("authentication = " + authentication);
+    public ResponseEntity<BaseResponse<MyInfoResDto>> me(final Authentication authentication) {
 
         Long userId = Long.valueOf(authentication.getName());
 
-        return ResponseEntity.ok(authService.getMyInfo(userId));
+        return ResponseUtils.ok(authService.getMyInfo(userId));
     }
 
     /**
      * 행사주최자 회원정보 수정
      */
+    @Operation(summary = "행사주최자 회원정보 수정")
     @PatchMapping("/me")
-    public ResponseEntity<MyInfoResDto> updateMyInfo(
-            Authentication authentication,
-            @Valid @RequestBody UpdateMyInfoReqDto req
+    public ResponseEntity<BaseResponse<MyInfoResDto>> updateMyInfo(
+            final Authentication authentication,
+            @Valid @RequestBody final UpdateMyInfoReqDto req
     ) {
 
         Long userId = Long.parseLong(authentication.getName());
 
-        return ResponseEntity.ok(authService.updateMyInfo(userId, req));
+        return ResponseUtils.ok(authService.updateMyInfo(userId, req));
     }
 
     /**
      * 행사주최자 비밀번호 변경
      */
+    @Operation(summary = "행사주최자 비밀번호 변경")
     @PatchMapping("/password")
-    public ResponseEntity<?> changePassword(
-            Authentication authentication,
-            @RequestBody ChangePasswordReqDto req) {
+    public ResponseEntity<BaseResponse<Void>> changePassword(
+            final Authentication authentication,
+            @RequestBody final ChangePasswordReqDto req) {
 
         Long userId = Long.parseLong(authentication.getName());
 
         authService.changePassword(userId, req);
 
-        return ResponseEntity.ok().build();
+        return ResponseUtils.ok(null);
     }
 
 
     /**
      * 행사주최자 회원 탈퇴
      */
+    @Operation(summary = "행사주최자 회원 탈퇴")
     @DeleteMapping("/me")
-    public ResponseEntity<Void> delete(Authentication authentication) {
+    public ResponseEntity<BaseResponse<Void>> delete(final Authentication authentication) {
 
         Long userId = Long.parseLong(authentication.getName());
 
         authService.deleteUser(userId);
 
-        return ResponseEntity.ok().build();
+        return ResponseUtils.ok(null);
     }
 
     /**
      * 행사주최자 로그아웃
      */
+    @Operation(summary = "행사주최자 로그아웃")
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletRequest request) {
+    public ResponseEntity<BaseResponse<Void>> logout(final HttpServletRequest request) {
 
         String bearer = request.getHeader("Authorization");
         String token = bearer.substring(7);
 
         authService.logout(token);
 
-        return ResponseEntity.ok().build();
+        return ResponseUtils.ok(null);
     }
 
 
     /**
      * 부스 관리자 로그인
      */
+    @Operation(summary = "부스 관리자 로그인")
     @PostMapping("/booth-login")
-    public ResponseEntity<LoginResDto> boothLogin(
-            @RequestBody BoothLoginReqDto request
+    public ResponseEntity<BaseResponse<LoginResDto>> boothLogin(
+            @RequestBody final BoothLoginReqDto request
     ) {
 
         LoginResDto response = authService.boothLogin(request);
 
-        return ResponseEntity.ok(response);
+        return ResponseUtils.ok(response);
     }
 
     /**
      * PIN 사용자 입장
      */
+    @Operation(summary = "PIN 사용자 입장")
     @PostMapping("/pin-enter")
-    public ResponseEntity<LoginResDto> pinEnter(
-            @RequestBody PinEnterReqDto request
+    public ResponseEntity<BaseResponse<LoginResDto>> pinEnter(
+            @RequestBody final PinEnterReqDto request
     ) {
 
         LoginResDto response = authService.pinEnter(request);
 
-        return ResponseEntity.ok(response);
+        return ResponseUtils.ok(response);
     }
 
 }

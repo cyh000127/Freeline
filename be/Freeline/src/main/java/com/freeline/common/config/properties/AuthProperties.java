@@ -9,9 +9,13 @@ import lombok.Getter;
 public class AuthProperties {
 
     private long emailCodeExpireMinutes;
+    private long emailVerifyTtlMinutes;
 
     public void setEmailCodeExpireMinutes(long emailCodeExpireMinutes) {
-        System.out.println("AuthProperties binding value = " + emailCodeExpireMinutes);
         this.emailCodeExpireMinutes = emailCodeExpireMinutes;
+    }
+
+    public void setEmailVerifyTtlMinutes(long emailVerifyTtlMinutes) {
+        this.emailVerifyTtlMinutes = emailVerifyTtlMinutes;
     }
 }

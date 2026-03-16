@@ -31,6 +31,19 @@ public enum ErrorCode {
     ADMIN_EMAIL_DUPLICATE(HttpStatus.CONFLICT, "A-002", "이미 존재하는 이메일입니다."),
 
     /**
+     * Auth Error (U-xxx)
+     */
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U-001", "사용자를 찾을 수 없습니다."),
+    EMAIL_DUPLICATE(HttpStatus.CONFLICT, "U-002", "이미 가입된 이메일입니다."),
+    EMAIL_VERIFICATION_REQUIRED(HttpStatus.BAD_REQUEST, "U-003", "이메일 인증이 필요합니다."),
+    EMAIL_CODE_EXPIRED(HttpStatus.BAD_REQUEST, "U-004", "인증 코드가 만료되었습니다."),
+    EMAIL_CODE_MISMATCH(HttpStatus.BAD_REQUEST, "U-005", "인증 코드가 일치하지 않습니다."),
+    EMAIL_ALREADY_SENT(HttpStatus.CONFLICT, "U-006", "이미 인증 코드가 발송되었습니다."),
+    PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "U-007", "비밀번호가 일치하지 않습니다."),
+    INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "U-008", "유효하지 않은 토큰입니다."),
+    PIN_NOT_FOUND(HttpStatus.NOT_FOUND, "U-009", "PIN 정보를 찾을 수 없습니다."),
+
+    /**
      * Event Error (E-xxx)
      */
     INVALID_EVENT_PERIOD(HttpStatus.BAD_REQUEST, "E-001", "행사 종료일이 시작일보다 빠를 수 없습니다."),

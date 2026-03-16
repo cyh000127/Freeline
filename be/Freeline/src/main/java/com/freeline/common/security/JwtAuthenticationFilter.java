@@ -37,11 +37,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        System.out.println("JWT FILTER 실행");
-
         String token = resolveToken(request);
-
-        System.out.println("token = " + token);
 
         if (token != null && jwtProvider.validateToken(token)) {
             // blacklist 검사 추가
@@ -55,7 +51,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             Claims claims = jwtProvider.getClaims(token);
 
-            Long id = claims.get("id", Long.class);
+            Long id = Long.parseLong(claims.getSubject());
             String role = claims.get("role", String.class);
 
             SimpleGrantedAuthority authority =
@@ -68,7 +64,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             List.of(authority)
                     );
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            System.out.println("authentication 저장 완료");
         }
 
         filterChain.doFilter(request, response);
