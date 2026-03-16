@@ -27,6 +27,7 @@ spring:
             enable: true
 auth:
   email-code-expire-minutes: ${EMAIL_CODE_EXPIRE_MINUTES}
+  email-verify-ttl-minutes: 10
 jwt:
   secret: ${JWT_SECRET:your_local_secret_key_for_freeline_min_32_chars}
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}

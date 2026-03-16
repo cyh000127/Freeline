@@ -3,17 +3,11 @@ package com.freeline.domain.auth.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
-import lombok.Getter;
-import lombok.Setter;
+public record LoginReqDto(
+        @Email
+        @NotBlank
+        String email,
 
-@Getter
-@Setter
-public class LoginReqDto {
-
-    @Email
-    @NotBlank
-    private String email;
-
-    @NotBlank
-    private String password;
-}
+        @NotBlank
+        String password
+) {}

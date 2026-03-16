@@ -4,6 +4,9 @@ import java.security.SecureRandom;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
+
+import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -14,7 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 
 import com.freeline.common.config.properties.AuthProperties;
+import com.freeline.common.error.ErrorCode;
 import com.freeline.common.security.JwtProvider;
+import com.freeline.domain.auth.converter.AuthConverter;
 import com.freeline.domain.auth.dto.BoothLoginReqDto;
 import com.freeline.domain.auth.dto.ChangePasswordReqDto;
 import com.freeline.domain.auth.dto.EmailVerifyReqDto;
@@ -29,6 +34,7 @@ import com.freeline.domain.auth.entity.BoothManager;
 import com.freeline.domain.auth.entity.Organizer;
 import com.freeline.domain.auth.entity.PinUser;
 import com.freeline.domain.auth.entity.Role;
+import com.freeline.domain.auth.exception.AuthException;
 import com.freeline.domain.auth.repository.BoothManagerRepository;
 import com.freeline.domain.auth.repository.OrganizerRepository;
 import com.freeline.domain.auth.repository.PinUserRepository;
@@ -38,39 +44,42 @@ import io.jsonwebtoken.Claims;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
-    private static final long EMAIL_VERIFY_TTL = 10; // 추가
+
     private final AuthProperties authProperties;
+
+    @Value("${jwt.refresh-token-expiration}")
+    private long refreshTokenExpiration;
+
+
     private final OrganizerRepository organizerRepository;
     private final BoothManagerRepository boothManagerRepository;
     private final PinUserRepository pinUserRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final StringRedisTemplate redisTemplate;
-    /**
-     * 이메일 인증 코드 발송
-     */
+
+    private final AuthConverter authConverter;
+
     private final JavaMailSender mailSender;
 
     /**
      * 이메일 인증 코드 생성
      */
     private String createVerificationCode() {
-
         SecureRandom random = new SecureRandom();
         int code = random.nextInt(900000) + 100000;
         return String.valueOf(code);
     }
 
-    public void sendVerificationCode(String email) {
 
-        System.out.println("ENV EMAIL_CODE_EXPIRE_MINUTES = "
-                + System.getenv("EMAIL_CODE_EXPIRE_MINUTES"));
+    /**
+     * 이메일 인증 코드 발송
+     */
+    public void sendVerificationCode(final String email) {
 
-        System.out.println("PROP emailCodeExpireMinutes = "
-                + authProperties.getEmailCodeExpireMinutes());
 
         if (organizerRepository.existsByEmail(email)) {
-            throw new RuntimeException("이미 가입된 이메일입니다.");
+            throw new AuthException(ErrorCode.EMAIL_DUPLICATE);
         }
 
         String code = createVerificationCode();
@@ -78,17 +87,13 @@ public class AuthService {
         String key = "email:verify:" + email;
         // 이미 발송된 인증코드 존재 확인
         if (redisTemplate.hasKey(key)) {
-            throw new RuntimeException("이미 인증 코드가 발송되었습니다.");
+            throw new AuthException(ErrorCode.EMAIL_ALREADY_SENT);
         }
 
         redisTemplate.opsForValue()
                 .set(key, code, authProperties.getEmailCodeExpireMinutes(), TimeUnit.MINUTES);
 
         SimpleMailMessage message = new SimpleMailMessage();
-
-        System.out.println("REDIS SAVE KEY = " + key);
-        System.out.println("REDIS SAVE CODE = " + code);
-
 
         message.setTo(email);
         message.setSubject("[Freeline] 이메일 인증 코드");
@@ -100,80 +105,74 @@ public class AuthService {
     /**
      * 이메일 인증 확인
      */
-    public void verifyCode(EmailVerifyReqDto req) {
+    public void verifyCode(final EmailVerifyReqDto req) {
 
-        String key = "email:verify:" + req.getEmail();
+        String key = "email:verify:" + req.email();
 
         String savedCode = redisTemplate.opsForValue().get(key);
 
         if (savedCode == null) {
-            throw new RuntimeException("인증 코드가 만료되었습니다.");
+            throw new AuthException(ErrorCode.EMAIL_CODE_EXPIRED);
         }
 
-        if (!savedCode.equals(req.getCode())) {
-            throw new RuntimeException("인증 코드가 일치하지 않습니다.");
+        if (!savedCode.equals(req.code())) {
+            throw new AuthException(ErrorCode.EMAIL_CODE_MISMATCH);
         }
 
         redisTemplate.delete(key);
 
         // 인증 완료 상태 저장
         redisTemplate.opsForValue()
-                .set("email:verified:" + req.getEmail(), "true", EMAIL_VERIFY_TTL, TimeUnit.MINUTES);
+                .set("email:verified:" + req.email(), "true", authProperties.getEmailVerifyTtlMinutes(), TimeUnit.MINUTES);
     }
 
     /**
      * 행사주최자 회원가입
      */
-    public SignupResDto signup(SignupReqDto req) {
-        if (organizerRepository.existsByEmail(req.getEmail())) {
-            throw new RuntimeException("이미 가입된 이메일입니다.");
+    public SignupResDto signup(final SignupReqDto req) {
+        if (organizerRepository.existsByEmail(req.email())) {
+            throw new AuthException(ErrorCode.EMAIL_DUPLICATE);
         }
 
         // 1. 이메일 인증 여부 확인
         String verified = redisTemplate.opsForValue()
-                .get("email:verified:" + req.getEmail());
+                .get("email:verified:" + req.email());
 
         if (verified == null || !verified.equals("true")) {
-            throw new RuntimeException("이메일 인증이 필요합니다.");
+            throw new AuthException(ErrorCode.EMAIL_VERIFICATION_REQUIRED);
         }
 
-
         // 2. 비밀번호 암호화
-        String encodedPassword = passwordEncoder.encode(req.getPassword());
+        String encodedPassword = passwordEncoder.encode(req.password());
 
         // 3. 회원 생성
-        Organizer organizer = Organizer.builder()
-                .email(req.getEmail())
-                .password(encodedPassword)
-                .name(req.getName())
-                .organization(req.getOrganization())
-                .verified(true) // 인증된 상태로 저장
-                .build();
+        Organizer organizer = authConverter.toOrganizer(req, encodedPassword);
 
-        organizerRepository.save(organizer);
+        Organizer saved = organizerRepository.save(organizer);
 
         // 4. 인증 상태 삭제
-        redisTemplate.delete("email:verified:" + req.getEmail());
+        redisTemplate.delete("email:verified:" + req.email());
 
         // 5. 응답
         return SignupResDto.builder()
-                .id(organizer.getId())
-                .email(organizer.getEmail())
-                .name(organizer.getName())
+                .id(saved.getId())
+                .email(saved.getEmail())
+                .name(saved.getName())
                 .build();
     }
 
     /**
      * 행사주최자 로그인
      */
-    public LoginResDto organizerLogin(LoginReqDto req) {
+    @Transactional(readOnly = true)
+    public LoginResDto organizerLogin(final LoginReqDto req) {
 
         Organizer organizer = organizerRepository
-                .findByEmail(req.getEmail())
-                .orElseThrow(() -> new RuntimeException("사용자 없음"));
+                .findByEmail(req.email())
+                .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
 
-        if (!passwordEncoder.matches(req.getPassword(), organizer.getPassword())) {
-            throw new RuntimeException("비밀번호 불일치");
+        if (!passwordEncoder.matches(req.password(), organizer.getPassword())) {
+            throw new AuthException(ErrorCode.PASSWORD_MISMATCH);
         }
 
         String accessToken = jwtProvider.createToken(
@@ -187,8 +186,8 @@ public class AuthService {
         redisTemplate.opsForValue().set(
                 "refresh:" + organizer.getId(),
                 refreshToken,
-                7,
-                TimeUnit.DAYS
+                refreshTokenExpiration,
+                TimeUnit.MILLISECONDS
         );
         return LoginResDto.builder()
                 .accessToken(accessToken)
@@ -199,7 +198,7 @@ public class AuthService {
     /**
      * AccessToken 재발급
      */
-    public LoginResDto refresh(String refreshToken) {
+    public LoginResDto refresh(final String refreshToken) {
 
         // refresh token 검증
         Claims claims = jwtProvider.getClaims(refreshToken);
@@ -211,7 +210,7 @@ public class AuthService {
                 .get("refresh:" + userId);
 
         if (saved == null || !saved.equals(refreshToken)) {
-            throw new RuntimeException("invalid refresh token");
+            throw new AuthException(ErrorCode.INVALID_TOKEN);
         }
 
         // 새로운 access token 발급
@@ -229,10 +228,11 @@ public class AuthService {
     /**
      * 행사주최자 내정보 조회
      */
-    public MyInfoResDto getMyInfo(Long userId) {
+    @Transactional(readOnly = true)
+    public MyInfoResDto getMyInfo(final Long userId) {
 
         Organizer organizer = organizerRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("사용자 없음"));
+                .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
 
         return MyInfoResDto.builder()
                 .id(organizer.getId())
@@ -245,12 +245,12 @@ public class AuthService {
     /**
      * 행사주최자 회원정보 수정
      */
-    public MyInfoResDto updateMyInfo(Long userId, UpdateMyInfoReqDto req) {
+    public MyInfoResDto updateMyInfo(final Long userId, final UpdateMyInfoReqDto req) {
 
         Organizer organizer = organizerRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("사용자 없음"));
+                .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
 
-        organizer.updateInfo(req.getName(), req.getOrganization());
+        organizer.updateInfo(req.name(), req.organization());
 
         organizerRepository.save(organizer);
 
@@ -266,17 +266,17 @@ public class AuthService {
      * 행사주최자 비밀번호 변경
      */
     @Transactional
-    public void changePassword(Long userId, ChangePasswordReqDto req) {
+    public void changePassword(final Long userId, final ChangePasswordReqDto req) {
 
         Organizer organizer = organizerRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("사용자 없음"));
+                .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
 
-        if (!passwordEncoder.matches(req.getCurrentPassword(), organizer.getPassword())) {
-            throw new RuntimeException("현재 비밀번호 불일치");
+        if (!passwordEncoder.matches(req.currentPassword(), organizer.getPassword())) {
+            throw new AuthException(ErrorCode.PASSWORD_MISMATCH);
         }
 
         organizer.changePassword(
-                passwordEncoder.encode(req.getNewPassword())
+                passwordEncoder.encode(req.newPassword())
         );
 
     }
@@ -285,7 +285,7 @@ public class AuthService {
     /**
      * 행사주최자 로그아웃
      */
-    public void logout(String token) {
+    public void logout(final String token) {
 
         Claims claims = jwtProvider.getClaims(token);
         Long userId = Long.parseLong(claims.getSubject());
@@ -305,10 +305,10 @@ public class AuthService {
     /**
      * 행사주최자 회원탈퇴
      */
-    public void deleteUser(Long userId) {
+    public void deleteUser(final Long userId) {
 
         Organizer organizer = organizerRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("사용자 없음"));
+                .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
         redisTemplate.delete("refresh:" + userId);
         organizerRepository.delete(organizer);
     }
@@ -316,14 +316,15 @@ public class AuthService {
     /**
      * 부스관리자 로그인
      */
-    public LoginResDto boothLogin(BoothLoginReqDto req) {
+    @Transactional(readOnly = true)
+    public LoginResDto boothLogin(final BoothLoginReqDto req) {
 
         BoothManager manager = boothManagerRepository
-                .findByLoginId(req.getLoginId())
-                .orElseThrow(() -> new RuntimeException("사용자 없음"));
+                .findByLoginId(req.loginId())
+                .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
 
-        if (!passwordEncoder.matches(req.getPassword(), manager.getPassword())) {
-            throw new RuntimeException("비밀번호 불일치");
+        if (!passwordEncoder.matches(req.password(), manager.getPassword())) {
+            throw new AuthException(ErrorCode.PASSWORD_MISMATCH);
         }
 
         String token = jwtProvider.createToken(
@@ -339,11 +340,12 @@ public class AuthService {
     /**
      * PIN 사용자 입장
      */
-    public LoginResDto pinEnter(PinEnterReqDto req) {
+    @Transactional(readOnly = true)
+    public LoginResDto pinEnter(final PinEnterReqDto req) {
 
         PinUser pinUser = pinUserRepository
-                .findByPinCode(req.getPinCode())
-                .orElseThrow(() -> new RuntimeException("PIN 없음"));
+                .findByPinCode(req.pinCode())
+                .orElseThrow(() -> new AuthException(ErrorCode.PIN_NOT_FOUND));
 
         String token = jwtProvider.createToken(
                 pinUser.getId(),

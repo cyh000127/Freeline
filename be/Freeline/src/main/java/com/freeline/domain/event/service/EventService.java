@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.freeline.common.error.ErrorCode;
+import com.freeline.common.util.TimeUtils;
 import com.freeline.domain.boothmap.entity.EventMap;
 import com.freeline.domain.boothmap.repository.EventMapRepository;
 import com.freeline.domain.event.converter.EventConverter;
@@ -133,7 +134,7 @@ public class EventService {
                 summary,
                 boothCongestion,
                 topWaitingBooths,
-                LocalDateTime.now()
+                TimeUtils.nowDateTime()
         );
     }
 
@@ -227,7 +228,7 @@ public class EventService {
 
         eventRepository.delete(event);
 
-        final LocalDateTime deletedAt = LocalDateTime.now();
+        final LocalDateTime deletedAt = TimeUtils.nowDateTime();
 
         log.info("[Event] delete completed {id: {}, adminId: {}, cascade: {}}",
                 event.getId(),
