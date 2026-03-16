@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.util.ResponseUtils;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
+import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
+import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCreateResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExpectedTimeResDto;
@@ -42,6 +44,15 @@ public class WaitingController {
         return ResponseUtils.created(response);
     }
 
+    @Operation(summary = "다음 대기자 호출", description = "부스 관리자가 호출 가능한 다음 대기자를 앞큐로 이동시킵니다.")
+    @PatchMapping("/booths/me/waitings/call")
+    public ResponseEntity<BaseResponse<WaitingCallResDto>> callNextWaiting(
+            @RequestHeader("X-Booth-Id") final Long boothId
+    ) {
+        final WaitingCallResDto response = waitingService.callNextWaiting(boothId);
+        return ResponseUtils.ok(response);
+    }
+
     @Operation(summary = "대기 취소", description = "관람객이 자신의 대기 내역을 직접 취소합니다.")
     @DeleteMapping("/waitings/{waitingId}")
     public ResponseEntity<BaseResponse<Void>> cancelWaiting(
@@ -52,6 +63,16 @@ public class WaitingController {
         return ResponseUtils.ok(null);
     }
 
+    @Operation(summary = "관리자 대기 취소", description = "부스 관리자가 대기 또는 노쇼 대상을 취소 처리합니다.")
+    @DeleteMapping("/waitings/{waitingId}/admin")
+    public ResponseEntity<BaseResponse<Void>> cancelWaitingByAdmin(
+            @PathVariable final Long waitingId,
+            @RequestHeader("X-Booth-Id") final Long boothId
+    ) {
+        waitingService.cancelWaitingByAdmin(waitingId, boothId);
+        return ResponseUtils.ok(null);
+    }
+
     @Operation(summary = "대기 순번 미루기", description = "관람객이 자신의 대기 순번을 한 칸 뒤로 미룹니다.")
     @PatchMapping("/waitings/{waitingId}/postpone")
     public ResponseEntity<BaseResponse<WaitingPostponeResDto>> postponeWaiting(
@@ -59,6 +80,16 @@ public class WaitingController {
             @RequestHeader("X-Visitor-Id") final Long visitorId
     ) {
         final WaitingPostponeResDto response = waitingService.postponeWaiting(waitingId, visitorId);
+        return ResponseUtils.ok(response);
+    }
+
+    @Operation(summary = "체험 입장 처리", description = "부스 관리자가 도착 확인이 끝난 대기를 입장 처리합니다.")
+    @PatchMapping("/waitings/{waitingId}/admit")
+    public ResponseEntity<BaseResponse<WaitingAdmitResDto>> admitWaiting(
+            @PathVariable final Long waitingId,
+            @RequestHeader("X-Booth-Id") final Long boothId
+    ) {
+        final WaitingAdmitResDto response = waitingService.admitWaiting(waitingId, boothId);
         return ResponseUtils.ok(response);
     }
 

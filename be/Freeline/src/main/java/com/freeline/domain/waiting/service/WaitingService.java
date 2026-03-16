@@ -22,6 +22,8 @@ import com.freeline.domain.booth.repository.BoothWaitingRepository;
 import com.freeline.domain.waiting.converter.WaitingConverter;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingResDto;
+import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
+import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCreateResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExpectedTimeResDto;
@@ -46,6 +48,12 @@ public class WaitingService {
             WaitingStatus.REGISTERED
     );
 
+    private static final List<WaitingStatus> OTHER_BOOTH_FRONT_QUEUE_STATUSES = List.of(
+            WaitingStatus.CALLED,
+            WaitingStatus.REGISTERED,
+            WaitingStatus.ENTERED
+    );
+
     private static final List<WaitingStatus> RANKED_WAITING_STATUSES = List.of(
             WaitingStatus.WAITING,
             WaitingStatus.CALLED,
@@ -58,7 +66,14 @@ public class WaitingService {
             WaitingStatus.CANCELED
     );
 
+    private static final List<WaitingStatus> ADMIN_CANCEL_BLOCKED_STATUSES = List.of(
+            WaitingStatus.ENTERED,
+            WaitingStatus.EXITED,
+            WaitingStatus.CANCELED
+    );
+
     private static final int MAX_ACTIVE_WAITING_COUNT = 3;
+    private static final int DEFAULT_CALL_VALID_TIME_SECONDS = 180;
     private static final int DEFAULT_DEFER_LIMIT = 0;
     private static final int DEFAULT_STAY_TIME_SECONDS = 0;
     private static final int SECONDS_PER_MINUTE = 60;
@@ -96,6 +111,39 @@ public class WaitingService {
                 resolveMyRank(saved),
                 resolveVisitorQueueStatus(activeWaitings)
         );
+    }
+
+    public WaitingCallResDto callNextWaiting(final Long boothId) {
+        getBoothEntity(boothId);
+
+        final BoothWaiting waiting = boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
+                        boothId,
+                        List.of(WaitingStatus.WAITING)
+                )
+                .stream()
+                .filter(candidate -> !boothWaitingRepository.existsByVisitorIdAndBoothIdNotAndStatusIn(
+                        candidate.getVisitorId(),
+                        boothId,
+                        OTHER_BOOTH_FRONT_QUEUE_STATUSES
+                ))
+                .findFirst()
+                .orElseThrow(() -> new WaitingException(ErrorCode.CALL_CANDIDATE_NOT_FOUND));
+
+        final int callValidTimeSeconds = resolveCallValidTimeSeconds(boothId);
+        final java.time.LocalDateTime calledAt = TimeUtils.nowDateTime();
+        waiting.updateStatus(WaitingStatus.CALLED);
+        waiting.updateCalledAt(calledAt);
+        waiting.updateCallExpiresAt(calledAt.plusSeconds(callValidTimeSeconds));
+
+        log.info(
+                "[Waiting] call complete {waitingId: {}, boothId: {}, visitorId: {}, waitingNumber: {}}",
+                waiting.getId(),
+                boothId,
+                waiting.getVisitorId(),
+                waiting.getWaitingNumber()
+        );
+
+        return WaitingConverter.toWaitingCallResDto(waiting);
     }
 
     public void cancelWaiting(final Long waitingId, final Long visitorId) {
@@ -173,6 +221,46 @@ public class WaitingService {
         );
 
         return WaitingConverter.toWaitingExitResDto(waiting);
+    }
+
+    public WaitingAdmitResDto admitWaiting(final Long waitingId, final Long boothId) {
+        final BoothWaiting waiting = getWaitingEntity(waitingId);
+        validateWaitingBooth(waiting, boothId);
+
+        if (waiting.getStatus() != WaitingStatus.REGISTERED) {
+            throw new WaitingException(ErrorCode.INVALID_STATUS_FOR_ADMIT);
+        }
+
+        waiting.updateStatus(WaitingStatus.ENTERED);
+        waiting.updateEnteredAt(TimeUtils.nowDateTime());
+
+        log.info(
+                "[Waiting] admit complete {waitingId: {}, boothId: {}, visitorId: {}}",
+                waiting.getId(),
+                boothId,
+                waiting.getVisitorId()
+        );
+
+        return WaitingConverter.toWaitingAdmitResDto(waiting);
+    }
+
+    public void cancelWaitingByAdmin(final Long waitingId, final Long boothId) {
+        final BoothWaiting waiting = getWaitingEntity(waitingId);
+        validateWaitingBooth(waiting, boothId);
+
+        if (ADMIN_CANCEL_BLOCKED_STATUSES.contains(waiting.getStatus())) {
+            throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_CANCEL);
+        }
+
+        waiting.updateStatus(WaitingStatus.CANCELED);
+        waiting.updateExitedAt(TimeUtils.nowDateTime());
+
+        log.info(
+                "[Waiting] admin cancel complete {waitingId: {}, boothId: {}, visitorId: {}}",
+                waiting.getId(),
+                boothId,
+                waiting.getVisitorId()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -281,6 +369,12 @@ public class WaitingService {
         }
     }
 
+    private void validateWaitingBooth(final BoothWaiting waiting, final Long boothId) {
+        if (!waiting.getBoothId().equals(boothId)) {
+            throw new WaitingException(ErrorCode.ACCESS_DENIED);
+        }
+    }
+
     private void validatePostponeStatus(final BoothWaiting waiting) {
         if (waiting.getStatus() != WaitingStatus.WAITING) {
             throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_POSTPONE);
@@ -292,6 +386,13 @@ public class WaitingService {
                 .map(BoothPolicy::getDeferLimit)
                 .filter(value -> value != null && value >= 0)
                 .orElse(DEFAULT_DEFER_LIMIT);
+    }
+
+    private int resolveCallValidTimeSeconds(final Long boothId) {
+        return boothPolicyRepository.findByBoothId(boothId)
+                .map(BoothPolicy::getCallValidTime)
+                .filter(value -> value != null && value > 0)
+                .orElse(DEFAULT_CALL_VALID_TIME_SECONDS);
     }
 
     private void swapWaitingNumbers(final BoothWaiting source, final BoothWaiting target) {

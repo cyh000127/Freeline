@@ -10,6 +10,8 @@ import com.freeline.domain.booth.entity.VisitorQueueStatus;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingResDto;
+import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
+import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCreateResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExpectedTimeResDto;
@@ -103,6 +105,24 @@ public class WaitingConverter {
                 .waitingId(waiting.getId())
                 .status(waiting.getStatus().name())
                 .exitedAt(waiting.getExitedAt())
+                .build();
+    }
+
+    public WaitingCallResDto toWaitingCallResDto(final BoothWaiting waiting) {
+        return WaitingCallResDto.builder()
+                .waitingId(waiting.getId())
+                .waitingNum(waiting.getWaitingNumber())
+                .status(waiting.getStatus().name())
+                .calledAt(waiting.getCalledAt())
+                .expiresAt(waiting.getCallExpiresAt())
+                .build();
+    }
+
+    public WaitingAdmitResDto toWaitingAdmitResDto(final BoothWaiting waiting) {
+        return WaitingAdmitResDto.builder()
+                .waitingId(waiting.getId())
+                .status(waiting.getStatus().name())
+                .enteredAt(waiting.getEnteredAt())
                 .build();
     }
 }
