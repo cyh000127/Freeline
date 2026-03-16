@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import lombok.RequiredArgsConstructor;
 
 import com.freeline.domain.auth.dto.BoothLoginReqDto;
+import com.freeline.domain.auth.dto.ChangePasswordReqDto;
 import com.freeline.domain.auth.dto.EmailVerifyReqDto;
 import com.freeline.domain.auth.dto.LoginReqDto;
 import com.freeline.domain.auth.dto.LoginResDto;
@@ -26,6 +27,7 @@ import com.freeline.domain.auth.dto.RefreshTokenReqDto;
 import com.freeline.domain.auth.dto.SignupReqDto;
 import com.freeline.domain.auth.dto.SignupResDto;
 import com.freeline.domain.auth.dto.UpdateMyInfoReqDto;
+import com.freeline.domain.auth.entity.Organizer;
 import com.freeline.domain.auth.service.AuthService;
 
 
@@ -120,6 +122,22 @@ public class AuthController {
 
     /**
      * 행사주최자 비밀번호 변경
+     */
+    @PatchMapping("/password")
+    public ResponseEntity<?> changePassword(
+            Authentication authentication,
+            @RequestBody ChangePasswordReqDto req) {
+
+        Long userId = Long.parseLong(authentication.getName());
+
+        authService.changePassword(userId, req);
+
+        return ResponseEntity.ok().build();
+    }
+
+
+    /**
+     * 행사주최자 회원 탈퇴
      */
     @DeleteMapping("/me")
     public ResponseEntity<Void> delete(Authentication authentication) {
