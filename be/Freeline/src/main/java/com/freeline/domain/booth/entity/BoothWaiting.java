@@ -81,6 +81,14 @@ public class BoothWaiting extends BaseEntity {
         this.status = status;
     }
 
+    public void updateWaitingNumber(final Integer waitingNumber) {
+        this.waitingNumber = waitingNumber;
+    }
+
+    public void increaseDeferCount() {
+        this.deferCount += 1;
+    }
+
     public void updateCalledAt(final LocalDateTime calledAt) {
         this.calledAt = calledAt;
     }

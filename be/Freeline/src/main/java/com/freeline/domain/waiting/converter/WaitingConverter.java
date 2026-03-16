@@ -11,7 +11,9 @@ import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCreateResDto;
+import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExpectedTimeResDto;
+import com.freeline.domain.waiting.dto.response.WaitingPostponeResDto;
 
 @UtilityClass
 public class WaitingConverter {
@@ -81,6 +83,26 @@ public class WaitingConverter {
                 .currentRank(currentRank)
                 .estimatedMinutes(estimatedMinutes)
                 .avgStayTime(avgStayTime)
+                .build();
+    }
+
+    public WaitingPostponeResDto toWaitingPostponeResDto(
+            final BoothWaiting waiting,
+            final int newRank,
+            final int remainingPostponeCount
+    ) {
+        return WaitingPostponeResDto.builder()
+                .waitingId(waiting.getId())
+                .newRank(newRank)
+                .remainingPostponeCount(remainingPostponeCount)
+                .build();
+    }
+
+    public WaitingExitResDto toWaitingExitResDto(final BoothWaiting waiting) {
+        return WaitingExitResDto.builder()
+                .waitingId(waiting.getId())
+                .status(waiting.getStatus().name())
+                .exitedAt(waiting.getExitedAt())
                 .build();
     }
 }

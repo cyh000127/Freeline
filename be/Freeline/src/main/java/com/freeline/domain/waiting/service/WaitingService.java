@@ -23,7 +23,9 @@ import com.freeline.domain.waiting.converter.WaitingConverter;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCreateResDto;
+import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExpectedTimeResDto;
+import com.freeline.domain.waiting.dto.response.WaitingPostponeResDto;
 import com.freeline.domain.waiting.exception.WaitingException;
 
 @Slf4j
@@ -48,6 +50,12 @@ public class WaitingService {
             WaitingStatus.WAITING,
             WaitingStatus.CALLED,
             WaitingStatus.REGISTERED
+    );
+
+    private static final List<WaitingStatus> CANCEL_BLOCKED_STATUSES = List.of(
+            WaitingStatus.EXITED,
+            WaitingStatus.EXPIRED,
+            WaitingStatus.CANCELED
     );
 
     private static final int MAX_ACTIVE_WAITING_COUNT = 3;
@@ -88,6 +96,83 @@ public class WaitingService {
                 resolveMyRank(saved),
                 resolveVisitorQueueStatus(activeWaitings)
         );
+    }
+
+    public void cancelWaiting(final Long waitingId, final Long visitorId) {
+        final BoothWaiting waiting = getWaitingEntity(waitingId);
+        validateWaitingOwner(waiting, visitorId);
+
+        if (CANCEL_BLOCKED_STATUSES.contains(waiting.getStatus())) {
+            throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_CANCEL);
+        }
+
+        waiting.updateStatus(WaitingStatus.CANCELED);
+        waiting.updateExitedAt(TimeUtils.nowDateTime());
+
+        log.info(
+                "[Waiting] cancel complete {waitingId: {}, boothId: {}, visitorId: {}}",
+                waiting.getId(),
+                waiting.getBoothId(),
+                visitorId
+        );
+    }
+
+    public WaitingPostponeResDto postponeWaiting(final Long waitingId, final Long visitorId) {
+        final BoothWaiting waiting = getWaitingEntity(waitingId);
+        validateWaitingOwner(waiting, visitorId);
+        validatePostponeStatus(waiting);
+
+        final int deferLimit = resolveDeferLimit(waiting.getBoothId());
+        if (waiting.getDeferCount() >= deferLimit) {
+            throw new WaitingException(ErrorCode.POSTPONE_LIMIT_EXCEEDED);
+        }
+
+        final BoothWaiting nextWaiting = boothWaitingRepository
+                .findFirstByBoothIdAndStatusAndWaitingNumberGreaterThanOrderByWaitingNumberAsc(
+                        waiting.getBoothId(),
+                        WaitingStatus.WAITING,
+                        waiting.getWaitingNumber()
+                )
+                .orElseThrow(() -> new WaitingException(ErrorCode.CANNOT_POSTPONE_LAST_IN_LINE));
+
+        swapWaitingNumbers(waiting, nextWaiting);
+        waiting.increaseDeferCount();
+
+        log.info(
+                "[Waiting] postpone complete {waitingId: {}, boothId: {}, visitorId: {}, newWaitingNumber: {}, deferCount: {}}",
+                waiting.getId(),
+                waiting.getBoothId(),
+                visitorId,
+                waiting.getWaitingNumber(),
+                waiting.getDeferCount()
+        );
+
+        return WaitingConverter.toWaitingPostponeResDto(
+                waiting,
+                resolveMyRank(waiting),
+                deferLimit - waiting.getDeferCount()
+        );
+    }
+
+    public WaitingExitResDto exitWaiting(final Long waitingId, final Long visitorId) {
+        final BoothWaiting waiting = getWaitingEntity(waitingId);
+        validateWaitingOwner(waiting, visitorId);
+
+        if (waiting.getStatus() != WaitingStatus.ENTERED) {
+            throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_EXIT);
+        }
+
+        waiting.updateStatus(WaitingStatus.EXITED);
+        waiting.updateExitedAt(TimeUtils.nowDateTime());
+
+        log.info(
+                "[Waiting] exit complete {waitingId: {}, boothId: {}, visitorId: {}}",
+                waiting.getId(),
+                waiting.getBoothId(),
+                visitorId
+        );
+
+        return WaitingConverter.toWaitingExitResDto(waiting);
     }
 
     @Transactional(readOnly = true)
@@ -161,16 +246,11 @@ public class WaitingService {
     }
 
     private boolean isPostponeAvailable(final BoothWaiting waiting) {
-        if (waiting.getStatus() != WaitingStatus.CALLED) {
+        if (waiting.getStatus() != WaitingStatus.WAITING) {
             return false;
         }
 
-        final int deferLimit = boothPolicyRepository.findByBoothId(waiting.getBoothId())
-                .map(BoothPolicy::getDeferLimit)
-                .filter(value -> value != null && value >= 0)
-                .orElse(DEFAULT_DEFER_LIMIT);
-
-        return waiting.getDeferCount() < deferLimit;
+        return waiting.getDeferCount() < resolveDeferLimit(waiting.getBoothId());
     }
 
     private VisitorQueueStatus resolveVisitorQueueStatus(final List<BoothWaiting> activeWaitings) {
@@ -188,5 +268,35 @@ public class WaitingService {
     private Booth getBoothEntity(final Long boothId) {
         return boothRepository.findById(boothId)
                 .orElseThrow(() -> new BoothException(ErrorCode.BOOTH_NOT_FOUND));
+    }
+
+    private BoothWaiting getWaitingEntity(final Long waitingId) {
+        return boothWaitingRepository.findById(waitingId)
+                .orElseThrow(() -> new WaitingException(ErrorCode.NOT_FOUND));
+    }
+
+    private void validateWaitingOwner(final BoothWaiting waiting, final Long visitorId) {
+        if (!waiting.getVisitorId().equals(visitorId)) {
+            throw new WaitingException(ErrorCode.WAITING_ACCESS_DENIED);
+        }
+    }
+
+    private void validatePostponeStatus(final BoothWaiting waiting) {
+        if (waiting.getStatus() != WaitingStatus.WAITING) {
+            throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_POSTPONE);
+        }
+    }
+
+    private int resolveDeferLimit(final Long boothId) {
+        return boothPolicyRepository.findByBoothId(boothId)
+                .map(BoothPolicy::getDeferLimit)
+                .filter(value -> value != null && value >= 0)
+                .orElse(DEFAULT_DEFER_LIMIT);
+    }
+
+    private void swapWaitingNumbers(final BoothWaiting source, final BoothWaiting target) {
+        final int sourceWaitingNumber = source.getWaitingNumber();
+        source.updateWaitingNumber(target.getWaitingNumber());
+        target.updateWaitingNumber(sourceWaitingNumber);
     }
 }
