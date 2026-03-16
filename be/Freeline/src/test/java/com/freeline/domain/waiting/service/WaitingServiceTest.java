@@ -23,6 +23,8 @@ import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
+import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
+import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCreateResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExpectedTimeResDto;
@@ -43,6 +45,12 @@ class WaitingServiceTest {
             WaitingStatus.WAITING,
             WaitingStatus.CALLED,
             WaitingStatus.REGISTERED
+    );
+
+    private static final List<WaitingStatus> OTHER_BOOTH_FRONT_QUEUE_STATUSES = List.of(
+            WaitingStatus.CALLED,
+            WaitingStatus.REGISTERED,
+            WaitingStatus.ENTERED
     );
 
     @Mock
@@ -131,6 +139,62 @@ class WaitingServiceTest {
     }
 
     @Test
+    void callNextWaiting_success_skipsVisitorInFrontQueueAtOtherBooth() {
+        final Booth booth = createBooth(12L, "Goods Booth");
+        final BoothWaiting firstWaiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 1, 0, null);
+        final BoothWaiting secondWaiting = createWaiting(302L, 12L, 22L, WaitingStatus.WAITING, 2, 0, null);
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
+                12L,
+                List.of(WaitingStatus.WAITING)
+        )).thenReturn(List.of(firstWaiting, secondWaiting));
+        Mockito.when(boothWaitingRepository.existsByVisitorIdAndBoothIdNotAndStatusIn(
+                21L,
+                12L,
+                OTHER_BOOTH_FRONT_QUEUE_STATUSES
+        )).thenReturn(true);
+        Mockito.when(boothWaitingRepository.existsByVisitorIdAndBoothIdNotAndStatusIn(
+                22L,
+                12L,
+                OTHER_BOOTH_FRONT_QUEUE_STATUSES
+        )).thenReturn(false);
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
+                BoothPolicy.builder()
+                        .id(1L)
+                        .boothId(12L)
+                        .callValidTime(180)
+                        .build()
+        ));
+
+        final WaitingCallResDto result = waitingService.callNextWaiting(12L);
+
+        Assertions.assertThat(firstWaiting.getStatus()).isEqualTo(WaitingStatus.WAITING);
+        Assertions.assertThat(secondWaiting.getStatus()).isEqualTo(WaitingStatus.CALLED);
+        Assertions.assertThat(secondWaiting.getCalledAt()).isNotNull();
+        Assertions.assertThat(secondWaiting.getCallExpiresAt()).isNotNull();
+        Assertions.assertThat(secondWaiting.getCallExpiresAt()).isAfter(secondWaiting.getCalledAt());
+        Assertions.assertThat(result.waitingId()).isEqualTo(302L);
+        Assertions.assertThat(result.waitingNum()).isEqualTo(2);
+        Assertions.assertThat(result.status()).isEqualTo("CALLED");
+    }
+
+    @Test
+    void callNextWaiting_fail_whenCandidateNotFound() {
+        final Booth booth = createBooth(12L, "Goods Booth");
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
+                12L,
+                List.of(WaitingStatus.WAITING)
+        )).thenReturn(List.of());
+
+        Assertions.assertThatThrownBy(() -> waitingService.callNextWaiting(12L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.CALL_CANDIDATE_NOT_FOUND.getMessage());
+    }
+
+    @Test
     void cancelWaiting_success() {
         final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 4, 0, null);
         Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
@@ -157,6 +221,27 @@ class WaitingServiceTest {
         Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
 
         Assertions.assertThatThrownBy(() -> waitingService.cancelWaiting(301L, 21L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.INVALID_WAITING_STATUS_FOR_CANCEL.getMessage());
+    }
+
+    @Test
+    void cancelWaitingByAdmin_success() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.CALLED, 4, 0, null);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+
+        waitingService.cancelWaitingByAdmin(301L, 12L);
+
+        Assertions.assertThat(waiting.getStatus()).isEqualTo(WaitingStatus.CANCELED);
+        Assertions.assertThat(waiting.getExitedAt()).isNotNull();
+    }
+
+    @Test
+    void cancelWaitingByAdmin_fail_whenInvalidStatus() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.ENTERED, 4, 0, null);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+
+        Assertions.assertThatThrownBy(() -> waitingService.cancelWaitingByAdmin(301L, 12L))
                 .isInstanceOf(WaitingException.class)
                 .hasMessage(ErrorCode.INVALID_WAITING_STATUS_FOR_CANCEL.getMessage());
     }
@@ -241,6 +326,40 @@ class WaitingServiceTest {
                         ArgumentMatchers.any(),
                         ArgumentMatchers.anyInt()
                 );
+    }
+
+    @Test
+    void admitWaiting_success_whenRegistered() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.REGISTERED, 4, 0, null);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+
+        final WaitingAdmitResDto result = waitingService.admitWaiting(301L, 12L);
+
+        Assertions.assertThat(waiting.getStatus()).isEqualTo(WaitingStatus.ENTERED);
+        Assertions.assertThat(waiting.getEnteredAt()).isNotNull();
+        Assertions.assertThat(result.waitingId()).isEqualTo(301L);
+        Assertions.assertThat(result.status()).isEqualTo("ENTERED");
+        Assertions.assertThat(result.enteredAt()).isNotNull();
+    }
+
+    @Test
+    void admitWaiting_fail_whenStatusIsWaiting() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 4, 0, null);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+
+        Assertions.assertThatThrownBy(() -> waitingService.admitWaiting(301L, 12L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.INVALID_STATUS_FOR_ADMIT.getMessage());
+    }
+
+    @Test
+    void admitWaiting_fail_whenStatusIsCalled() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.CALLED, 4, 0, null);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+
+        Assertions.assertThatThrownBy(() -> waitingService.admitWaiting(301L, 12L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.INVALID_STATUS_FOR_ADMIT.getMessage());
     }
 
     @Test

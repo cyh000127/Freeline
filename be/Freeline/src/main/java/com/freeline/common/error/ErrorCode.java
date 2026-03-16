@@ -81,6 +81,13 @@ public enum ErrorCode {
             "대기열의 마지막 순서이므로 더 이상 미룰 수 없습니다."
     ),
 
+    CALL_CANDIDATE_NOT_FOUND(HttpStatus.NOT_FOUND, "B-013", "호출 가능한 대기자가 없습니다."),
+    INVALID_STATUS_FOR_ADMIT(
+            HttpStatus.BAD_REQUEST,
+            "B-014",
+            "도착 확인(REGISTERED)이 완료된 대기만 입장 처리할 수 있습니다."
+    ),
+
     /**
      * File Error (F-xxx)
      */
