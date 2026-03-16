@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.freeline.common.error.ErrorCode;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothPolicy;
 import com.freeline.domain.booth.entity.BoothWaiting;
@@ -23,7 +24,9 @@ import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCreateResDto;
+import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExpectedTimeResDto;
+import com.freeline.domain.waiting.dto.response.WaitingPostponeResDto;
 import com.freeline.domain.waiting.exception.WaitingException;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,20 +59,8 @@ class WaitingServiceTest {
 
     @Test
     void createWaiting_success() {
-        final Booth booth = Booth.builder()
-                .id(12L)
-                .eventId(3L)
-                .name("굿즈 부스")
-                .build();
-        final BoothWaiting savedWaiting = BoothWaiting.builder()
-                .id(301L)
-                .boothId(12L)
-                .visitorId(21L)
-                .status(WaitingStatus.WAITING)
-                .waitingNumber(4)
-                .deferCount(0)
-                .requestedAt(LocalDateTime.of(2026, 3, 13, 10, 0))
-                .build();
+        final Booth booth = createBooth(12L, "Goods Booth");
+        final BoothWaiting savedWaiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 4, 0, null);
 
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
         Mockito.when(boothWaitingRepository.existsByVisitorIdAndBoothIdAndStatusIn(
@@ -79,15 +70,7 @@ class WaitingServiceTest {
         )).thenReturn(false);
         Mockito.when(boothWaitingRepository.countByVisitorIdAndStatusIn(21L, ACTIVE_WAITING_STATUSES)).thenReturn(1L);
         Mockito.when(boothWaitingRepository.findTopByBoothIdOrderByWaitingNumberDesc(12L)).thenReturn(Optional.of(
-                BoothWaiting.builder()
-                        .id(300L)
-                        .boothId(12L)
-                        .visitorId(19L)
-                        .status(WaitingStatus.WAITING)
-                        .waitingNumber(3)
-                        .deferCount(0)
-                        .requestedAt(LocalDateTime.of(2026, 3, 13, 9, 55))
-                        .build()
+                createWaiting(300L, 12L, 19L, WaitingStatus.WAITING, 3, 0, null)
         ));
         Mockito.when(boothWaitingRepository.save(ArgumentMatchers.any(BoothWaiting.class))).thenReturn(savedWaiting);
         Mockito.when(boothWaitingRepository.findAllByVisitorIdAndStatusInOrderByRequestedAtAsc(
@@ -111,11 +94,7 @@ class WaitingServiceTest {
 
     @Test
     void createWaiting_fail_whenAlreadyWaitingAtSameBooth() {
-        final Booth booth = Booth.builder()
-                .id(12L)
-                .eventId(3L)
-                .name("굿즈 부스")
-                .build();
+        final Booth booth = createBooth(12L, "Goods Booth");
 
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
         Mockito.when(boothWaitingRepository.existsByVisitorIdAndBoothIdAndStatusIn(
@@ -126,7 +105,7 @@ class WaitingServiceTest {
 
         Assertions.assertThatThrownBy(() -> waitingService.createWaiting(12L, 21L))
                 .isInstanceOf(WaitingException.class)
-                .hasMessage("이미 해당 부스에 진행 중인 대기가 존재합니다.");
+                .hasMessage(ErrorCode.ALREADY_WAITING_FOR_BOOTH.getMessage());
 
         Mockito.verify(boothWaitingRepository, Mockito.never()).countByVisitorIdAndStatusIn(
                 ArgumentMatchers.anyLong(),
@@ -136,11 +115,7 @@ class WaitingServiceTest {
 
     @Test
     void createWaiting_fail_whenActiveWaitingLimitExceeded() {
-        final Booth booth = Booth.builder()
-                .id(12L)
-                .eventId(3L)
-                .name("굿즈 부스")
-                .build();
+        final Booth booth = createBooth(12L, "Goods Booth");
 
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
         Mockito.when(boothWaitingRepository.existsByVisitorIdAndBoothIdAndStatusIn(
@@ -152,41 +127,152 @@ class WaitingServiceTest {
 
         Assertions.assertThatThrownBy(() -> waitingService.createWaiting(12L, 21L))
                 .isInstanceOf(WaitingException.class)
-                .hasMessage("최대 활성 대기 개수(3개)를 초과할 수 없습니다.");
+                .hasMessage(ErrorCode.MAX_WAITING_EXCEEDED.getMessage());
+    }
+
+    @Test
+    void cancelWaiting_success() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 4, 0, null);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+
+        waitingService.cancelWaiting(301L, 21L);
+
+        Assertions.assertThat(waiting.getStatus()).isEqualTo(WaitingStatus.CANCELED);
+        Assertions.assertThat(waiting.getExitedAt()).isNotNull();
+    }
+
+    @Test
+    void cancelWaiting_fail_whenAccessDenied() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 22L, WaitingStatus.WAITING, 4, 0, null);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+
+        Assertions.assertThatThrownBy(() -> waitingService.cancelWaiting(301L, 21L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.WAITING_ACCESS_DENIED.getMessage());
+    }
+
+    @Test
+    void cancelWaiting_fail_whenStatusAlreadyClosed() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.EXITED, 4, 0, null);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+
+        Assertions.assertThatThrownBy(() -> waitingService.cancelWaiting(301L, 21L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.INVALID_WAITING_STATUS_FOR_CANCEL.getMessage());
+    }
+
+    @Test
+    void postponeWaiting_success() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 3, 0, null);
+        final BoothWaiting nextWaiting = createWaiting(302L, 12L, 22L, WaitingStatus.WAITING, 4, 0, null);
+
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
+                BoothPolicy.builder()
+                        .id(1L)
+                        .boothId(12L)
+                        .deferLimit(2)
+                        .build()
+        ));
+        Mockito.when(boothWaitingRepository.findFirstByBoothIdAndStatusAndWaitingNumberGreaterThanOrderByWaitingNumberAsc(
+                12L,
+                WaitingStatus.WAITING,
+                3
+        )).thenReturn(Optional.of(nextWaiting));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusInAndWaitingNumberLessThan(
+                12L,
+                RANKED_WAITING_STATUSES,
+                4
+        )).thenReturn(3L);
+
+        final WaitingPostponeResDto result = waitingService.postponeWaiting(301L, 21L);
+
+        Assertions.assertThat(waiting.getWaitingNumber()).isEqualTo(4);
+        Assertions.assertThat(nextWaiting.getWaitingNumber()).isEqualTo(3);
+        Assertions.assertThat(waiting.getDeferCount()).isEqualTo(1);
+        Assertions.assertThat(result.waitingId()).isEqualTo(301L);
+        Assertions.assertThat(result.newRank()).isEqualTo(4);
+        Assertions.assertThat(result.remainingPostponeCount()).isEqualTo(1);
+    }
+
+    @Test
+    void postponeWaiting_fail_whenLastInLine() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 3, 0, null);
+
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
+                BoothPolicy.builder()
+                        .id(1L)
+                        .boothId(12L)
+                        .deferLimit(2)
+                        .build()
+        ));
+        Mockito.when(boothWaitingRepository.findFirstByBoothIdAndStatusAndWaitingNumberGreaterThanOrderByWaitingNumberAsc(
+                12L,
+                WaitingStatus.WAITING,
+                3
+        )).thenReturn(Optional.empty());
+
+        Assertions.assertThatThrownBy(() -> waitingService.postponeWaiting(301L, 21L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.CANNOT_POSTPONE_LAST_IN_LINE.getMessage());
+    }
+
+    @Test
+    void postponeWaiting_fail_whenLimitExceeded() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 3, 2, null);
+
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
+                BoothPolicy.builder()
+                        .id(1L)
+                        .boothId(12L)
+                        .deferLimit(2)
+                        .build()
+        ));
+
+        Assertions.assertThatThrownBy(() -> waitingService.postponeWaiting(301L, 21L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.POSTPONE_LIMIT_EXCEEDED.getMessage());
+
+        Mockito.verify(boothWaitingRepository, Mockito.never())
+                .findFirstByBoothIdAndStatusAndWaitingNumberGreaterThanOrderByWaitingNumberAsc(
+                        ArgumentMatchers.anyLong(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.anyInt()
+                );
+    }
+
+    @Test
+    void exitWaiting_success() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.ENTERED, 4, 0, null);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+
+        final WaitingExitResDto result = waitingService.exitWaiting(301L, 21L);
+
+        Assertions.assertThat(waiting.getStatus()).isEqualTo(WaitingStatus.EXITED);
+        Assertions.assertThat(waiting.getExitedAt()).isNotNull();
+        Assertions.assertThat(result.waitingId()).isEqualTo(301L);
+        Assertions.assertThat(result.status()).isEqualTo("EXITED");
+        Assertions.assertThat(result.exitedAt()).isNotNull();
+    }
+
+    @Test
+    void exitWaiting_fail_whenInvalidStatus() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 4, 0, null);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+
+        Assertions.assertThatThrownBy(() -> waitingService.exitWaiting(301L, 21L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.INVALID_WAITING_STATUS_FOR_EXIT.getMessage());
     }
 
     @Test
     void getMyWaitings_success() {
-        final Booth goodsBooth = Booth.builder()
-                .id(12L)
-                .eventId(3L)
-                .name("굿즈 부스")
-                .build();
-        final Booth foodBooth = Booth.builder()
-                .id(14L)
-                .eventId(3L)
-                .name("푸드 부스")
-                .build();
-        final BoothWaiting waiting = BoothWaiting.builder()
-                .id(301L)
-                .boothId(12L)
-                .booth(goodsBooth)
-                .visitorId(21L)
-                .status(WaitingStatus.WAITING)
-                .waitingNumber(8)
-                .deferCount(0)
-                .requestedAt(LocalDateTime.of(2026, 3, 13, 10, 0))
-                .build();
-        final BoothWaiting called = BoothWaiting.builder()
-                .id(302L)
-                .boothId(14L)
-                .booth(foodBooth)
-                .visitorId(21L)
-                .status(WaitingStatus.CALLED)
-                .waitingNumber(2)
-                .deferCount(0)
-                .requestedAt(LocalDateTime.of(2026, 3, 13, 10, 1))
-                .build();
+        final Booth goodsBooth = createBooth(12L, "Goods Booth");
+        final Booth foodBooth = createBooth(14L, "Food Booth");
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 8, 0, goodsBooth);
+        final BoothWaiting called = createWaiting(302L, 14L, 21L, WaitingStatus.CALLED, 2, 0, foodBooth);
 
         Mockito.when(boothWaitingRepository.findAllByVisitorIdAndStatusInOrderByRequestedAtAsc(
                 21L,
@@ -202,10 +288,10 @@ class WaitingServiceTest {
                 RANKED_WAITING_STATUSES,
                 2
         )).thenReturn(1L);
-        Mockito.when(boothPolicyRepository.findByBoothId(14L)).thenReturn(Optional.of(
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
                 BoothPolicy.builder()
                         .id(1L)
-                        .boothId(14L)
+                        .boothId(12L)
                         .deferLimit(2)
                         .build()
         ));
@@ -214,19 +300,16 @@ class WaitingServiceTest {
 
         Assertions.assertThat(result.visitorQueueStatus()).isEqualTo("FRONT_QUEUE_OCCUPIED");
         Assertions.assertThat(result.waitings()).hasSize(2);
-        Assertions.assertThat(result.waitings().get(0).boothName()).isEqualTo("굿즈 부스");
+        Assertions.assertThat(result.waitings().get(0).boothName()).isEqualTo("Goods Booth");
         Assertions.assertThat(result.waitings().get(0).myRank()).isEqualTo(5);
+        Assertions.assertThat(result.waitings().get(0).postponeAvailable()).isTrue();
         Assertions.assertThat(result.waitings().get(1).myRank()).isEqualTo(2);
-        Assertions.assertThat(result.waitings().get(1).postponeAvailable()).isTrue();
+        Assertions.assertThat(result.waitings().get(1).postponeAvailable()).isFalse();
     }
 
     @Test
     void getExpectedWaitingTime_success() {
-        final Booth booth = Booth.builder()
-                .id(12L)
-                .eventId(3L)
-                .name("굿즈 부스")
-                .build();
+        final Booth booth = createBooth(12L, "Goods Booth");
 
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
         Mockito.when(boothWaitingRepository.countByBoothIdAndStatus(12L, WaitingStatus.WAITING)).thenReturn(7L);
@@ -252,6 +335,35 @@ class WaitingServiceTest {
 
         Assertions.assertThatThrownBy(() -> waitingService.getExpectedWaitingTime(12L))
                 .isInstanceOf(BoothException.class)
-                .hasMessage("존재하지 않는 부스입니다.");
+                .hasMessage(ErrorCode.BOOTH_NOT_FOUND.getMessage());
+    }
+
+    private Booth createBooth(final Long boothId, final String name) {
+        return Booth.builder()
+                .id(boothId)
+                .eventId(3L)
+                .name(name)
+                .build();
+    }
+
+    private BoothWaiting createWaiting(
+            final Long waitingId,
+            final Long boothId,
+            final Long visitorId,
+            final WaitingStatus status,
+            final int waitingNumber,
+            final int deferCount,
+            final Booth booth
+    ) {
+        return BoothWaiting.builder()
+                .id(waitingId)
+                .boothId(boothId)
+                .booth(booth)
+                .visitorId(visitorId)
+                .status(status)
+                .waitingNumber(waitingNumber)
+                .deferCount(deferCount)
+                .requestedAt(LocalDateTime.of(2026, 3, 13, 10, 0))
+                .build();
     }
 }

@@ -58,6 +58,29 @@ public enum ErrorCode {
     MAX_WAITING_EXCEEDED(HttpStatus.FORBIDDEN, "B-005", "최대 활성 대기 개수(3개)를 초과할 수 없습니다."),
     ALREADY_WAITING_FOR_BOOTH(HttpStatus.CONFLICT, "B-006", "이미 해당 부스에 진행 중인 대기가 존재합니다."),
 
+    WAITING_ACCESS_DENIED(HttpStatus.FORBIDDEN, "B-007", "본인의 대기 내역만 제어할 수 있습니다."),
+    INVALID_WAITING_STATUS_FOR_CANCEL(
+            HttpStatus.BAD_REQUEST,
+            "B-008",
+            "이미 종료되거나 취소된 대기는 취소할 수 없습니다."
+    ),
+    INVALID_WAITING_STATUS_FOR_EXIT(
+            HttpStatus.BAD_REQUEST,
+            "B-009",
+            "입장(ENTERED) 상태인 경우에만 퇴장 처리할 수 있습니다."
+    ),
+    INVALID_WAITING_STATUS_FOR_POSTPONE(
+            HttpStatus.BAD_REQUEST,
+            "B-010",
+            "대기 중(WAITING) 상태에서만 순번을 미룰 수 있습니다."
+    ),
+    POSTPONE_LIMIT_EXCEEDED(HttpStatus.FORBIDDEN, "B-011", "순번 미루기 허용 횟수를 초과했습니다."),
+    CANNOT_POSTPONE_LAST_IN_LINE(
+            HttpStatus.BAD_REQUEST,
+            "B-012",
+            "대기열의 마지막 순서이므로 더 이상 미룰 수 없습니다."
+    ),
+
     /**
      * File Error (F-xxx)
      */

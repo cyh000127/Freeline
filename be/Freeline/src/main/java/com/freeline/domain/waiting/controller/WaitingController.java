@@ -1,7 +1,9 @@
 package com.freeline.domain.waiting.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -14,7 +16,9 @@ import com.freeline.common.response.BaseResponse;
 import com.freeline.common.util.ResponseUtils;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCreateResDto;
+import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExpectedTimeResDto;
+import com.freeline.domain.waiting.dto.response.WaitingPostponeResDto;
 import com.freeline.domain.waiting.service.WaitingService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,7 +32,7 @@ public class WaitingController {
 
     private final WaitingService waitingService;
 
-    @Operation(summary = "대기 등록", description = "관람객을 특정 부스 대기열에 등록합니다.")
+    @Operation(summary = "대기 등록", description = "관람객이 특정 부스의 대기열에 등록합니다.")
     @PostMapping("/booths/{boothId}/waitings")
     public ResponseEntity<BaseResponse<WaitingCreateResDto>> createWaiting(
             @PathVariable final Long boothId,
@@ -36,6 +40,36 @@ public class WaitingController {
     ) {
         final WaitingCreateResDto response = waitingService.createWaiting(boothId, visitorId);
         return ResponseUtils.created(response);
+    }
+
+    @Operation(summary = "대기 취소", description = "관람객이 자신의 대기 내역을 직접 취소합니다.")
+    @DeleteMapping("/waitings/{waitingId}")
+    public ResponseEntity<BaseResponse<Void>> cancelWaiting(
+            @PathVariable final Long waitingId,
+            @RequestHeader("X-Visitor-Id") final Long visitorId
+    ) {
+        waitingService.cancelWaiting(waitingId, visitorId);
+        return ResponseUtils.ok(null);
+    }
+
+    @Operation(summary = "대기 순번 미루기", description = "관람객이 자신의 대기 순번을 한 칸 뒤로 미룹니다.")
+    @PatchMapping("/waitings/{waitingId}/postpone")
+    public ResponseEntity<BaseResponse<WaitingPostponeResDto>> postponeWaiting(
+            @PathVariable final Long waitingId,
+            @RequestHeader("X-Visitor-Id") final Long visitorId
+    ) {
+        final WaitingPostponeResDto response = waitingService.postponeWaiting(waitingId, visitorId);
+        return ResponseUtils.ok(response);
+    }
+
+    @Operation(summary = "이용 종료", description = "관람객이 체험을 마치고 퇴장 처리합니다.")
+    @PatchMapping("/waitings/{waitingId}/exit")
+    public ResponseEntity<BaseResponse<WaitingExitResDto>> exitWaiting(
+            @PathVariable final Long waitingId,
+            @RequestHeader("X-Visitor-Id") final Long visitorId
+    ) {
+        final WaitingExitResDto response = waitingService.exitWaiting(waitingId, visitorId);
+        return ResponseUtils.ok(response);
     }
 
     @Operation(summary = "내 대기 목록 조회", description = "관람객의 활성 대기 목록과 현재 대기 상태를 조회합니다.")
