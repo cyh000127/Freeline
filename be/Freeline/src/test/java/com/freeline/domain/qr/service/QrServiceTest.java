@@ -243,9 +243,9 @@ class QrServiceTest {
         )).thenReturn(Optional.empty());
 
         Assertions.assertThatThrownBy(() -> qrService.scanQr(QrScanReqDto.builder()
-                .visitorId(21L)
-                .qrCode("FREELINE|FRONT_QUEUE_ARRIVAL|v1|12|fixed-key")
-                .build()))
+                        .visitorId(21L)
+                        .qrCode("FREELINE|FRONT_QUEUE_ARRIVAL|v1|12|fixed-key")
+                        .build()))
                 .isInstanceOf(QrException.class)
                 .hasMessage("호출 상태의 대기를 찾을 수 없습니다.");
 

@@ -45,6 +45,10 @@ qr:
   reissue-cooldown-seconds: 30
   scan-lock-seconds: 5
 
+firebase:
+  project-id: ${FIREBASE_PROJECT_ID:}
+  service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:}
+
 app:
   database:
     reset-on-startup: false

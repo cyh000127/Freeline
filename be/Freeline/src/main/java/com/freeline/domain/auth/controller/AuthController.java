@@ -27,7 +27,6 @@ import com.freeline.domain.auth.dto.RefreshTokenReqDto;
 import com.freeline.domain.auth.dto.SignupReqDto;
 import com.freeline.domain.auth.dto.SignupResDto;
 import com.freeline.domain.auth.dto.UpdateMyInfoReqDto;
-import com.freeline.domain.auth.entity.Organizer;
 import com.freeline.domain.auth.service.AuthService;
 
 
