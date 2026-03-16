@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.freeline.domain.booth.entity.BoothWaiting;
 import com.freeline.domain.booth.entity.WaitingStatus;
@@ -31,6 +33,19 @@ public interface BoothWaitingRepository extends JpaRepository<BoothWaiting, Long
     List<BoothWaiting> findAllByVisitorIdAndStatusInOrderByRequestedAtAsc(
             final Long visitorId,
             final Collection<WaitingStatus> statuses
+    );
+
+    @Query("""
+            select w
+            from BoothWaiting w
+            join fetch w.visitor
+            where w.boothId = :boothId
+              and w.status in :statuses
+            order by w.waitingNumber asc
+            """)
+    List<BoothWaiting> findWithVisitorByBoothIdAndStatusInOrderByWaitingNumberAsc(
+            @Param("boothId") final Long boothId,
+            @Param("statuses") final Collection<WaitingStatus> statuses
     );
 
     Optional<BoothWaiting> findFirstByBoothIdAndStatusOrderByCalledAtDesc(

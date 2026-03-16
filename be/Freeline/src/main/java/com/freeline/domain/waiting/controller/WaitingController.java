@@ -18,6 +18,7 @@ import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCreateResDto;
+import com.freeline.domain.waiting.dto.response.WaitingDashboardResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExpectedTimeResDto;
 import com.freeline.domain.waiting.dto.response.WaitingPostponeResDto;
@@ -50,6 +51,15 @@ public class WaitingController {
             @RequestHeader("X-Booth-Id") final Long boothId
     ) {
         final WaitingCallResDto response = waitingService.callNextWaiting(boothId);
+        return ResponseUtils.ok(response);
+    }
+
+    @Operation(summary = "실시간 부스 대기열 현황 조회", description = "부스 관리자가 현재 부스의 활성 대기열 현황을 조회합니다.")
+    @GetMapping("/booths/me/queue")
+    public ResponseEntity<BaseResponse<WaitingDashboardResDto>> getBoothQueueDashboard(
+            @RequestHeader("X-Booth-Id") final Long boothId
+    ) {
+        final WaitingDashboardResDto response = waitingService.getBoothQueueDashboard(boothId);
         return ResponseUtils.ok(response);
     }
 

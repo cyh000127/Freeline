@@ -25,9 +25,11 @@ import com.freeline.domain.waiting.dto.response.VisitorWaitingResDto;
 import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCreateResDto;
+import com.freeline.domain.waiting.dto.response.WaitingDashboardResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExpectedTimeResDto;
 import com.freeline.domain.waiting.dto.response.WaitingPostponeResDto;
+import com.freeline.domain.waiting.dto.response.WaitingQueueItemDto;
 import com.freeline.domain.waiting.exception.WaitingException;
 
 @Slf4j
@@ -242,6 +244,19 @@ public class WaitingService {
         );
 
         return WaitingConverter.toWaitingAdmitResDto(waiting);
+    }
+
+    @Transactional(readOnly = true)
+    public WaitingDashboardResDto getBoothQueueDashboard(final Long boothId) {
+        getBoothEntity(boothId);
+
+        final List<WaitingQueueItemDto> queueList = boothWaitingRepository
+                .findWithVisitorByBoothIdAndStatusInOrderByWaitingNumberAsc(boothId, ACTIVE_WAITING_STATUSES)
+                .stream()
+                .map(WaitingConverter::toWaitingQueueItemDto)
+                .toList();
+
+        return WaitingConverter.toWaitingDashboardResDto(boothId, queueList);
     }
 
     public void cancelWaitingByAdmin(final Long waitingId, final Long boothId) {

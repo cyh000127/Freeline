@@ -13,9 +13,11 @@ import com.freeline.domain.waiting.dto.response.VisitorWaitingResDto;
 import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCreateResDto;
+import com.freeline.domain.waiting.dto.response.WaitingDashboardResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExpectedTimeResDto;
 import com.freeline.domain.waiting.dto.response.WaitingPostponeResDto;
+import com.freeline.domain.waiting.dto.response.WaitingQueueItemDto;
 
 @UtilityClass
 public class WaitingConverter {
@@ -123,6 +125,28 @@ public class WaitingConverter {
                 .waitingId(waiting.getId())
                 .status(waiting.getStatus().name())
                 .enteredAt(waiting.getEnteredAt())
+                .build();
+    }
+
+    public WaitingQueueItemDto toWaitingQueueItemDto(final BoothWaiting waiting) {
+        return WaitingQueueItemDto.builder()
+                .waitingId(waiting.getId())
+                .waitingNumber(waiting.getWaitingNumber())
+                .visitorName(waiting.getVisitor() != null ? waiting.getVisitor().getName() : null)
+                .status(waiting.getStatus().name())
+                .deferCount(waiting.getDeferCount())
+                .calledAt(waiting.getCalledAt())
+                .build();
+    }
+
+    public WaitingDashboardResDto toWaitingDashboardResDto(
+            final Long boothId,
+            final List<WaitingQueueItemDto> queueList
+    ) {
+        return WaitingDashboardResDto.builder()
+                .boothId(boothId)
+                .totalWaitingCount(queueList.size())
+                .queueList(queueList)
                 .build();
     }
 }

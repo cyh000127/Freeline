@@ -17,6 +17,7 @@ import com.freeline.common.error.ErrorCode;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothPolicy;
 import com.freeline.domain.booth.entity.BoothWaiting;
+import com.freeline.domain.booth.entity.Visitor;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.exception.BoothException;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
@@ -26,6 +27,7 @@ import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCreateResDto;
+import com.freeline.domain.waiting.dto.response.WaitingDashboardResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExpectedTimeResDto;
 import com.freeline.domain.waiting.dto.response.WaitingPostponeResDto;
@@ -427,6 +429,40 @@ class WaitingServiceTest {
     }
 
     @Test
+    void getBoothQueueDashboard_success_returnsActiveWaitingsInOrder() {
+        final Booth booth = createBooth(12L, "Goods Booth");
+        final Visitor visitorOne = createVisitor(21L, "Kim");
+        final Visitor visitorTwo = createVisitor(22L, "Lee");
+        final Visitor visitorThree = createVisitor(23L, "Park");
+        final BoothWaiting firstWaiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 1, 0, null, visitorOne);
+        final BoothWaiting secondWaiting = createWaiting(302L, 12L, 22L, WaitingStatus.CALLED, 2, 1, null, visitorTwo);
+        final BoothWaiting thirdWaiting = createWaiting(303L, 12L, 23L, WaitingStatus.ENTERED, 3, 0, null, visitorThree);
+        secondWaiting.updateCalledAt(LocalDateTime.of(2026, 3, 13, 10, 3));
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.findWithVisitorByBoothIdAndStatusInOrderByWaitingNumberAsc(
+                12L,
+                ACTIVE_WAITING_STATUSES
+        )).thenReturn(List.of(firstWaiting, secondWaiting, thirdWaiting));
+
+        final WaitingDashboardResDto result = waitingService.getBoothQueueDashboard(12L);
+
+        Assertions.assertThat(result.boothId()).isEqualTo(12L);
+        Assertions.assertThat(result.totalWaitingCount()).isEqualTo(3);
+        Assertions.assertThat(result.queueList()).hasSize(3);
+        Assertions.assertThat(result.queueList().get(0).waitingId()).isEqualTo(301L);
+        Assertions.assertThat(result.queueList().get(0).visitorName()).isEqualTo("Kim");
+        Assertions.assertThat(result.queueList().get(1).waitingNumber()).isEqualTo(2);
+        Assertions.assertThat(result.queueList().get(1).status()).isEqualTo("CALLED");
+        Assertions.assertThat(result.queueList().get(1).deferCount()).isEqualTo(1);
+        Assertions.assertThat(result.queueList().get(1).calledAt()).isEqualTo(LocalDateTime.of(2026, 3, 13, 10, 3));
+        Assertions.assertThat(result.queueList().get(2).visitorName()).isEqualTo("Park");
+
+        Mockito.verify(boothWaitingRepository)
+                .findWithVisitorByBoothIdAndStatusInOrderByWaitingNumberAsc(12L, ACTIVE_WAITING_STATUSES);
+    }
+
+    @Test
     void getExpectedWaitingTime_success() {
         final Booth booth = createBooth(12L, "Goods Booth");
 
@@ -474,15 +510,39 @@ class WaitingServiceTest {
             final int deferCount,
             final Booth booth
     ) {
+        return createWaiting(waitingId, boothId, visitorId, status, waitingNumber, deferCount, booth, null);
+    }
+
+    private BoothWaiting createWaiting(
+            final Long waitingId,
+            final Long boothId,
+            final Long visitorId,
+            final WaitingStatus status,
+            final int waitingNumber,
+            final int deferCount,
+            final Booth booth,
+            final Visitor visitor
+    ) {
         return BoothWaiting.builder()
                 .id(waitingId)
                 .boothId(boothId)
                 .booth(booth)
                 .visitorId(visitorId)
+                .visitor(visitor)
                 .status(status)
                 .waitingNumber(waitingNumber)
                 .deferCount(deferCount)
                 .requestedAt(LocalDateTime.of(2026, 3, 13, 10, 0))
+                .build();
+    }
+
+    private Visitor createVisitor(final Long visitorId, final String name) {
+        return Visitor.builder()
+                .id(visitorId)
+                .eventId(3L)
+                .entryCode("ENTRY-" + visitorId)
+                .name(name)
+                .active(true)
                 .build();
     }
 }
