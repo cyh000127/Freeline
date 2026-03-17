@@ -19,7 +19,7 @@ services:
       - infra-public
 
   jenkins-agent:
-    image: jenkins/ssh-agent:6.11.2-jdk21
+    build: ./agent
     container_name: jenkins-agent
     restart: always
     environment:
