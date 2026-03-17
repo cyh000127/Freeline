@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'ssh-agent' }
+    agent { label 'build-agent-01' }
 
     environment {
         IMAGE_NAME = 'freeline-backend'
@@ -62,7 +62,7 @@ pipeline {
                 }
             }
             steps {
-                withCredentials([string(credentialsId: 'infisical-token', variable: 'INFISICAL_TOKEN')]) {
+                withCredentials([string(credentialsId: 'infisical-universal-auth', variable: 'INFISICAL_TOKEN')]) {
                     sh """
                         infisical run --env=prod --token=${INFISICAL_TOKEN} -- \
                             docker compose -f ${COMPOSE_FILE} up -d --force-recreate freeline-backend
