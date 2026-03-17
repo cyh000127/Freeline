@@ -1,21 +1,20 @@
 package com.freeline.common.config;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-
+import com.freeline.common.config.properties.FirebaseProperties;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.FirebaseOptions;
+import com.google.firebase.messaging.FirebaseMessaging;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import lombok.extern.slf4j.Slf4j;
-
-import com.freeline.common.config.properties.FirebaseProperties;
-import com.google.auth.oauth2.GoogleCredentials;
-import com.google.firebase.FirebaseApp;
-import com.google.firebase.FirebaseOptions;
-import com.google.firebase.messaging.FirebaseMessaging;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.Base64;
 
 @Slf4j
 @Configuration
@@ -23,15 +22,16 @@ import com.google.firebase.messaging.FirebaseMessaging;
 public class FirebaseConfig {
 
     @Bean
-    @ConditionalOnProperty(prefix = "firebase", name = "service-account-path")
+    @ConditionalOnProperty(prefix = "firebase", name = "service-account-base64")
     public FirebaseApp firebaseApp(final FirebaseProperties firebaseProperties) throws IOException {
         log.info(
-                "[Firebase] Initialization started. projectId={}, serviceAccountPath={}",
-                firebaseProperties.projectId(),
-                firebaseProperties.serviceAccountPath()
+                "[Firebase] Initialization started. projectId={}",
+                firebaseProperties.projectId()
         );
 
-        try (FileInputStream serviceAccount = new FileInputStream(firebaseProperties.serviceAccountPath())) {
+        byte[] decodedKey = Base64.getDecoder().decode(firebaseProperties.serviceAccountBase64());
+
+        try (ByteArrayInputStream serviceAccount = new ByteArrayInputStream(decodedKey)) {
             final FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
                     .setProjectId(firebaseProperties.projectId())
@@ -48,9 +48,8 @@ public class FirebaseConfig {
             return firebaseApp;
         } catch (final IOException exception) {
             log.error(
-                    "[Firebase] Failed to initialize Firebase. projectId={}, serviceAccountPath={}",
+                    "[Firebase] Failed to initialize Firebase. projectId={}",
                     firebaseProperties.projectId(),
-                    firebaseProperties.serviceAccountPath(),
                     exception
             );
             throw exception;
