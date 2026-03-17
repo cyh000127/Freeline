@@ -4,3 +4,9 @@ cloudflare:
   access-key: test-access-key
   secret-key: test-secret-key
   outer-prefix: https://pub-test.r2.dev/
+spring:
+  flyway:
+    enabled: true
+app:
+  database:
+    reset-on-startup: true
