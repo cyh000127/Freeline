@@ -4,9 +4,7 @@ import java.security.SecureRandom;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
-
 import org.springframework.beans.factory.annotation.Value;
-
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -46,21 +44,16 @@ import io.jsonwebtoken.Claims;
 public class AuthService {
 
     private final AuthProperties authProperties;
-
-    @Value("${jwt.refresh-token-expiration}")
-    private long refreshTokenExpiration;
-
-
     private final OrganizerRepository organizerRepository;
     private final BoothManagerRepository boothManagerRepository;
     private final PinUserRepository pinUserRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final StringRedisTemplate redisTemplate;
-
     private final AuthConverter authConverter;
-
     private final JavaMailSender mailSender;
+    @Value("${jwt.refresh-token-expiration}")
+    private long refreshTokenExpiration;
 
     /**
      * 이메일 인증 코드 생성
