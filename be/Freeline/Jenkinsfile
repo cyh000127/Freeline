@@ -31,7 +31,7 @@ pipeline {
                         infisicalCredentialId: 'infisical-universal-auth',
                         infisicalEnvironmentSlug: 'prod',
                         infisicalProjectSlug: 'freeline',
-                        infisicalUrl: 'https://j14a207.p.ssafy.io:8443/'
+                        infisicalUrl: 'https://j14a207.p.ssafy.io:8443'
                     ],
                     infisicalSecrets: [
                         infisicalSecret(
@@ -109,7 +109,7 @@ pipeline {
                         infisicalCredentialId: 'infisical-universal-auth',
                         infisicalEnvironmentSlug: 'prod',
                         infisicalProjectSlug: 'freeline',
-                        infisicalUrl: 'https://j14a207.p.ssafy.io:8443/'
+                        infisicalUrl: 'https://j14a207.p.ssafy.io:8443'
                     ],
                     infisicalSecrets: [
                         infisicalSecret(
