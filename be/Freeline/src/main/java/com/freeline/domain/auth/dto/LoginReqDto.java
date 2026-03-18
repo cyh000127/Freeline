@@ -10,4 +10,5 @@ public record LoginReqDto(
 
         @NotBlank
         String password
-) {}
+) {
+}

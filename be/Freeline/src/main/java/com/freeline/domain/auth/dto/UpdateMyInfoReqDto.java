@@ -8,4 +8,5 @@ public record UpdateMyInfoReqDto(
 
         @NotBlank
         String organization
-) {}
+) {
+}

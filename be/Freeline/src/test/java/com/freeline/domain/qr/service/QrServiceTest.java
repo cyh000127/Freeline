@@ -60,7 +60,8 @@ class QrServiceTest {
                 boothWaitingRepository,
                 boothQrRepository,
                 stringRedisTemplate,
-                qrProperties
+                qrProperties,
+                null
         );
     }
 

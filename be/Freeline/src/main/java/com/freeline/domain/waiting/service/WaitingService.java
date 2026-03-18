@@ -83,6 +83,7 @@ public class WaitingService {
     private final BoothRepository boothRepository;
     private final BoothWaitingRepository boothWaitingRepository;
     private final BoothPolicyRepository boothPolicyRepository;
+    private final TimeUtils timeUtils;
 
     public WaitingCreateResDto createWaiting(final Long boothId, final Long visitorId) {
         getBoothEntity(boothId);
@@ -95,7 +96,7 @@ public class WaitingService {
                 .orElse(1);
 
         final BoothWaiting saved = boothWaitingRepository.save(
-                WaitingConverter.toEntity(boothId, visitorId, nextWaitingNumber, TimeUtils.nowDateTime())
+                WaitingConverter.toEntity(boothId, visitorId, nextWaitingNumber, timeUtils.nowDateTime())
         );
         final List<BoothWaiting> activeWaitings = boothWaitingRepository
                 .findAllByVisitorIdAndStatusInOrderByRequestedAtAsc(visitorId, ACTIVE_WAITING_STATUSES);
@@ -132,7 +133,7 @@ public class WaitingService {
                 .orElseThrow(() -> new WaitingException(ErrorCode.CALL_CANDIDATE_NOT_FOUND));
 
         final int callValidTimeSeconds = resolveCallValidTimeSeconds(boothId);
-        final java.time.LocalDateTime calledAt = TimeUtils.nowDateTime();
+        final java.time.LocalDateTime calledAt = timeUtils.nowDateTime();
         waiting.updateStatus(WaitingStatus.CALLED);
         waiting.updateCalledAt(calledAt);
         waiting.updateCallExpiresAt(calledAt.plusSeconds(callValidTimeSeconds));
@@ -157,7 +158,7 @@ public class WaitingService {
         }
 
         waiting.updateStatus(WaitingStatus.CANCELED);
-        waiting.updateExitedAt(TimeUtils.nowDateTime());
+        waiting.updateExitedAt(timeUtils.nowDateTime());
 
         log.info(
                 "[Waiting] cancel complete {waitingId: {}, boothId: {}, visitorId: {}}",
@@ -207,13 +208,14 @@ public class WaitingService {
     public WaitingExitResDto exitWaiting(final Long waitingId, final Long visitorId) {
         final BoothWaiting waiting = getWaitingEntity(waitingId);
         validateWaitingOwner(waiting, visitorId);
+        // TODO: ENTERED -> EXITED 이후 BoothManagerSseService에 퇴장 이벤트를 보내 부스 관리자 화면을 갱신한다.
 
         if (waiting.getStatus() != WaitingStatus.ENTERED) {
             throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_EXIT);
         }
 
         waiting.updateStatus(WaitingStatus.EXITED);
-        waiting.updateExitedAt(TimeUtils.nowDateTime());
+        waiting.updateExitedAt(timeUtils.nowDateTime());
 
         log.info(
                 "[Waiting] exit complete {waitingId: {}, boothId: {}, visitorId: {}}",
@@ -228,13 +230,14 @@ public class WaitingService {
     public WaitingAdmitResDto admitWaiting(final Long waitingId, final Long boothId) {
         final BoothWaiting waiting = getWaitingEntity(waitingId);
         validateWaitingBooth(waiting, boothId);
+        // TODO: REGISTERED -> ENTERED 이후 부스 관리자 전용 이벤트 타입으로 세분화할지 결정하고 SSE 브로드캐스트를 통합한다.
 
         if (waiting.getStatus() != WaitingStatus.REGISTERED) {
             throw new WaitingException(ErrorCode.INVALID_STATUS_FOR_ADMIT);
         }
 
         waiting.updateStatus(WaitingStatus.ENTERED);
-        waiting.updateEnteredAt(TimeUtils.nowDateTime());
+        waiting.updateEnteredAt(timeUtils.nowDateTime());
 
         log.info(
                 "[Waiting] admit complete {waitingId: {}, boothId: {}, visitorId: {}}",
@@ -262,13 +265,14 @@ public class WaitingService {
     public void cancelWaitingByAdmin(final Long waitingId, final Long boothId) {
         final BoothWaiting waiting = getWaitingEntity(waitingId);
         validateWaitingBooth(waiting, boothId);
+        // TODO: 관리자 취소 이후 BoothManagerSseService를 통해 프론트/이용중 목록과 요약 통계를 함께 갱신한다.
 
         if (ADMIN_CANCEL_BLOCKED_STATUSES.contains(waiting.getStatus())) {
             throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_CANCEL);
         }
 
         waiting.updateStatus(WaitingStatus.CANCELED);
-        waiting.updateExitedAt(TimeUtils.nowDateTime());
+        waiting.updateExitedAt(timeUtils.nowDateTime());
 
         log.info(
                 "[Waiting] admin cancel complete {waitingId: {}, boothId: {}, visitorId: {}}",

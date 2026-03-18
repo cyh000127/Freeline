@@ -21,4 +21,5 @@ public record SignupReqDto(
 
         @NotBlank(message = "소속은 필수입니다.")
         String organization
-) {}
+) {
+}

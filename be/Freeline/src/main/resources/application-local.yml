@@ -17,8 +17,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -26,7 +26,7 @@ spring:
           starttls:
             enable: true
 auth:
-  email-code-expire-minutes: ${EMAIL_CODE_EXPIRE_MINUTES}
+  email-code-expire-minutes: ${EMAIL_CODE_EXPIRE_MINUTES:10}
   email-verify-ttl-minutes: 10
 jwt:
   secret: ${JWT_SECRET:your_local_secret_key_for_freeline_min_32_chars}
