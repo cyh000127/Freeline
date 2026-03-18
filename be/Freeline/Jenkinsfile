@@ -27,7 +27,7 @@ pipeline {
             steps {
                 dir('be/Freeline') {
                     sh 'chmod +x ./gradlew'
-                    sh './gradlew clean build'
+                    sh "infisical run --env=prod --path='/be' --token=${INFISICAL_TOKEN} -- ./gradlew clean build"
                 }
             }
             post {
