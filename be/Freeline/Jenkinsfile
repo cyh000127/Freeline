@@ -4,7 +4,6 @@ pipeline {
     environment {
         IMAGE_NAME = 'freeline-backend'
         COMPOSE_FILE = "${WORKSPACE}/infra/backend/docker-compose.yml"
-        INFISICAL_TOKEN = credentials('infisical-universal-auth')
     }
 
     triggers {
@@ -26,16 +25,26 @@ pipeline {
 
         stage('Test & Build') {
             steps {
-                dir('be/Freeline') {
-                    sh 'chmod +x ./gradlew'
-                    sh "infisical run --env=prod --path='/be' --token=${INFISICAL_TOKEN} -- ./gradlew clean build"
+                withInfisical(
+                    configuration: [
+                        infisicalCredentialId: 'infisical-universal-auth',
+                        infisicalEnvironmentSlug: 'prod',
+                        infisicalProjectSlug: 'freeline',
+                        infisicalUrl: 'https://j14a207.p.ssafy.io:8443/'
+                    ],
+                    infisicalSecrets: [] 
+                ) {
+                    dir('be/Freeline') {
+                        sh 'chmod +x ./gradlew'
+                        sh "infisical run --env=prod --path='/be' -- ./gradlew clean build"
+                    }
                 }
             }
             post {
                 always {
                     dir('be/Freeline') {
                         junit allowEmptyResults: true,
-                             testResults: 'build/test-results/test/*.xml'
+                            testResults: 'build/test-results/test/*.xml'
                     }
                 }
             }
@@ -63,15 +72,24 @@ pipeline {
                 }
             }
             steps {
+
+                withInfisical(
+                    configuration: [
+                        infisicalCredentialId: 'infisical-universal-auth',
+                        infisicalEnvironmentSlug: 'prod',
+                        infisicalProjectSlug: 'freeline',
+                        infisicalUrl: 'https://j14a207.p.ssafy.io:8443/'
+                    ],
+                    infisicalSecrets: [] 
+                ) {
                 sh """
-                    infisical run --env=prod --path="/be" --token=${INFISICAL_TOKEN} -- \
-                        docker compose -f ${COMPOSE_FILE} up -d --force-recreate freeline-backend
+                    infisical run --env=prod --path="/be" -- docker compose -f ${COMPOSE_FILE} up -d --force-recreate freeline-backend
                 """
-
+                }
                 echo "Waiting for backend to stabilize..."
-        sleep 10
+                sleep 10
 
-        sh "curl -f http://localhost:8080/actuator/health || exit 1"
+                sh "curl -f http://localhost:8080/actuator/health || exit 1"
             }
         }
     }
