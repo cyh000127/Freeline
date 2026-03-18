@@ -1,12 +1,12 @@
 package com.freeline.domain.waiting.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,8 +39,9 @@ public class WaitingController {
     @PostMapping("/booths/{boothId}/waitings")
     public ResponseEntity<BaseResponse<WaitingCreateResDto>> createWaiting(
             @PathVariable final Long boothId,
-            @RequestHeader("X-Visitor-Id") final Long visitorId
+            final Authentication authentication
     ) {
+        final Long visitorId = extractId(authentication);
         final WaitingCreateResDto response = waitingService.createWaiting(boothId, visitorId);
         return ResponseUtils.created(response);
     }
@@ -48,8 +49,9 @@ public class WaitingController {
     @Operation(summary = "다음 대기자 호출", description = "부스 관리자가 호출 가능한 다음 대기자를 앞큐로 이동시킵니다.")
     @PatchMapping("/booths/me/waitings/call")
     public ResponseEntity<BaseResponse<WaitingCallResDto>> callNextWaiting(
-            @RequestHeader("X-Booth-Id") final Long boothId
+            final Authentication authentication
     ) {
+        final Long boothId = extractId(authentication);
         final WaitingCallResDto response = waitingService.callNextWaiting(boothId);
         return ResponseUtils.ok(response);
     }
@@ -57,8 +59,9 @@ public class WaitingController {
     @Operation(summary = "실시간 부스 대기열 현황 조회", description = "부스 관리자가 현재 부스의 활성 대기열 현황을 조회합니다.")
     @GetMapping("/booths/me/queue")
     public ResponseEntity<BaseResponse<WaitingDashboardResDto>> getBoothQueueDashboard(
-            @RequestHeader("X-Booth-Id") final Long boothId
+            final Authentication authentication
     ) {
+        final Long boothId = extractId(authentication);
         final WaitingDashboardResDto response = waitingService.getBoothQueueDashboard(boothId);
         return ResponseUtils.ok(response);
     }
@@ -67,8 +70,9 @@ public class WaitingController {
     @DeleteMapping("/waitings/{waitingId}")
     public ResponseEntity<BaseResponse<Void>> cancelWaiting(
             @PathVariable final Long waitingId,
-            @RequestHeader("X-Visitor-Id") final Long visitorId
+            final Authentication authentication
     ) {
+        final Long visitorId = extractId(authentication);
         waitingService.cancelWaiting(waitingId, visitorId);
         return ResponseUtils.ok(null);
     }
@@ -77,8 +81,9 @@ public class WaitingController {
     @DeleteMapping("/waitings/{waitingId}/admin")
     public ResponseEntity<BaseResponse<Void>> cancelWaitingByAdmin(
             @PathVariable final Long waitingId,
-            @RequestHeader("X-Booth-Id") final Long boothId
+            final Authentication authentication
     ) {
+        final Long boothId = extractId(authentication);
         waitingService.cancelWaitingByAdmin(waitingId, boothId);
         return ResponseUtils.ok(null);
     }
@@ -87,8 +92,9 @@ public class WaitingController {
     @PatchMapping("/waitings/{waitingId}/postpone")
     public ResponseEntity<BaseResponse<WaitingPostponeResDto>> postponeWaiting(
             @PathVariable final Long waitingId,
-            @RequestHeader("X-Visitor-Id") final Long visitorId
+            final Authentication authentication
     ) {
+        final Long visitorId = extractId(authentication);
         final WaitingPostponeResDto response = waitingService.postponeWaiting(waitingId, visitorId);
         return ResponseUtils.ok(response);
     }
@@ -97,8 +103,9 @@ public class WaitingController {
     @PatchMapping("/waitings/{waitingId}/admit")
     public ResponseEntity<BaseResponse<WaitingAdmitResDto>> admitWaiting(
             @PathVariable final Long waitingId,
-            @RequestHeader("X-Booth-Id") final Long boothId
+            final Authentication authentication
     ) {
+        final Long boothId = extractId(authentication);
         final WaitingAdmitResDto response = waitingService.admitWaiting(waitingId, boothId);
         return ResponseUtils.ok(response);
     }
@@ -107,8 +114,9 @@ public class WaitingController {
     @PatchMapping("/waitings/{waitingId}/exit")
     public ResponseEntity<BaseResponse<WaitingExitResDto>> exitWaiting(
             @PathVariable final Long waitingId,
-            @RequestHeader("X-Visitor-Id") final Long visitorId
+            final Authentication authentication
     ) {
+        final Long visitorId = extractId(authentication);
         final WaitingExitResDto response = waitingService.exitWaiting(waitingId, visitorId);
         return ResponseUtils.ok(response);
     }
@@ -116,8 +124,9 @@ public class WaitingController {
     @Operation(summary = "내 대기 목록 조회", description = "관람객의 활성 대기 목록과 현재 대기 상태를 조회합니다.")
     @GetMapping("/visitors/me/waitings")
     public ResponseEntity<BaseResponse<VisitorWaitingListResDto>> getMyWaitings(
-            @RequestHeader("X-Visitor-Id") final Long visitorId
+            final Authentication authentication
     ) {
+        final Long visitorId = extractId(authentication);
         final VisitorWaitingListResDto response = waitingService.getMyWaitings(visitorId);
         return ResponseUtils.ok(response);
     }
@@ -126,9 +135,14 @@ public class WaitingController {
     @GetMapping("/booths/{boothId}/waitings/expected-time")
     public ResponseEntity<BaseResponse<WaitingExpectedTimeResDto>> getExpectedWaitingTime(
             @PathVariable final Long boothId,
-            @RequestHeader("X-Visitor-Id") final Long visitorId
+            final Authentication authentication
     ) {
+        extractId(authentication);
         final WaitingExpectedTimeResDto response = waitingService.getExpectedWaitingTime(boothId);
         return ResponseUtils.ok(response);
+    }
+
+    private Long extractId(final Authentication authentication) {
+        return Long.valueOf(authentication.getName());
     }
 }
