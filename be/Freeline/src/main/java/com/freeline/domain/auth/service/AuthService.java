@@ -4,6 +4,8 @@ import java.security.SecureRandom;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
@@ -11,8 +13,6 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import lombok.RequiredArgsConstructor;
 
 import com.freeline.common.config.properties.AuthProperties;
 import com.freeline.common.error.ErrorCode;
