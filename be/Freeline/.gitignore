@@ -1,31 +1,28 @@
-# [湲곕낯 鍮뚮뱶 寃곌낵臾?
+# [Build Results]
 HELP.md
 .gradle/
 build/
 bin/
 out/
 !gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
-!**/src/main/**/out/
-!**/src/test/**/out/
 
-# [蹂댁븞 諛??섍꼍 蹂?? - ?덈? 而ㅻ컠 湲덉?
+# [Environment Variables & Secrets]
 .env
 .local.env
 *.env.*
 application-local.properties
+application-live.yml
+application-local.yml
 
 # Firebase service account key
 *service-account*.json
 *firebase*private*.json
 *firebase*credential*.json
 **/firebase/*.json
+firebase_env.json
 secrets/
 
-# [?꾩빱 諛??명봽???곗씠?? - 濡쒖뺄 ?곗씠???좎텧 諛⑹?
+# [Database & Infrastructure]
 postgres_data/
 redis_data/
 kafka_data/
@@ -33,20 +30,21 @@ zookeeper_data/
 docker-compose.test.yml
 .docker/
 
-# [IntelliJ IDEA]
+# [IDE - IntelliJ IDEA]
 .idea/
 *.iws
 *.iml
 *.ipr
 .shelf/
 gen/
+out/
 
-# [VS Code]
+# [IDE - VS Code]
 .vscode/
 *.code-workspace
 .history/
 
-# [Eclipse / STS / NetBeans]
+# [IDE - Eclipse / STS / NetBeans]
 .apt_generated
 .classpath
 .factorypath
@@ -60,7 +58,7 @@ gen/
 /nbdist/
 /.nb-gradle/
 
-# [OS / ?쒖뒪???뚯씪]
+# [OS / System Files]
 .DS_Store
 .DS_Store?
 ._*
@@ -70,7 +68,9 @@ ehthumbs.db
 Thumbs.db
 Desktop.ini
 
-# [湲고? ?꾨줈?앺듃 ?꾧뎄]
+# [Others]
+#docs/
+src/main/resources/dummy.sql
 node_modules/
 .npm/
 dist/
@@ -78,6 +78,5 @@ tmp/
 temp/
 *.log
 *.temp
-be/Freeline/docs
 /tree.txt
 docker-compose-local.yml
