@@ -23,6 +23,7 @@ services:
       context: ./agent
       args:
         - DOCKER_GID=988
+    image: freeline-jenkins-agent:latest
     container_name: jenkins-agent
     restart: always
     environment:

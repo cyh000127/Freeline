@@ -4,6 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = 'freeline-backend'
         COMPOSE_FILE = "${WORKSPACE}/infra/backend/docker-compose.yml"
+        INFISICAL_TOKEN = credentials('infisical-universal-auth')
     }
 
     triggers {
@@ -62,12 +63,15 @@ pipeline {
                 }
             }
             steps {
-                withCredentials([string(credentialsId: 'infisical-universal-auth', variable: 'INFISICAL_TOKEN')]) {
-                    sh """
-                        infisical run --env=prod --path="/be" --token=${INFISICAL_TOKEN} -- \
-                            docker compose -f ${COMPOSE_FILE} up -d --force-recreate freeline-backend
-                    """
-                }
+                sh """
+                    infisical run --env=prod --path="/be" --token=${INFISICAL_TOKEN} -- \
+                        docker compose -f ${COMPOSE_FILE} up -d --force-recreate freeline-backend
+                """
+
+                echo "Waiting for backend to stabilize..."
+        sleep 10
+
+        sh "curl -f http://localhost:8080/actuator/health || exit 1"
             }
         }
     }
