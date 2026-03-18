@@ -158,7 +158,9 @@ pipeline {
         failure {
             updateGitlabCommitStatus name: 'build', state: 'failed'
         }
-        sh 'docker image prune -f --filter "until=24h" || true'
-        cleanWs()
+        cleanup {
+            sh 'docker image prune -f --filter "until=24h" || true'
+            cleanWs()
+        }
     }
 }
