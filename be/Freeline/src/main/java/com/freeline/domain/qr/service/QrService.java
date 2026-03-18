@@ -49,9 +49,11 @@ public class QrService {
     private final BoothQrRepository boothQrRepository;
     private final StringRedisTemplate stringRedisTemplate;
     private final QrProperties qrProperties;
+    private final TimeUtils timeUtils;
 
     // TODO: visitor 인증이 붙으면 scanQr()에서 visitorId를 request body로 받지 않고 인증 정보에서 추출하도록 변경한다.
     // TODO: booth_qr 이력 정리 및 만료 QR 배치 정리 정책이 필요하면 별도 스케줄러로 분리한다.
+    // TODO: CALLED -> REGISTERED 로 바뀌는 시점에 BoothManagerSseService와 연결해 부스 관리자 화면에 도착 확인 이벤트를 전파한다.
 
     // 부스에 붙여둘 고정형 QR을 생성한다. 이미 활성 QR이 있으면 기존 QR을 그대로 돌려준다.
     public BoothQrResDto createBoothQr(final Long boothId) {
@@ -79,7 +81,7 @@ public class QrService {
                 .findFirstByBoothIdAndPurposeAndStatusOrderByIdDesc(boothId, getBoothPurpose(), BoothQrStatus.ACTIVE)
                 .orElseThrow(() -> new QrException(ErrorCode.QR_NOT_FOUND));
 
-        if (boothQr.getExpiresAt().isBefore(TimeUtils.nowDateTime())) {
+        if (boothQr.getExpiresAt().isBefore(timeUtils.nowDateTime())) {
             throw new QrException(ErrorCode.QR_EXPIRED);
         }
 
@@ -131,7 +133,7 @@ public class QrService {
 
             final String previousStatus = waiting.getStatus().name();
             waiting.updateStatus(WaitingStatus.REGISTERED);
-            waiting.updateRegisteredAt(TimeUtils.nowDateTime());
+            waiting.updateRegisteredAt(timeUtils.nowDateTime());
 
             log.info(
                     "[QR] 스캔 등록 완료 {qrId: {}, boothId: {}, waitingId: {}, visitorId: {}}",
@@ -149,7 +151,7 @@ public class QrService {
 
     // 새 QR 엔티티를 만들 때 발급 시각과 만료 시각을 함께 계산한다.
     private BoothQr createNewBoothQr(final Long boothId) {
-        final LocalDateTime issuedAt = TimeUtils.nowDateTime();
+        final LocalDateTime issuedAt = timeUtils.nowDateTime();
         final LocalDateTime expiresAt = issuedAt.plusDays(qrProperties.boothActiveTtlDays());
         final String qrKey = QrCodeUtil.generateQrKey();
 
@@ -169,7 +171,7 @@ public class QrService {
                 .findByBoothIdAndPurposeAndQrKeyAndStatus(boothId, getBoothPurpose(), qrKey, BoothQrStatus.ACTIVE)
                 .orElseThrow(() -> new QrException(ErrorCode.QR_NOT_FOUND));
 
-        if (boothQr.getExpiresAt().isBefore(TimeUtils.nowDateTime())) {
+        if (boothQr.getExpiresAt().isBefore(timeUtils.nowDateTime())) {
             boothQr.updateStatus(BoothQrStatus.EXPIRED);
             throw new QrException(ErrorCode.QR_EXPIRED);
         }
@@ -179,7 +181,7 @@ public class QrService {
 
     // 활성 QR을 조회할 때 이미 만료되었으면 상태를 EXPIRED로 바꿔둔다.
     private BoothQr expireIfNeeded(final BoothQr boothQr) {
-        if (boothQr.getExpiresAt().isBefore(TimeUtils.nowDateTime())) {
+        if (boothQr.getExpiresAt().isBefore(timeUtils.nowDateTime())) {
             boothQr.updateStatus(BoothQrStatus.EXPIRED);
         }
         return boothQr;
@@ -205,7 +207,7 @@ public class QrService {
 
     // 호출된 사용자가 아직 도착 확인 가능한 시간 안에 있는지 확인한다.
     private void validateWaitingCallWindow(final BoothWaiting waiting, final Long boothId) {
-        final LocalDateTime now = TimeUtils.nowDateTime();
+        final LocalDateTime now = timeUtils.nowDateTime();
         final LocalDateTime expiresAt = resolveWaitingCallExpiresAt(waiting, boothId);
 
         if (expiresAt != null) {

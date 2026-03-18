@@ -8,4 +8,5 @@ public record MyInfoResDto(
         String email,
         String name,
         String organization
-) {}
+) {
+}
