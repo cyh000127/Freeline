@@ -375,7 +375,9 @@ firebase:
 - Actuator: 모든 엔드포인트 허용 (프로덕션에서는 제한 필요)
 - DevTools: 로컬 개발 시 자동 재시작 지원
 - Swagger URL: `http://localhost:8080/swagger-ui/index.html`
-- 기준 시간은 `TimeUtils`의 `Asia/Seoul`을 사용하며, 시간 관련 로직은 직접 `now()`를 호출하지 않고 `TimeUtils`를 우선 사용
+- 시간 관련 로직은 `TimeUtils`를 주입받아서 사용한다.
+- `TimeUtils` 내부 기준 시간은 `LocalDateTime.now()`이며, 별도의 `Asia/Seoul` 고정값은 쓰지 않는다.
+- 현재 시각이 필요한 서비스만 `TimeUtils`를 의존하고, `BaseResponse` 같은 공통 응답 포맷은 기존 방식 그대로 둔다.
 - 기준 스키마는 `Flyway`가 아니라 `src/main/resources/ddl.sql` 단일 파일로 관리
 - 굿즈 생성 API는 JSON이 아니라 `multipart/form-data` 기반이며, `name`, `imageFile` 파트를 사용
 
