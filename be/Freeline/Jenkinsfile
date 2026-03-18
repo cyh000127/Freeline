@@ -40,6 +40,14 @@ pipeline {
                     }
                 }
             }
+            post {
+                always {
+                    dir('be/Freeline') {
+                        junit allowEmptyResults: true,
+                              testResults: 'build/test-results/test/*.xml'
+                    }
+                }
+            }
         }
 
         stage('Docker Build') {
