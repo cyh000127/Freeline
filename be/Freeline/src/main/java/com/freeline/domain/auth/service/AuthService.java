@@ -13,47 +13,55 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import com.freeline.common.config.properties.AuthProperties;
 import com.freeline.common.error.ErrorCode;
 import com.freeline.common.security.JwtProvider;
 import com.freeline.domain.auth.converter.AuthConverter;
-import com.freeline.domain.auth.dto.BoothLoginReqDto;
-import com.freeline.domain.auth.dto.ChangePasswordReqDto;
-import com.freeline.domain.auth.dto.EmailVerifyReqDto;
-import com.freeline.domain.auth.dto.LoginReqDto;
-import com.freeline.domain.auth.dto.LoginResDto;
-import com.freeline.domain.auth.dto.MyInfoResDto;
-import com.freeline.domain.auth.dto.PinEnterReqDto;
-import com.freeline.domain.auth.dto.SignupReqDto;
-import com.freeline.domain.auth.dto.SignupResDto;
-import com.freeline.domain.auth.dto.UpdateMyInfoReqDto;
-import com.freeline.domain.auth.entity.BoothManager;
-import com.freeline.domain.auth.entity.Organizer;
-import com.freeline.domain.auth.entity.PinUser;
+import com.freeline.domain.auth.dto.request.BoothAdminCreateReqDto;
+import com.freeline.domain.auth.dto.request.BoothLoginReqDto;
+import com.freeline.domain.auth.dto.request.ChangePasswordReqDto;
+import com.freeline.domain.auth.dto.request.EmailVerifyReqDto;
+import com.freeline.domain.auth.dto.request.LoginReqDto;
+import com.freeline.domain.auth.dto.request.SignupReqDto;
+import com.freeline.domain.auth.dto.request.UpdateMyInfoReqDto;
+import com.freeline.domain.auth.dto.request.VisitorEnterReqDto;
+import com.freeline.domain.auth.dto.response.BoothAdminCreateResDto;
+import com.freeline.domain.auth.dto.response.LoginResDto;
+import com.freeline.domain.auth.dto.response.MyInfoResDto;
+import com.freeline.domain.auth.dto.response.SignupResDto;
+import com.freeline.domain.auth.entity.BoothAdmin;
+import com.freeline.domain.auth.entity.EventAdmin;
 import com.freeline.domain.auth.entity.Role;
 import com.freeline.domain.auth.exception.AuthException;
-import com.freeline.domain.auth.repository.BoothManagerRepository;
-import com.freeline.domain.auth.repository.OrganizerRepository;
-import com.freeline.domain.auth.repository.PinUserRepository;
+import com.freeline.domain.auth.repository.BoothAdminRepository;
+import com.freeline.domain.auth.repository.EventAdminRepository;
+import com.freeline.domain.booth.entity.Visitor;
+import com.freeline.domain.booth.repository.BoothRepository;
+import com.freeline.domain.booth.repository.VisitorRepository;
 
 import io.jsonwebtoken.Claims;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final AuthProperties authProperties;
-    private final OrganizerRepository organizerRepository;
-    private final BoothManagerRepository boothManagerRepository;
-    private final PinUserRepository pinUserRepository;
+    private final EventAdminRepository eventAdminRepository;
+    private final BoothAdminRepository boothAdminRepository;
+    private final VisitorRepository visitorRepository;
+    private final BoothRepository boothRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final StringRedisTemplate redisTemplate;
     private final AuthConverter authConverter;
     private final JavaMailSender mailSender;
+
     @Value("${jwt.refresh-token-expiration}")
     private long refreshTokenExpiration;
+
 
     /**
      * 이메일 인증 코드 생성
@@ -70,30 +78,36 @@ public class AuthService {
      */
     public void sendVerificationCode(final String email) {
 
-
-        if (organizerRepository.existsByEmail(email)) {
+        if (eventAdminRepository.existsByEmail(email)) {
             throw new AuthException(ErrorCode.EMAIL_DUPLICATE);
         }
 
         String code = createVerificationCode();
-
         String key = "email:verify:" + email;
-        // 이미 발송된 인증코드 존재 확인
-        if (redisTemplate.hasKey(key)) {
-            throw new AuthException(ErrorCode.EMAIL_ALREADY_SENT);
+
+        // 이미 발송된 인증코드 존재 시 기존 것 삭제 후 재발송 가능하도록 변경 (UX 개선)
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(key))) {
+            redisTemplate.delete(key);
         }
 
         redisTemplate.opsForValue()
                 .set(key, code, authProperties.getEmailCodeExpireMinutes(), TimeUnit.MINUTES);
 
-        SimpleMailMessage message = new SimpleMailMessage();
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(email);
+            message.setSubject("[Freeline] 이메일 인증 코드");
+            message.setText("인증 코드: " + code);
 
-        message.setTo(email);
-        message.setSubject("[Freeline] 이메일 인증 코드");
-        message.setText("인증 코드: " + code);
-
-        mailSender.send(message);
+            mailSender.send(message);
+            log.info("[Auth] Verification code sent to: {}", email);
+        } catch (Exception e) {
+            log.error("[Auth] Failed to send email to: {}", email, e);
+            redisTemplate.delete(key);
+            throw new AuthException(ErrorCode.EMAIL_SEND_FAILED);
+        }
     }
+
 
     /**
      * 이메일 인증 확인
@@ -101,7 +115,6 @@ public class AuthService {
     public void verifyCode(final EmailVerifyReqDto req) {
 
         String key = "email:verify:" + req.email();
-
         String savedCode = redisTemplate.opsForValue().get(key);
 
         if (savedCode == null) {
@@ -117,13 +130,16 @@ public class AuthService {
         // 인증 완료 상태 저장
         redisTemplate.opsForValue()
                 .set("email:verified:" + req.email(), "true", authProperties.getEmailVerifyTtlMinutes(), TimeUnit.MINUTES);
+        log.info("[Auth] Email verified: {}", req.email());
     }
 
+
     /**
-     * 행사주최자 회원가입
+     * 행사 주최자 회원가입
      */
+    @Transactional
     public SignupResDto signup(final SignupReqDto req) {
-        if (organizerRepository.existsByEmail(req.email())) {
+        if (eventAdminRepository.existsByEmail(req.email())) {
             throw new AuthException(ErrorCode.EMAIL_DUPLICATE);
         }
 
@@ -139,54 +155,51 @@ public class AuthService {
         String encodedPassword = passwordEncoder.encode(req.password());
 
         // 3. 회원 생성
-        Organizer organizer = authConverter.toOrganizer(req, encodedPassword);
-
-        Organizer saved = organizerRepository.save(organizer);
+        EventAdmin eventAdmin = authConverter.toEventAdmin(req, encodedPassword);
+        EventAdmin saved = eventAdminRepository.save(eventAdmin);
 
         // 4. 인증 상태 삭제
         redisTemplate.delete("email:verified:" + req.email());
 
+        log.info("[Auth] New event admin signed up: {}", saved.getEmail());
+
         // 5. 응답
-        return SignupResDto.builder()
-                .id(saved.getId())
-                .email(saved.getEmail())
-                .name(saved.getName())
-                .build();
+        return authConverter.toSignupResDto(saved);
     }
 
+
     /**
-     * 행사주최자 로그인
+     * 행사 주최자 로그인
      */
     @Transactional(readOnly = true)
-    public LoginResDto organizerLogin(final LoginReqDto req) {
+    public LoginResDto eventAdminLogin(final LoginReqDto req) {
 
-        Organizer organizer = organizerRepository
+        EventAdmin eventAdmin = eventAdminRepository
                 .findByEmail(req.email())
                 .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
 
-        if (!passwordEncoder.matches(req.password(), organizer.getPassword())) {
+        if (!passwordEncoder.matches(req.password(), eventAdmin.getPassword())) {
             throw new AuthException(ErrorCode.PASSWORD_MISMATCH);
         }
 
         String accessToken = jwtProvider.createToken(
-                organizer.getId(),
-                Role.EVENT_ORGANIZER.name()
+                eventAdmin.getId(),
+                Role.EVENT_ADMIN.name()
         );
 
-        String refreshToken = jwtProvider.createRefreshToken(organizer.getId());
+        String refreshToken = jwtProvider.createRefreshToken(eventAdmin.getId());
 
-        redisTemplate.delete("refresh:" + organizer.getId());
         redisTemplate.opsForValue().set(
-                "refresh:" + organizer.getId(),
+                "refresh:" + eventAdmin.getId(),
                 refreshToken,
                 refreshTokenExpiration,
                 TimeUnit.MILLISECONDS
         );
-        return LoginResDto.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .build();
+
+        log.info("[Auth] Event admin logged in: {}", eventAdmin.getEmail());
+        return authConverter.toLoginResDto(accessToken, refreshToken, Role.EVENT_ADMIN);
     }
+
 
     /**
      * AccessToken 재발급
@@ -195,7 +208,6 @@ public class AuthService {
 
         // refresh token 검증
         Claims claims = jwtProvider.getClaims(refreshToken);
-
         Long userId = Long.parseLong(claims.getSubject());
 
         // Redis에 저장된 refresh token 조회
@@ -206,77 +218,70 @@ public class AuthService {
             throw new AuthException(ErrorCode.INVALID_TOKEN);
         }
 
-        // 새로운 access token 발급
+        // 토큰에서 Role을 추출하거나 DB에서 조회하여 반영 (보안 강화)
+        Role role = eventAdminRepository.existsById(userId) ? Role.EVENT_ADMIN : Role.BOOTH_ADMIN;
+
         String newAccessToken = jwtProvider.createToken(
                 userId,
-                Role.EVENT_ORGANIZER.name()
+                role.name()
         );
 
-        return LoginResDto.builder()
-                .accessToken(newAccessToken)
-                .build();
+        return authConverter.toLoginResDto(newAccessToken, refreshToken, role);
     }
 
 
     /**
-     * 행사주최자 내정보 조회
+     * 행사 주최자 내 정보 조회
      */
     @Transactional(readOnly = true)
     public MyInfoResDto getMyInfo(final Long userId) {
 
-        Organizer organizer = organizerRepository.findById(userId)
+        EventAdmin eventAdmin = eventAdminRepository.findById(userId)
                 .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
 
-        return MyInfoResDto.builder()
-                .id(organizer.getId())
-                .email(organizer.getEmail())
-                .name(organizer.getName())
-                .organization(organizer.getOrganization())
-                .build();
+        return authConverter.toMyInfoResDto(eventAdmin);
     }
 
+
     /**
-     * 행사주최자 회원정보 수정
+     * 행사 주최자 회원정보 수정
      */
+    @Transactional
     public MyInfoResDto updateMyInfo(final Long userId, final UpdateMyInfoReqDto req) {
 
-        Organizer organizer = organizerRepository.findById(userId)
+        EventAdmin eventAdmin = eventAdminRepository.findById(userId)
                 .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
 
-        organizer.updateInfo(req.name(), req.organization());
+        eventAdmin.updateInfo(req.name(), req.organization());
+        eventAdminRepository.save(eventAdmin);
 
-        organizerRepository.save(organizer);
-
-        return MyInfoResDto.builder()
-                .id(organizer.getId())
-                .email(organizer.getEmail())
-                .name(organizer.getName())
-                .organization(organizer.getOrganization())
-                .build();
+        return authConverter.toMyInfoResDto(eventAdmin);
     }
 
+
     /**
-     * 행사주최자 비밀번호 변경
+     * 행사 주최자 비밀번호 변경
      */
     @Transactional
     public void changePassword(final Long userId, final ChangePasswordReqDto req) {
 
-        Organizer organizer = organizerRepository.findById(userId)
+        EventAdmin eventAdmin = eventAdminRepository.findById(userId)
                 .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
 
-        if (!passwordEncoder.matches(req.currentPassword(), organizer.getPassword())) {
+        if (!passwordEncoder.matches(req.currentPassword(), eventAdmin.getPassword())) {
             throw new AuthException(ErrorCode.PASSWORD_MISMATCH);
         }
 
-        organizer.changePassword(
+        eventAdmin.changePassword(
                 passwordEncoder.encode(req.newPassword())
         );
 
+        log.info("[Auth] Password changed for event admin: {}", eventAdmin.getEmail());
     }
 
 
     /**
-     * 행사주최자 로그아웃
+     * 행사 주최자 로그아웃
      */
     public void logout(final String token) {
 
@@ -286,67 +291,113 @@ public class AuthService {
 
         long remainTime = expiration.getTime() - System.currentTimeMillis();
 
-        redisTemplate.opsForValue().set(
-                "blacklist:" + token,
-                "logout",
-                remainTime,
-                TimeUnit.MILLISECONDS
-        );
+        if (remainTime > 0) {
+            redisTemplate.opsForValue().set(
+                    "blacklist:" + token,
+                    "logout",
+                    remainTime,
+                    TimeUnit.MILLISECONDS
+            );
+        }
         redisTemplate.delete("refresh:" + userId);
+        log.info("[Auth] User logged out, userId: {}", userId);
     }
 
+
     /**
-     * 행사주최자 회원탈퇴
+     * 행사 주최자 회원 탈퇴
      */
+    @Transactional
     public void deleteUser(final Long userId) {
 
-        Organizer organizer = organizerRepository.findById(userId)
+        EventAdmin eventAdmin = eventAdminRepository.findById(userId)
                 .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
         redisTemplate.delete("refresh:" + userId);
-        organizerRepository.delete(organizer);
+        eventAdminRepository.delete(eventAdmin);
+        log.info("[Auth] Event admin deleted: {}", eventAdmin.getEmail());
     }
 
+
     /**
-     * 부스관리자 로그인
+     * 부스 관리자 생성
+     */
+    @Transactional
+    public BoothAdminCreateResDto createBoothAdmin(final Long userId, final BoothAdminCreateReqDto req) {
+
+        // 1. 요청자가 실제 존재하는 행사 주최자인지 확인
+        if (!eventAdminRepository.existsById(userId)) {
+            throw new AuthException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        // 2. 대상 부스가 실제 존재하는지 확인
+        if (!boothRepository.existsById(req.boothId())) {
+            throw new AuthException(ErrorCode.BOOTH_NOT_FOUND);
+        }
+
+        // 3. 로그인 ID 중복 확인
+        if (boothAdminRepository.findByLoginId(req.loginId()).isPresent()) {
+            throw new AuthException(ErrorCode.LOGIN_ID_DUPLICATE);
+        }
+
+        // 4. 비밀번호 암호화
+        String encodedPassword = passwordEncoder.encode(req.password());
+
+        // 5. 부스 관리자 엔티티 생성
+        BoothAdmin boothAdmin = BoothAdmin.builder()
+                .boothId(req.boothId())
+                .loginId(req.loginId())
+                .password(encodedPassword)
+                .name(req.name())
+                .build();
+
+        BoothAdmin saved = boothAdminRepository.save(boothAdmin);
+
+        log.info("[Auth] New booth admin created by admin {}: {}, boothId: {}", userId, saved.getLoginId(), saved.getBoothId());
+
+        return authConverter.toBoothAdminCreateResDto(saved);
+    }
+
+
+    /**
+     * 부스 관리자 로그인
      */
     @Transactional(readOnly = true)
     public LoginResDto boothLogin(final BoothLoginReqDto req) {
 
-        BoothManager manager = boothManagerRepository
+        BoothAdmin boothAdmin = boothAdminRepository
                 .findByLoginId(req.loginId())
                 .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
 
-        if (!passwordEncoder.matches(req.password(), manager.getPassword())) {
+        if (!passwordEncoder.matches(req.password(), boothAdmin.getPassword())) {
             throw new AuthException(ErrorCode.PASSWORD_MISMATCH);
         }
 
         String token = jwtProvider.createToken(
-                manager.getId(),
-                Role.BOOTH_MANAGER.name()
+                boothAdmin.getId(),
+                Role.BOOTH_ADMIN.name()
         );
 
-        return LoginResDto.builder()
-                .accessToken(token)
-                .build();
+        log.info("[Auth] Booth admin logged in: {}", boothAdmin.getLoginId());
+        return authConverter.toLoginResDto(token, null, Role.BOOTH_ADMIN);
     }
 
+
     /**
-     * PIN 사용자 입장
+     * 방문자 입장
      */
     @Transactional(readOnly = true)
-    public LoginResDto pinEnter(final PinEnterReqDto req) {
+    public LoginResDto visitorEnter(final VisitorEnterReqDto req) {
 
-        PinUser pinUser = pinUserRepository
-                .findByPinCode(req.pinCode())
-                .orElseThrow(() -> new AuthException(ErrorCode.PIN_NOT_FOUND));
+        Visitor visitor = visitorRepository
+                .findByEntryCode(req.entryCode())
+                .orElseThrow(() -> new AuthException(ErrorCode.VISITOR_NOT_FOUND));
 
         String token = jwtProvider.createToken(
-                pinUser.getId(),
-                Role.PERSONAL_USER.name()
+                visitor.getId(),
+                Role.VISITOR.name()
         );
 
-        return LoginResDto.builder()
-                .accessToken(token)
-                .build();
+        log.info("[Auth] Visitor entered, visitorId: {}", visitor.getId());
+        return authConverter.toLoginResDto(token, null, Role.VISITOR);
     }
 }

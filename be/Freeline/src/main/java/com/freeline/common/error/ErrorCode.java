@@ -41,7 +41,9 @@ public enum ErrorCode {
     EMAIL_ALREADY_SENT(HttpStatus.CONFLICT, "U-006", "이미 인증 코드가 발송되었습니다."),
     PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "U-007", "비밀번호가 일치하지 않습니다."),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "U-008", "유효하지 않은 토큰입니다."),
-    PIN_NOT_FOUND(HttpStatus.NOT_FOUND, "U-009", "PIN 정보를 찾을 수 없습니다."),
+    VISITOR_NOT_FOUND(HttpStatus.NOT_FOUND, "U-009", "방문자 정보를 찾을 수 없습니다."),
+    LOGIN_ID_DUPLICATE(HttpStatus.CONFLICT, "U-010", "이미 사용 중인 아이디입니다."),
+    EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "U-011", "이메일 발송에 실패했습니다."),
 
     /**
      * Event Error (E-xxx)

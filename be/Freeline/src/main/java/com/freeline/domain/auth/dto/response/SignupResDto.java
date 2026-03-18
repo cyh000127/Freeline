@@ -1,4 +1,4 @@
-package com.freeline.domain.auth.dto;
+package com.freeline.domain.auth.dto.response;
 
 import lombok.Builder;
 

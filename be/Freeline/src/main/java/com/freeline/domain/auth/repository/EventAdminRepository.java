@@ -4,11 +4,11 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import com.freeline.domain.auth.entity.Organizer;
+import com.freeline.domain.auth.entity.EventAdmin;
 
-public interface OrganizerRepository extends JpaRepository<Organizer, Long> {
+public interface EventAdminRepository extends JpaRepository<EventAdmin, Long> {
 
-    Optional<Organizer> findByEmail(String email);
+    Optional<EventAdmin> findByEmail(String email);
 
     boolean existsByEmail(String email);
 
