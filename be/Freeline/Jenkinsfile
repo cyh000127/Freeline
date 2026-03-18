@@ -4,6 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = 'freeline-backend'
         COMPOSE_FILE = "${WORKSPACE}/infra/backend/docker-compose.yml"
+        INFISICAL_PROJECT_ID = 'b029b0c5-7661-4cb4-b8c2-cbe72de03a4a'
     }
 
     triggers {
@@ -36,7 +37,7 @@ pipeline {
                 ) {
                     dir('be/Freeline') {
                         sh 'chmod +x ./gradlew'
-                        sh "infisical run --env=prod --path='/be' -- ./gradlew clean build"
+                        sh "infisical run --env=prod --path='/be' --projectId=${INFISICAL_PROJECT_ID} -- ./gradlew clean build"
                     }
                 }
             }
@@ -83,7 +84,8 @@ pipeline {
                     infisicalSecrets: [] 
                 ) {
                 sh """
-                    infisical run --env=prod --path="/be" -- docker compose -f ${COMPOSE_FILE} up -d --force-recreate freeline-backend
+                    infisical run --env=prod --path="/be" --projectId=${INFISICAL_PROJECT_ID} -- \
+                        docker compose -f ${COMPOSE_FILE} up -d --force-recreate freeline-backend
                 """
                 }
                 echo "Waiting for backend to stabilize..."
