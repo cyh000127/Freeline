@@ -89,6 +89,18 @@ pipeline {
     }
 
     post {
+        success {
+            updateGitlabCommitStatus name: 'build', state: 'success'
+        }
+        notBuilt {
+            updateGitlabCommitStatus name: 'build', state: 'success'
+        }
+        aborted {
+            updateGitlabCommitStatus name: 'build', state: 'canceled'
+        }
+        failure {
+            updateGitlabCommitStatus name: 'build', state: 'failed'
+        }
         always {
             sh "docker image prune -f --filter until=24h"
             cleanWs()

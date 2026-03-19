@@ -135,9 +135,17 @@ pipeline {
     post {
         success {
             echo '✅ Infrastructure CI/CD completed successfully.'
+            updateGitlabCommitStatus name: 'infra', state: 'success'
+        }
+        notBuilt {
+            updateGitlabCommitStatus name: 'infra', state: 'success'
+        }
+        aborted {
+            updateGitlabCommitStatus name: 'infra', state: 'canceled'
         }
         failure {
             echo '❌ Infrastructure CI/CD failed. Please check logs.'
+            updateGitlabCommitStatus name: 'infra', state: 'failed'
         }
     }
 }
