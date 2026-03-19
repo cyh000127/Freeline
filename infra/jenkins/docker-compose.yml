@@ -1,10 +1,9 @@
 services:
   jenkins:
-    image: jenkins/jenkins:2.541.2-lts
+    image: jenkins/jenkins:2.541.3-lts
     container_name: jenkins
     restart: always
     user: root
-    # privileged: true
     ports:
       - "8090:8080"
       - "50000:50000"
@@ -15,21 +14,6 @@ services:
       - ./jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
       - /usr/bin/docker:/usr/bin/docker
-    networks:
-      - infra-public
-
-  jenkins-agent:
-    build: 
-      context: ./agent
-      args:
-        - DOCKER_GID=988
-    image: freeline-jenkins-agent:latest
-    container_name: jenkins-agent
-    restart: always
-    environment:
-      - JENKINS_AGENT_SSH_PUBKEY=${JENKINS_AGENT_SSH_PUBKEY}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - infra-public
 

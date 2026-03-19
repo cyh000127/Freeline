@@ -14,8 +14,8 @@ RUN ./gradlew bootJar -x test --no-daemon
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# ENV TZ=Asia/Seoul
-# RUN apk add --no-cache tzdata
+ENV TZ=Asia/Seoul
+RUN apk add --no-cache tzdata
 
 COPY --from=builder /app/build/libs/*-SNAPSHOT.jar app.jar
 

@@ -38,9 +38,13 @@ public class SwaggerConfig {
                 .addList("accessTokenAuth")
                 .addList("refreshTokenAuth");
 
-        final Server server = new Server();
-        server.setUrl(BackDomain.LOCAL.getUrl());
-        server.setDescription(BackDomain.LOCAL.getDescription());
+        final Server localServer = new Server();
+        localServer.setUrl(BackDomain.LOCAL.getUrl());
+        localServer.setDescription(BackDomain.LOCAL.getDescription());
+
+        final Server liveServer = new Server();
+        liveServer.setUrl(BackDomain.LIVE.getUrl());
+        liveServer.setDescription(BackDomain.LIVE.getDescription());
 
         return new OpenAPI()
                 .info(new Info().title("Freeline API")
@@ -49,7 +53,7 @@ public class SwaggerConfig {
                 .components(new Components()
                         .addSecuritySchemes("accessTokenAuth", accessTokenAuth))
                 .security(Collections.singletonList(securityRequirement))
-                .servers(List.of(server));
+                .servers(List.of(liveServer, localServer));
     }
 
     @Bean
