@@ -87,12 +87,6 @@ pipeline {
         }
 
         stage('Docker Build') {
-            when {
-                allOf {
-                    branch 'main'
-                    not { changeRequest() }
-                }
-            }
             steps {
                 dir('be/Freeline') {
                     sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} -t ${IMAGE_NAME}:latest ."
@@ -101,12 +95,6 @@ pipeline {
         }
 
         stage('Deploy') {
-            when {
-                allOf {
-                    branch 'main'
-                    not { changeRequest() }
-                }
-            }
             steps {
                 withInfisical(
                     configuration: [
