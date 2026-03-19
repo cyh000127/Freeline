@@ -7,6 +7,7 @@ export default function HomeBanner() {
         source={require('@/assets/events/event_banner.png')}
         style={styles.banner}
         imageStyle={styles.bannerImage}
+        resizeMode="cover"
       >
         <View style={styles.overlay} />
 
@@ -14,6 +15,7 @@ export default function HomeBanner() {
           <Text style={styles.title}>AW2026 스마트{'\n'}제조혁신 산업전</Text>
         </View>
       </ImageBackground>
+
       <View style={styles.infoRow}>
         <Text style={styles.infoText}>2026.03.06 - 2026.03.08</Text>
         <Text style={styles.infoText}>2일차</Text>
@@ -25,17 +27,20 @@ export default function HomeBanner() {
 const styles = StyleSheet.create({
   container: {
     marginTop: 4,
+    width: '100%',
   },
 
   banner: {
-    height: 190,
-    borderRadius: 0,
+    width: '100%',
+    aspectRatio: 343 / 132,
     overflow: 'hidden',
     justifyContent: 'flex-end',
+    alignSelf: 'stretch',
   },
 
   bannerImage: {
-    borderRadius: 0,
+    width: '100%',
+    height: '100%',
   },
 
   overlay: {
@@ -48,19 +53,6 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
 
-  badge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#DBFC53',
-    color: '#2F2C48',
-    fontSize: 11,
-    fontWeight: '800',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginBottom: 10,
-    overflow: 'hidden',
-  },
-
   title: {
     fontSize: 15,
     fontWeight: '800',
@@ -68,15 +60,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  subtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 10,
-  },
-
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    width: '100%',
   },
 
   infoText: {

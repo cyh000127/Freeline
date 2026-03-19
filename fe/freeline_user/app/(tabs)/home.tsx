@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import BottomTabBar, { TabKey } from '@/components/navigation/BottomTabBar';
 import HomeBanner from '@/components/home/HomeBanner';
-import PopularBoothCard from '@/components/home/PopularBoothCard';
+// import PopularBoothCard from '@/components/home/PopularBoothCard';
 import { useQRMock } from '@/app/contexts/QRMockContext';
 import ReservationCard from '@/components/reservation/ReservationCard';
 import { useExperienceMock } from '@/mocks/useExperienceMock';
@@ -37,8 +37,7 @@ export default function HomeScreen() {
           <View style={styles.header}>
             <View style={styles.brandRow}>
               <View style={styles.logoWrap}>
-                <Text style={styles.logoMark}>L</Text>
-                <View style={styles.logoDot} />
+                <Image source={require('@/assets/main/logo.png')} />
               </View>
               <Text style={styles.brandText}>줄서잇</Text>
             </View>
@@ -57,14 +56,16 @@ export default function HomeScreen() {
               <View style={styles.sectionAccent} />
               <Text style={styles.sectionTitle}>현재 체험 현황</Text>
             </View>
-            <ExperienceCard data={data} onPrimaryPress={() => console.log('action')} />;
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              {['idle', 'pending', 'active', 'warning', 'overdue'].map((m) => (
-                <Pressable key={m} onPress={() => setMode(m as any)}>
-                  <Text>{m}</Text>
-                </Pressable>
-              ))}
-            </View>
+            <ExperienceCard data={data} onPrimaryPress={() => console.log('action')} />
+            {__DEV__ && (
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {['idle', 'pending', 'active', 'warning', 'overdue'].map((m) => (
+                  <Pressable key={m} onPress={() => setMode(m as any)}>
+                    <Text>{m}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>현재 예약 현황</Text>
@@ -115,8 +116,8 @@ export default function HomeScreen() {
               </View>
             )}
           </View>
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
+          {/* <View style={styles.section}> */}
+          {/* <View style={styles.sectionHeader}>
               <View style={styles.sectionAccent} />
               <Text style={styles.sectionTitle}>현재 인기 부스</Text>
             </View>
@@ -124,9 +125,9 @@ export default function HomeScreen() {
             <View style={styles.infoRow}>
               <Text style={styles.infoIcon}>◔</Text>
               <Text style={styles.infoText}>3월 6일 16:00 기준</Text>
-            </View>
+            </View> */}
 
-            <ScrollView
+          {/* <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.popularRail}
@@ -157,8 +158,8 @@ export default function HomeScreen() {
                 onReservePress={() => router.replace('/reservation')}
                 reserveDisabled={false}
               />
-            </ScrollView>
-          </View>
+            </ScrollView> */}
+          {/* </View> */}
         </ScrollView>
 
         <BottomTabBar activeTab="home" onTabPress={handleTabPress} />
