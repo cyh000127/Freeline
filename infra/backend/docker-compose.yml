@@ -7,6 +7,7 @@ services:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Seoul
     volumes:
       - freeline-db-data:/var/lib/postgresql/data
     networks:
@@ -21,6 +22,8 @@ services:
     image: redis:8.6.1-alpine
     container_name: freeline-redis
     restart: always
+    environment:
+      TZ: Asia/Seoul
     command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - freeline-redis-data:/data
@@ -44,6 +47,7 @@ services:
     ports:
       - "8080:8080"
     environment:
+      TZ: Asia/Seoul
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
 
       DB_HOST: freeline-db

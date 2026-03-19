@@ -7,6 +7,8 @@ services:
       - "80:80"
       - "443:443"
       - "8443:8443"
+    environment:
+      TZ: Asia/Seoul
     env_file:
       - ./upstream.env
     volumes:
