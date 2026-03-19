@@ -15,6 +15,23 @@ pipeline {
 
     stages {
 
+        stage('Change Detection') {
+            steps {
+                script {
+                    def changes = sh(
+                        script: "git diff --name-only HEAD~1 HEAD | grep '^infra/' || true",
+                        returnStdout: true
+                    ).trim()
+                    if (!changes && !params.DEPLOY_ALL) {
+                        echo "infra/ 폴더 변경 없음. 파이프라인 스킵."
+                        currentBuild.result = 'NOT_BUILT'
+                        error("No relevant changes in infra/")
+                    }
+                    echo "변경 감지된 파일:\n${changes}"
+                }
+            }
+        }
+
         stage('Load Host Mapping') {
             steps {
                 script {
@@ -81,13 +98,13 @@ pipeline {
             }
             steps {
                 script {
-                    // 배포 대상 호스트들에 networks가 먼저 올라가 있어야 함
-                    def hostMap = new groovy.json.JsonSlurper().parseText(env.HOST_MAP_JSON)
+                    def hostMap = new HashMap(new groovy.json.JsonSlurper().parseText(env.HOST_MAP_JSON))
                     def targetHosts = env.CHANGED_COMPONENTS.split(',').collect { hostMap[it] ?: 'localhost' }.unique()
 
                     targetHosts.each { host ->
                         echo "네트워크 확인: ${host}"
-                        deployComponent('networks', host, params.SSH_CREDENTIALS_ID)
+                        // docker network create는 이미 존재하면 무시 (Agent 재시작 방지)
+                        ensureNetwork('infra-public', host, params.SSH_CREDENTIALS_ID)
                     }
                 }
             }
@@ -99,7 +116,7 @@ pipeline {
             }
             steps {
                 script {
-                    def hostMap = new groovy.json.JsonSlurper().parseText(env.HOST_MAP_JSON)
+                    def hostMap = new HashMap(new groovy.json.JsonSlurper().parseText(env.HOST_MAP_JSON))
                     def components = env.CHANGED_COMPONENTS.split(',')
 
                     components.each { component ->
@@ -121,6 +138,20 @@ pipeline {
         }
         failure {
             echo '❌ Infrastructure CI/CD failed. Please check logs.'
+        }
+    }
+}
+
+// ──────────────────────────────────────────────
+// Helper: Docker 네트워크를 안전하게 생성 (이미 있으면 무시)
+// ──────────────────────────────────────────────
+def ensureNetwork(String networkName, String host, String sshCredId) {
+    def cmd = "docker network create ${networkName} 2>/dev/null || echo 'Network ${networkName} already exists'"
+    if (host == 'localhost' || host == '127.0.0.1') {
+        sh cmd
+    } else {
+        sshagent([sshCredId]) {
+            sh "ssh -o StrictHostKeyChecking=no ${host} '${cmd}'"
         }
     }
 }

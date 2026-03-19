@@ -28,6 +28,23 @@ pipeline {
             }
         }
 
+        stage('Change Detection') {
+            steps {
+                script {
+                    def changes = sh(
+                        script: "git diff --name-only HEAD~1 HEAD | grep '^be/' || true",
+                        returnStdout: true
+                    ).trim()
+                    if (!changes) {
+                        echo "be/ 폴더 변경 없음. 파이프라인 스킵."
+                        currentBuild.result = 'NOT_BUILT'
+                        error("No relevant changes in be/")
+                    }
+                    echo "변경 감지된 파일:\n${changes}"
+                }
+            }
+        }
+
         stage('Test & Build') {
             steps {
                 withInfisical(

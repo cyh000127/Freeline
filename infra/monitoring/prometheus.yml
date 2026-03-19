@@ -1,0 +1,44 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # ── Server B (localhost) ──
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['prometheus:9090']
+        labels:
+          server: 'server-b'
+
+  - job_name: 'node-exporter-b'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          server: 'server-b'
+
+  - job_name: 'cadvisor-b'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          server: 'server-b'
+
+  # ── Server A (172.26.3.239) ──
+  - job_name: 'node-exporter-a'
+    static_configs:
+      - targets: ['172.26.3.239:9100']
+        labels:
+          server: 'server-a'
+
+  - job_name: 'cadvisor-a'
+    static_configs:
+      - targets: ['172.26.3.239:9180']
+        labels:
+          server: 'server-a'
+
+  - job_name: 'spring-boot'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['172.26.3.239:8080']
+        labels:
+          server: 'server-a'
+          application: 'freeline-backend'

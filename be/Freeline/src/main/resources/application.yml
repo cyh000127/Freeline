@@ -60,3 +60,13 @@ app:
 booth-manager:
   sse:
     timeout-millis: 3600000
+
+# Monitoring (Prometheus + Actuator)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: freeline-backend
