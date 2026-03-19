@@ -6,6 +6,7 @@ import lombok.Builder;
 public record SignupResDto(
         Long id,
         String email,
-        String name
+        String name,
+        String organization
 ) {
 }

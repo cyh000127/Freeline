@@ -13,4 +13,6 @@ public interface BoothAdminRepository extends JpaRepository<BoothAdmin, Long> {
 
     List<BoothAdmin> findAllByBoothIdIn(List<Long> boothIds);
 
+    List<BoothAdmin> findAllByBoothIdInOrderByBoothIdAsc(List<Long> boothIds);
+
 }

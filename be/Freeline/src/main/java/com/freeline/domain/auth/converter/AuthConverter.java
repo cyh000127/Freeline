@@ -15,21 +15,12 @@ import com.freeline.domain.auth.entity.Role;
 @Component
 public class AuthConverter {
 
-    public EventAdmin toEventAdmin(final SignupReqDto req, final String encodedPassword) {
-        return EventAdmin.builder()
-                .email(req.email())
-                .password(encodedPassword)
-                .name(req.name())
-                .organization(req.organization())
-                .verified(true)
-                .build();
-    }
-
     public SignupResDto toSignupResDto(final EventAdmin eventAdmin) {
         return SignupResDto.builder()
                 .id(eventAdmin.getId())
                 .email(eventAdmin.getEmail())
                 .name(eventAdmin.getName())
+                .organization(eventAdmin.getOrganization())
                 .build();
     }
 
@@ -50,20 +41,33 @@ public class AuthConverter {
                 .build();
     }
 
+    public EventAdmin toEventAdmin(final SignupReqDto req, final String encodedPassword) {
+        return EventAdmin.builder()
+                .email(req.email())
+                .password(encodedPassword)
+                .name(req.name())
+                .organization(req.organization())
+                .build();
+    }
+
     public BoothAdmin toBoothAdmin(final BoothAdminCreateReqDto req, final String encodedPassword) {
         return BoothAdmin.builder()
+                .boothId(req.boothId())
                 .loginId(req.loginId())
                 .password(encodedPassword)
                 .name(req.name())
-                .boothId(req.boothId())
+                .email(req.email())
                 .build();
     }
 
     public BoothAdminCreateResDto toBoothAdminCreateResDto(final BoothAdmin boothAdmin) {
-        return BoothAdminCreateResDto.builder()
-                .id(boothAdmin.getId())
-                .loginId(boothAdmin.getLoginId())
-                .name(boothAdmin.getName())
-                .build();
+        return new BoothAdminCreateResDto(
+                boothAdmin.getId(),
+                boothAdmin.getBoothId(),
+                boothAdmin.getLoginId(),
+                null, // rawPassword
+                boothAdmin.getEmail(),
+                boothAdmin.getName()
+        );
     }
 }

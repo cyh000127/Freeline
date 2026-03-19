@@ -39,7 +39,7 @@ public class FirebasePushNotificationSender implements PushNotificationSender {
 
             firebaseMessaging.send(message);
         } catch (final Exception exception) {
-            throw new PushNotificationException(ErrorCode.PUSH_NOTIFICATION_SEND_FAILED);
+            throw new PushNotificationException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
 }

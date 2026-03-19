@@ -63,9 +63,9 @@ public record BaseResponse<T>(
     /**
      * Error Response
      */
-    public static <T> BaseResponse<T> fail(final ErrorResponse error) {
+    public static <T> BaseResponse<T> fail(final ErrorResponse error, final HttpStatus status) {
         return BaseResponse.<T>builder()
-                .httpStatus(error.status())
+                .httpStatus(status)
                 .success(false)
                 .data(null)
                 .error(error)

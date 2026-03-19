@@ -20,9 +20,6 @@ public record BoothListResDto(
         @Schema(description = "위치 코드", example = "A-03")
         String locationCode,
 
-        @Schema(description = "부스 관리자 ID", example = "3")
-        Long boothAdminId,
-
         @Schema(description = "긴급 마감 여부", example = "false")
         boolean isEmergencyClosed,
 
