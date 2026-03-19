@@ -135,9 +135,17 @@ pipeline {
     post {
         success {
             echo '✅ Infrastructure CI/CD completed successfully.'
+            updateGitlabCommitStatus name: 'infra', state: 'success'
+        }
+        notBuilt {
+            updateGitlabCommitStatus name: 'infra', state: 'success'
+        }
+        aborted {
+            updateGitlabCommitStatus name: 'infra', state: 'canceled'
         }
         failure {
             echo '❌ Infrastructure CI/CD failed. Please check logs.'
+            updateGitlabCommitStatus name: 'infra', state: 'failed'
         }
     }
 }
@@ -150,8 +158,8 @@ def ensureNetwork(String networkName, String host, String sshCredId) {
     if (host == 'localhost' || host == '127.0.0.1') {
         sh cmd
     } else {
-        sshagent([sshCredId]) {
-            sh "ssh -o StrictHostKeyChecking=no ${host} '${cmd}'"
+        withCredentials([sshUserPrivateKey(credentialsId: sshCredId, keyFileVariable: 'SSH_KEY')]) {
+            sh "ssh -i \$SSH_KEY -o StrictHostKeyChecking=no ${host} '${cmd}'"
         }
     }
 }
@@ -163,12 +171,12 @@ def deployComponent(String component, String host, String sshCredId) {
     if (host == 'localhost' || host == '127.0.0.1') {
         sh "infra/scripts/deploy.sh ${component}"
     } else {
-        sshagent([sshCredId]) {
+        withCredentials([sshUserPrivateKey(credentialsId: sshCredId, keyFileVariable: 'SSH_KEY')]) {
             def remoteBase = '/home/ubuntu/infra'
-            sh "ssh -o StrictHostKeyChecking=no ${host} 'mkdir -p ${remoteBase}/scripts'"
-            sh "scp -r infra/${component} ${host}:${remoteBase}/"
-            sh "scp infra/scripts/deploy.sh ${host}:${remoteBase}/scripts/"
-            sh "ssh ${host} 'chmod +x ${remoteBase}/scripts/deploy.sh && ${remoteBase}/scripts/deploy.sh ${component}'"
+            sh "ssh -i \$SSH_KEY -o StrictHostKeyChecking=no ${host} 'mkdir -p ${remoteBase}/scripts'"
+            sh "scp -i \$SSH_KEY -o StrictHostKeyChecking=no -r infra/${component} ${host}:${remoteBase}/"
+            sh "scp -i \$SSH_KEY -o StrictHostKeyChecking=no infra/scripts/deploy.sh ${host}:${remoteBase}/scripts/"
+            sh "ssh -i \$SSH_KEY -o StrictHostKeyChecking=no ${host} 'chmod +x ${remoteBase}/scripts/deploy.sh && ${remoteBase}/scripts/deploy.sh ${component}'"
         }
     }
 }
