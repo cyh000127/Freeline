@@ -1,0 +1,13 @@
+services:
+  freeline-frontend:
+    image: freeline-frontend:latest
+    container_name: freeline-frontend
+    restart: always
+    environment:
+      - TZ=Asia/Seoul
+    networks:
+      - infra-public
+
+networks:
+  infra-public:
+    external: true
