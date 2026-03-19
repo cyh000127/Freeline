@@ -15,7 +15,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import com.freeline.common.config.properties.QrProperties;
-import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
@@ -60,21 +59,12 @@ class QrServiceTest {
                 boothWaitingRepository,
                 boothQrRepository,
                 stringRedisTemplate,
-                qrProperties,
-                null
+                qrProperties
         );
     }
 
     @Test
     void 부스_QR_생성_성공() {
-        final Booth booth = Booth.builder()
-                .id(12L)
-                .eventId(3L)
-                .name("체험 부스")
-                .locationCode("A-03")
-                .emergencyClosed(false)
-                .build();
-
         final BoothQr saved = BoothQr.builder()
                 .id(1L)
                 .boothId(12L)
@@ -86,7 +76,7 @@ class QrServiceTest {
                 .status(BoothQrStatus.ACTIVE)
                 .build();
 
-        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothRepository.existsById(12L)).thenReturn(true);
         Mockito.when(boothQrRepository.findFirstByBoothIdAndPurposeAndStatusOrderByIdDesc(
                 12L,
                 QrPurpose.FRONT_QUEUE_ARRIVAL,
@@ -103,14 +93,6 @@ class QrServiceTest {
 
     @Test
     void 부스_QR_재발급_성공() {
-        final Booth booth = Booth.builder()
-                .id(12L)
-                .eventId(3L)
-                .name("체험 부스")
-                .locationCode("A-03")
-                .emergencyClosed(false)
-                .build();
-
         final BoothQr active = BoothQr.builder()
                 .id(1L)
                 .boothId(12L)
@@ -133,7 +115,7 @@ class QrServiceTest {
                 .status(BoothQrStatus.ACTIVE)
                 .build();
 
-        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothRepository.existsById(12L)).thenReturn(true);
         Mockito.when(stringRedisTemplate.hasKey("qr:booth:12:reissue:cooldown")).thenReturn(false);
         Mockito.when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         Mockito.when(boothQrRepository.findFirstByBoothIdAndPurposeAndStatusOrderByIdDesc(
@@ -197,10 +179,12 @@ class QrServiceTest {
 //                WaitingStatus.CALLED
 //        )).thenReturn(Optional.of(waiting));
 //
-//        final QrScanResDto result = qrService.scanQr(QrScanReqDto.builder()
-//                .visitorId(21L)
-//                .qrCode("FREELINE|FRONT_QUEUE_ARRIVAL|v1|12|fixed-key")
-//                .build());
+//        final QrScanResDto result = qrService.scanQr(
+//                QrScanReqDto.builder()
+//                        .qrCode("FREELINE|FRONT_QUEUE_ARRIVAL|v1|12|fixed-key")
+//                        .build(),
+//                21L
+//        );
 //
 //        Assertions.assertThat(result.waitingId()).isEqualTo(100L);
 //        Assertions.assertThat(result.previousStatus()).isEqualTo("CALLED");
@@ -241,13 +225,16 @@ class QrServiceTest {
                 WaitingStatus.CALLED
         )).thenReturn(Optional.empty());
 
-        Assertions.assertThatThrownBy(() -> qrService.scanQr(QrScanReqDto.builder()
-                        .visitorId(21L)
-                        .qrCode("FREELINE|FRONT_QUEUE_ARRIVAL|v1|12|fixed-key")
-                        .build()))
+        Assertions.assertThatThrownBy(() -> qrService.scanQr(
+                        QrScanReqDto.builder()
+                                .qrCode("FREELINE|FRONT_QUEUE_ARRIVAL|v1|12|fixed-key")
+                                .build(),
+                        21L))
                 .isInstanceOf(QrException.class)
                 .hasMessage("호출 상태의 대기를 찾을 수 없습니다.");
 
         Mockito.verify(stringRedisTemplate).delete("qr:scan:lock:booth:12:visitor:21");
     }
 }
+
+
