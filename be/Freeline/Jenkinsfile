@@ -87,6 +87,9 @@ pipeline {
         }
 
         stage('Docker Build') {
+            when {
+                expression { env.gitlabMergeRequestIid == null && env.gitlabBranch == 'main' }
+            }
             steps {
                 dir('be/Freeline') {
                     sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} -t ${IMAGE_NAME}:latest ."
@@ -95,6 +98,9 @@ pipeline {
         }
 
         stage('Deploy') {
+            when {
+                expression { env.gitlabMergeRequestIid == null && env.gitlabBranch == 'main' }
+            }
             steps {
                 withInfisical(
                     configuration: [
