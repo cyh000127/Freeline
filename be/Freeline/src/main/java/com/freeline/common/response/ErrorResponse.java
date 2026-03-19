@@ -5,26 +5,31 @@ import java.util.List;
 
 import jakarta.servlet.http.HttpServletRequest;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import com.freeline.common.error.ErrorCode;
 
+@Getter
 @Builder
-public record ErrorResponse(
-        HttpStatus status,
-        String message,
-        String method,
-        String requestUri,
-        List<FieldErrorDetail> errors
-) {
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+public class ErrorResponse {
+    private String status; // 이제 ErrorCode의 Name (예: BOOTH_NOT_FOUND)이 들어갑니다.
+    private String message;
+    private String method;
+    private String requestUri;
+    private List<FieldErrorDetail> errors;
 
     public static ErrorResponse of(ErrorCode errorCode, HttpServletRequest request) {
         return ErrorResponse.builder()
-                .status(errorCode.getHttpStatus())
+                .status(errorCode.name())
                 .message(errorCode.getMessage())
                 .method(request.getMethod())
                 .requestUri(request.getRequestURI())
@@ -34,7 +39,7 @@ public record ErrorResponse(
 
     public static ErrorResponse of(HttpServletRequest request, ErrorCode errorCode, final String errorMessage) {
         return ErrorResponse.builder()
-                .status(errorCode.getHttpStatus())
+                .status(errorCode.name())
                 .message(errorMessage)
                 .method(request.getMethod())
                 .requestUri(request.getRequestURI())
@@ -43,6 +48,9 @@ public record ErrorResponse(
     }
 
     public void addValidationErrors(BindingResult bindingResult) {
+        if (this.errors == null) {
+            this.errors = new ArrayList<>();
+        }
         bindingResult.getFieldErrors().forEach(this::addValidationError);
     }
 
@@ -55,7 +63,12 @@ public record ErrorResponse(
         );
     }
 
+    @Getter
     @Builder
-    public record FieldErrorDetail(String field, String message) {
+    @NoArgsConstructor(access = AccessLevel.PROTECTED)
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    public static class FieldErrorDetail {
+        private String field;
+        private String message;
     }
 }

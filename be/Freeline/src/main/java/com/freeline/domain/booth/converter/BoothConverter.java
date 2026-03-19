@@ -47,7 +47,6 @@ public class BoothConverter {
                 .boothId(booth.getId())
                 .name(booth.getName())
                 .locationCode(booth.getLocationCode())
-                .boothAdminId(booth.getBoothAdminId())
                 .isEmergencyClosed(booth.isEmergencyClosed())
                 .openTime(booth.getOpenTime())
                 .closeTime(booth.getCloseTime())

@@ -33,9 +33,6 @@ public class Booth extends BaseEntity {
     @Column(name = "event_id", nullable = false)
     private Long eventId;
 
-    @Column(name = "booth_admin_id")
-    private Long boothAdminId;
-
     @Column(name = "name", nullable = false, length = 120)
     private String name;
 

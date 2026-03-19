@@ -1,4 +1,4 @@
-package com.freeline.domain.auth.dto;
+package com.freeline.domain.auth.dto.response;
 
 import lombok.Builder;
 
@@ -6,6 +6,7 @@ import lombok.Builder;
 public record SignupResDto(
         Long id,
         String email,
-        String name
+        String name,
+        String organization
 ) {
 }

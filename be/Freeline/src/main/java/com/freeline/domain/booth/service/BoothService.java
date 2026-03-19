@@ -123,7 +123,13 @@ public class BoothService {
                 .map(BoothConverter::toBoothCalledUserResDto)
                 .orElse(null);
 
-        return BoothConverter.toBoothQueueResDto(boothId, backQueueCount, frontQueueCount, frontQueue, currentCalledUser);
+        return BoothQueueResDto.builder()
+                .boothId(boothId)
+                .backQueueCount(backQueueCount)
+                .frontQueueCount(frontQueueCount)
+                .frontQueue(frontQueue)
+                .currentCalledUser(currentCalledUser)
+                .build();
     }
 
     public BoothStatusResDto updateBoothStatus(final Long boothId, final BoothStatusUpdateReqDto request) {
