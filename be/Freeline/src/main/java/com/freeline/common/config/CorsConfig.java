@@ -15,7 +15,9 @@ import com.freeline.common.constant.FrontDomain;
 public class CorsConfig {
     private static final List<String> ALLOWED_ORIGINS = List.of(
             BackDomain.LOCAL.getUrl(),
-            FrontDomain.LOCAL.getUrl()
+            BackDomain.LIVE.getUrl(),
+            FrontDomain.LOCAL.getUrl(),
+            FrontDomain.LIVE.getUrl()
     );
 
     private static final List<String> ALLOWED_HEADERS = List.of(

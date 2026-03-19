@@ -136,7 +136,8 @@ pipeline {
                                 [infisicalKey: 'FIREBASE_PROJECT_ID'],
                                 [infisicalKey: 'FIREBASE_SERVICE_ACCOUNT_BASE64'],
                                 [infisicalKey: 'MAIL_USERNAME'],
-                                [infisicalKey: 'MAIL_PASSWORD']
+                                [infisicalKey: 'MAIL_PASSWORD'],
+                                [infisicalKey: 'SPRING_PROFILES_ACTIVE']
                             ]
                         )
                     ]
