@@ -1,7 +1,9 @@
 package com.freeline.domain.auth.dto.request;
 
-import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
+
+import jakarta.validation.constraints.NotEmpty;
+
 import lombok.Builder;
 
 @Builder
