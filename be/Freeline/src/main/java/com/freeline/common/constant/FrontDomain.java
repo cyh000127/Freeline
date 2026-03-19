@@ -8,7 +8,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 public enum FrontDomain {
 
-    LOCAL("http://localhost:5173", "프론트 로컬 도메인"),
+    LOCAL1("http://localhost:3000", "프론트 로컬 도메인"),
+    LOCAL2("http://localhost:3001", "프론트 로컬 도메인"),
     LIVE("https://j14a207.p.ssafy.io", "프론트 배포 도메인");
 
     private final String url;

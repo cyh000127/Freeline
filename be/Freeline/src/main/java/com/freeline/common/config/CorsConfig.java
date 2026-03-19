@@ -16,7 +16,8 @@ public class CorsConfig {
     private static final List<String> ALLOWED_ORIGINS = List.of(
             BackDomain.LOCAL.getUrl(),
             BackDomain.LIVE.getUrl(),
-            FrontDomain.LOCAL.getUrl(),
+            FrontDomain.LOCAL1.getUrl(),
+            FrontDomain.LOCAL2.getUrl(),
             FrontDomain.LIVE.getUrl()
     );
 
