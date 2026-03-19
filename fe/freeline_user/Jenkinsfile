@@ -16,6 +16,23 @@ pipeline {
             }
         }
 
+        stage('Change Detection') {
+            steps {
+                script {
+                    def changes = sh(
+                        script: "git diff --name-only HEAD~1 HEAD | grep '^fe/' || true",
+                        returnStdout: true
+                    ).trim()
+                    if (!changes) {
+                        echo "fe/ 폴더 변경 없음. 파이프라인 스킵."
+                        currentBuild.result = 'NOT_BUILT'
+                        error("No relevant changes in fe/")
+                    }
+                    echo "변경 감지된 파일:\n${changes}"
+                }
+            }
+        }
+
         stage('Docker Build with Secrets') {
             steps {
                 // 프론트엔드쪽 Infisical path 및 필요한 키들을 맞게 수정 필요
