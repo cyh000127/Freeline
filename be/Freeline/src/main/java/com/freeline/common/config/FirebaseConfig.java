@@ -31,7 +31,8 @@ public class FirebaseConfig {
                 firebaseProperties.projectId()
         );
 
-        byte[] decodedKey = Base64.getDecoder().decode(firebaseProperties.serviceAccountBase64());
+        String cleanBase64 = firebaseProperties.serviceAccountBase64().replaceAll("\\s+", "");
+        byte[] decodedKey = Base64.getDecoder().decode(cleanBase64);
 
         try (ByteArrayInputStream serviceAccount = new ByteArrayInputStream(decodedKey)) {
             final FirebaseOptions options = FirebaseOptions.builder()
