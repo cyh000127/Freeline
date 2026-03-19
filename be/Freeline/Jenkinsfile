@@ -141,7 +141,7 @@ pipeline {
                 echo "Waiting for backend to stabilize..."
                 sh '''
                     for i in $(seq 1 30); do
-                        if curl -sf http://localhost:8080/actuator/health; then
+                        if curl -sf http://freeline-backend:8080/v3/api-docs > /dev/null; then
                             echo "\\nBackend is UP!"
                             exit 0
                         fi
