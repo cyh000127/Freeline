@@ -1,7 +1,7 @@
 server {
     listen 80;
     listen [::]:80;
-    server_name j14a207.p.ssafy.io;
+    server_name ${SERVER_NAME};
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -15,10 +15,10 @@ server {
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
-    server_name j14a207.p.ssafy.io;
+    server_name ${SERVER_NAME};
 
-    ssl_certificate /etc/letsencrypt/live/j14a207.p.ssafy.io/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/j14a207.p.ssafy.io/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/${SERVER_NAME}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${SERVER_NAME}/privkey.pem;
     
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
@@ -30,7 +30,7 @@ server {
     }
 
     location /api/ {
-        set $backend_api http://freeline-backend:8080;
+        set $backend_api http://${BACKEND_HOST}:${BACKEND_PORT};
         proxy_pass $backend_api;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -39,25 +39,25 @@ server {
     }
 
     location = /swagger-ui.html {
-        set $backend_swagger_html http://freeline-backend:8080;
+        set $backend_swagger_html http://${BACKEND_HOST}:${BACKEND_PORT};
         proxy_pass $backend_swagger_html;
         proxy_set_header Host $host;
     }
 
     location /swagger-ui/ {
-        set $backend_swagger_ui http://freeline-backend:8080;
+        set $backend_swagger_ui http://${BACKEND_HOST}:${BACKEND_PORT};
         proxy_pass $backend_swagger_ui;
         proxy_set_header Host $host;
     }
 
     location /v3/api-docs {
-        set $backend_docs http://freeline-backend:8080;
+        set $backend_docs http://${BACKEND_HOST}:${BACKEND_PORT};
         proxy_pass $backend_docs;
         proxy_set_header Host $host;
     }
     
     location /jenkins {
-        set $jenkins_server http://172.26.15.39:8090;
+        set $jenkins_server http://${JENKINS_HOST}:${JENKINS_PORT};
         
         proxy_pass $jenkins_server;
         
@@ -84,13 +84,13 @@ server {
 server {
     listen 8443 ssl;
     listen [::]:8443 ssl;
-    server_name j14a207.p.ssafy.io;
+    server_name ${SERVER_NAME};
 
-    ssl_certificate /etc/letsencrypt/live/j14a207.p.ssafy.io/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/j14a207.p.ssafy.io/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/${SERVER_NAME}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${SERVER_NAME}/privkey.pem;
 
     location / {
-        proxy_pass http://172.26.15.39:8081;
+        proxy_pass http://${INFISICAL_HOST}:${INFISICAL_PORT};
         
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

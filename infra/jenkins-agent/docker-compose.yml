@@ -1,0 +1,21 @@
+services:
+  jenkins-agent:
+    build:
+      context: ./agent
+      args:
+        - DOCKER_GID=988
+    image: freeline-jenkins-agent:latest
+    container_name: jenkins-agent
+    restart: always
+    ports:
+      - "2222:22"
+    environment:
+      - JENKINS_AGENT_SSH_PUBKEY=ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC2mDdp8bC3HLu3KN1KKlW2LWs77R8Xx9kUsj/hylJfC9vKBUTWndnyM7jliXKmUuLujppeIDICj4mn/COsQfXErzGxuR0+uTHY83QP7s6PnYvcO+mnJGD0wf+HaiE1LcVZxTAUaFel9EkuByRUQq2Uq+TK5CFcKHqHCiGH68FFSfhWMexvds35JnyHB7+/cgxzH1SFQxa0bUxd8sFMJItQPwMTtuy5y0Ivlbm2GdJVPFN/cmJXhVpRfA3jUaRus7tB9TJmP526qzPepjHpofw9v20mGVHQCxqQ9od7A3rqaFqqo59nYQTcwimE9jjCTRmASZXHDeOnR9HSIbkVwjw6hbI+gtgIGm1oPxGXPSWK3RRZ3xrn98fF11PxdPnnC4f1voTMhiPDtmVgj21OZr09MTiMHT4Jhq07aLznZZINlHtGZscEhg/vydqF2Tcf46R0bJ/fXBwbeEp5R9KuZYRtusUq7BSwI+JiXjJAgfi6hANHpmURoXzod61UIFyp8A+WxG+C1dpLFxpNi2rpt75+m3B6zxbWAIwCDQu3tBU8vygtglBD+TzmZ3VuWAS+fvWnTT+TYti3O8ENtB9wkOHDoi6YS4fzNHPlYAeRQcE5+aDcT81TX9a7u4B1HybooAY0ihGxqLd5P/+eUq5ml7isqIlRlpUCL2T4UUGdgOfu7Q== ubuntu@ip-172-26-3-239
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - infra-public
+
+networks:
+  infra-public:
+    external: true
