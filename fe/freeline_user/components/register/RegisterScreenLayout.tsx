@@ -1,4 +1,5 @@
-import { ImageBackground, StyleSheet, Text, View, Image } from 'react-native';
+import React from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type RegisterScreenLayoutProps = {
@@ -7,66 +8,67 @@ type RegisterScreenLayoutProps = {
 
 export default function RegisterScreenLayout({ children }: RegisterScreenLayoutProps) {
   return (
-    <ImageBackground
-      source={require('@/assets/register/register_background.png')}
-      resizeMode="cover"
-      style={styles.background}
-    >
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <View style={styles.topArea}>
-          <View style={styles.notchPlaceholder} />
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
+        <View style={styles.topImageSection}>
+          <Image
+            source={require('@/assets/register/register_background.png')}
+            style={styles.topImage}
+            resizeMode="cover"
+          />
         </View>
 
         <View style={styles.bottomArea}>
           <View style={styles.card}>
             <View style={styles.logoWrap}>
-              <Image
-                source={require('@/assets/main/logo.png')}
-                style={styles.logo}
-              ></Image>
+              <Image source={require('@/assets/main/logo.png')} style={styles.logo} />
               <Text style={styles.logoText}> 줄서잇</Text>
             </View>
 
             {children}
           </View>
         </View>
-      </SafeAreaView>
-    </ImageBackground>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
   safeArea: {
     flex: 1,
-  },
-  topArea: {
-    flex: 0.28,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: 4,
-  },
-  notchPlaceholder: {
-    width: 110,
-    height: 34,
-    borderRadius: 18,
-    backgroundColor: '#000000',
-  },
-  bottomArea: {
-    flex: 0.72,
     backgroundColor: '#F3F3F4',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#F3F3F4',
+  },
+
+  topImageSection: {
+    width: '100%',
+    height: 220,
+    overflow: 'hidden',
+  },
+  topImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  bottomArea: {
+    flex: 1,
+    marginTop: -12,
     paddingHorizontal: 20,
-    paddingTop: 18,
+    paddingTop: 0,
   },
+
   card: {
+    flex: 1,
     backgroundColor: '#E9EAED',
-    borderRadius: 18,
-    paddingHorizontal: 28,
-    paddingTop: 26,
-    paddingBottom: 34,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 32,
+    paddingBottom: 28,
   },
+
   logoWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -74,8 +76,8 @@ const styles = StyleSheet.create({
     marginBottom: 36,
   },
   logo: {
-    height: 28,
     width: 22,
+    height: 28,
   },
   logoText: {
     fontFamily: 'Pretendard',
