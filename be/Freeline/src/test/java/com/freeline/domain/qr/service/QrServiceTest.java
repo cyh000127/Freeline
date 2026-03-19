@@ -236,3 +236,4 @@ class QrServiceTest {
         Mockito.verify(stringRedisTemplate).delete("qr:scan:lock:booth:12:visitor:21");
     }
 }
+
