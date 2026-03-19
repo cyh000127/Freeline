@@ -3,6 +3,7 @@ package com.freeline.domain.qr.controller;
 import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,9 +31,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class QrController {
 
     private final QrService qrService;
-
-    // TODO: 인증/인가 적용 시 부스 QR 조회는 부스 관리자와 행사 참여자 모두 접근 가능하도록 정책을 분리한다.
-    // TODO: 인증/인가 적용 시 QR 생성/재발급은 부스 관리자 권한으로 제한한다.
 
     @Operation(summary = "부스 QR 생성", description = "부스에 부착할 고정형 QR payload를 생성합니다. 활성 QR이 있으면 기존 QR을 반환합니다.")
     @PostMapping("/booths/{boothId}")
@@ -64,9 +62,11 @@ public class QrController {
     @Operation(summary = "QR 스캔 등록", description = "사용자가 부스 QR을 스캔하면 호출 상태를 확인하고 앞큐 등록 상태로 변경합니다.")
     @PostMapping("/scan")
     public ResponseEntity<BaseResponse<QrScanResDto>> scanQr(
-            @Valid @RequestBody final QrScanReqDto request
+            @Valid @RequestBody final QrScanReqDto request,
+            final Authentication authentication
     ) {
-        final QrScanResDto response = qrService.scanQr(request);
+        final Long visitorId = Long.valueOf(authentication.getName());
+        final QrScanResDto response = qrService.scanQr(request, visitorId);
         return ResponseUtils.ok(response);
     }
 }
