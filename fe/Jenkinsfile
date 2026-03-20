@@ -3,6 +3,10 @@ pipeline {
         label 'build-agent-01'
     }
 
+    parameters {
+        booleanParam(name: 'FORCE_REDEPLOY', defaultValue: false, description: '변경 감지 무시하고 강제 배포')
+    }
+
     options {
         gitLabConnection('lab-ssafy') 
     }
@@ -36,30 +40,38 @@ pipeline {
         stage('Determine Changes') {
             steps {
                 script {
-                    def changes = sh(
-                        script: "git diff --name-only HEAD~1 HEAD || true",
-                        returnStdout: true
-                    ).trim()
-                    
-                    env.BUILD_USER = "false"
-                    env.BUILD_BOOTH = "false"
-                    env.BUILD_SUPER = "false"
-
-                    if (!changes) {
-                        // 만약 첫 빌드이거나 diff가 안 잡히는 상황이면 모두 빌드
+                    if (params.FORCE_REDEPLOY) {
+                        echo "FORCE_REDEPLOY 활성화됨. 모든 프론트엔드 빌드 대상으로 설정."
                         env.BUILD_USER = "true"
                         env.BUILD_BOOTH = "true"
                         env.BUILD_SUPER = "true"
                     } else {
-                        if (changes.contains("fe/freeline_user/") || changes.contains("fe/types/")) {
+                        def changes = sh(
+                            script: "git diff --name-only HEAD~1 HEAD || true",
+                            returnStdout: true
+                        ).trim()
+                        
+                        env.BUILD_USER = "false"
+                        env.BUILD_BOOTH = "false"
+                        env.BUILD_SUPER = "false"
+
+                        if (!changes || changes.contains("fe/types/")) {
+                            // 만약 첫 빌드이거나 공통 타입 변경 시 모두 빌드
                             env.BUILD_USER = "true"
-                        }
-                        if (changes.contains("fe/freeline-booth/") || changes.contains("fe/types/")) {
                             env.BUILD_BOOTH = "true"
-                        }
-                        if (changes.contains("fe/freeline-super/") || changes.contains("fe/types/")) {
                             env.BUILD_SUPER = "true"
+                        } else {
+                            if (changes.contains("fe/freeline_user/")) {
+                                env.BUILD_USER = "true"
+                            }
+                            if (changes.contains("fe/freeline-booth/")) {
+                                env.BUILD_BOOTH = "true"
+                            }
+                            if (changes.contains("fe/freeline-super/")) {
+                                env.BUILD_SUPER = "true"
+                            }
                         }
+                        echo "Changed files:\n${changes}"
                     }
 
                     if (env.BUILD_USER == "false" && env.BUILD_BOOTH == "false" && env.BUILD_SUPER == "false") {
@@ -69,7 +81,6 @@ pipeline {
                     }
 
                     echo "Build User: ${env.BUILD_USER}, Build Booth: ${env.BUILD_BOOTH}, Build Super: ${env.BUILD_SUPER}"
-                    echo "Changed files:\n${changes}"
                 }
             }
         }
@@ -163,9 +174,12 @@ pipeline {
                 echo "Waiting for frontends to stabilize..."
                 sh '''
                     for i in $(seq 1 15); do
-                        if curl -sf http://freeline-frontend:80 > /dev/null && \
-                           curl -sf http://freeline-booth:3000 > /dev/null && \
-                           curl -sf http://freeline-super:3000 > /dev/null; then
+                        SUCCESS=true
+                        if ! curl -sf http://freeline-frontend:80 > /dev/null; then SUCCESS=false; fi
+                        if [ "$BUILD_BOOTH" = "true" ] && ! curl -sf http://freeline-booth:3000/booth > /dev/null; then SUCCESS=false; fi
+                        if [ "$BUILD_SUPER" = "true" ] && ! curl -sf http://freeline-super:3000/super > /dev/null; then SUCCESS=false; fi
+                        
+                        if [ "$SUCCESS" = "true" ]; then
                             echo "\\nFrontends are UP!"
                             exit 0
                         fi
