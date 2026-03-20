@@ -7,8 +7,8 @@ export function useExperienceMock() {
   const dataMap: Record<string, ExperienceState> = {
     idle: { status: 'idle' },
 
-    pending: {
-      status: 'pending',
+    called: {
+      status: 'called',
       boothName: '포스코 DX',
     },
 

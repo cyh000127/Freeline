@@ -17,7 +17,7 @@ export default function TabBarIcon({ tab, isActive = false }: TabBarIconProps) {
     case 'home':
       return <Ionicons name={'home-outline'} size={size} color={color} />;
     case 'reservation':
-      return <Ionicons name={'calendar-outline'} size={size} color={color} />;
+      return <Ionicons name={'document-outline'} size={size} color={color} />;
     case 'map':
       return <Ionicons name={'map-outline'} size={size} color={color} />;
     case 'my':

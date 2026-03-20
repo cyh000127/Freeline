@@ -71,6 +71,7 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: 'Pretendard-Bold',
     fontSize: 32,
+    fontWeight: 'bold',
     color: '#373451',
     letterSpacing: -0.6,
   },

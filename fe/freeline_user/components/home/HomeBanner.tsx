@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View, ImageBackground } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeBanner() {
   return (
@@ -17,7 +18,16 @@ export default function HomeBanner() {
       </ImageBackground>
 
       <View style={styles.infoRow}>
-        <Text style={styles.infoText}>2026.03.06 - 2026.03.08</Text>
+        <View style={styles.dateGroup}>
+          <Ionicons
+            name="calendar-outline"
+            size={16}
+            color="#000"
+            style={{ marginTop: 1 }}
+          />
+          <Text style={styles.infoText}>2026.03.06 - 2026.03.08</Text>
+        </View>
+
         <Text style={styles.infoText}>2일차</Text>
       </View>
     </View>
@@ -26,7 +36,7 @@ export default function HomeBanner() {
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 4,
+    // marginTop: 4,
     width: '100%',
   },
 
@@ -61,14 +71,22 @@ const styles = StyleSheet.create({
   },
 
   infoRow: {
+    paddingVertical: 5,
+    paddingHorizontal: 20,
     flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'space-between',
     width: '100%',
   },
 
   infoText: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '700',
     color: '#000000',
+  },
+  dateGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
 });

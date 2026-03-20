@@ -99,6 +99,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Pretendard-Bold',
     fontSize: 24,
     lineHeight: 32,
+    fontWeight: 'bold',
     color: '#111111',
     textAlign: 'center',
     letterSpacing: -0.5,
