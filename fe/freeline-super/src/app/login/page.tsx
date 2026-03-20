@@ -1,5 +1,6 @@
 "use client";
 
+import axios from "axios";
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -24,18 +25,21 @@ export default function LoginPage() {
     setErrorMsg("");
 
     try {
-      const response = await authApi.login({ email, password });
-      // Depending on how backend sends the token (e.g. response.data.accessToken)
-      const token = response.data?.accessToken || response.data?.token;
+      const response = await authApi.login({ id: email, password });
+      const token = response.data?.data?.accessToken || response.data?.accessToken || response.data?.token;
       if (token) {
         localStorage.setItem("accessToken", token);
       }
       
       // Redirect to dashboard or main page
       router.push("/");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Login Error:", error);
-      setErrorMsg(error.response?.data?.message || "로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.");
+      if (axios.isAxiosError(error)) {
+        setErrorMsg(error.response?.data?.error?.message || "로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.");
+      } else {
+        setErrorMsg("로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.");
+      }
     } finally {
       setIsLoading(false);
     }

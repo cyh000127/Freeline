@@ -2,7 +2,7 @@ import { api } from '../api';
 
 // --- Types (Can be refined later when exact DTO is known) ---
 export interface LoginRequest {
-  email?: string;
+  id?: string;
   password?: string;
 }
 
