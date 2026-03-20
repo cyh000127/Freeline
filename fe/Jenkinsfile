@@ -163,9 +163,12 @@ pipeline {
                 echo "Waiting for frontends to stabilize..."
                 sh '''
                     for i in $(seq 1 15); do
-                        if curl -sf http://freeline-frontend:80 > /dev/null && \
-                           curl -sf http://freeline-booth:3000 > /dev/null && \
-                           curl -sf http://freeline-super:3000 > /dev/null; then
+                        SUCCESS=true
+                        if ! curl -sf http://freeline-frontend:80 > /dev/null; then SUCCESS=false; fi
+                        if [ "$BUILD_BOOTH" = "true" ] && ! curl -sf http://freeline-booth:3000/booth > /dev/null; then SUCCESS=false; fi
+                        if [ "$BUILD_SUPER" = "true" ] && ! curl -sf http://freeline-super:3000/super > /dev/null; then SUCCESS=false; fi
+                        
+                        if [ "$SUCCESS" = "true" ]; then
                             echo "\\nFrontends are UP!"
                             exit 0
                         fi
