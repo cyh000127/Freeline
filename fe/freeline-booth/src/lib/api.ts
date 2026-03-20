@@ -13,10 +13,10 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     // Inject auth token from localStorage or cookies here
-    // const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`;
-    // }
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => {

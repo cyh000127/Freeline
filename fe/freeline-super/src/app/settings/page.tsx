@@ -19,9 +19,25 @@ export default function SettingsPage() {
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
     if (!token) {
       router.replace("/login");
-    } else {
-      setIsChecking(false);
+      return;
     }
+
+    // Fetch user info
+    const fetchUser = async () => {
+      try {
+        const res = await authApi.getMe();
+        if (res.data?.success && res.data?.data) {
+          setName(res.data.data.name || "");
+          setOrganization(res.data.data.organization || "");
+        }
+      } catch (err) {
+        console.error("Failed to fetch user info", err);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    fetchUser();
   }, [router]);
 
   // Profile Form
@@ -34,9 +50,6 @@ export default function SettingsPage() {
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   
   const [isLoading, setIsLoading] = useState(false);
-
-  // 임시 우회를 위해 me 조회는 당장 안 함 (해도 에러남)
-  // 실제 연동 시 useEffect로 authApi.getMe() 호출 후 초기값 세팅
   
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,6 +115,13 @@ export default function SettingsPage() {
     }
   };
 
+  const handleLogout = () => {
+    if (confirm("로그아웃 하시겠습니까?")) {
+      localStorage.removeItem("accessToken");
+      router.replace("/login");
+    }
+  };
+
   if (isChecking) {
     return <div className="min-h-screen bg-[#F1F3F5]" />;
   }
@@ -127,7 +147,11 @@ export default function SettingsPage() {
         </div>
 
         <div className="w-[100px] flex justify-end text-gray-300 gap-2">
-          <button title="로그아웃" className="hover:text-white transition-colors p-2 rounded-full hover:bg-white/10">
+          <button 
+            title="로그아웃" 
+            onClick={handleLogout}
+            className="hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
+          >
             <LogOut className="w-5 h-5" />
           </button>
         </div>

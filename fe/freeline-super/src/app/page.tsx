@@ -9,19 +9,36 @@ import { AddEventModal } from "@/components/AddEventModal";
 import { EditEventModal } from "@/components/EditEventModal";
 import { MoreVertical, Settings, LogOut } from "lucide-react";
 import { api } from "@/lib/api";
+import { authApi } from "@/lib/api/auth";
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
+  const [userName, setUserName] = useState("관리자");
 
   useEffect(() => {
     // Check for auth token, redirect to login if missing
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
     if (!token) {
       router.replace("/login");
-    } else {
-      setIsChecking(false);
+      return;
     }
+
+    // Fetch user info
+    const fetchUser = async () => {
+      try {
+        const res = await authApi.getMe();
+        if (res.data?.success && res.data?.data?.name) {
+          setUserName(res.data.data.name);
+        }
+      } catch (err) {
+        console.error("Failed to fetch user info", err);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    fetchUser();
   }, [router]);
 
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
@@ -46,6 +63,13 @@ export default function SuperAdminDashboard() {
       }
     }
     setOpenMenuId(null);
+  };
+
+  const handleLogout = () => {
+    if (confirm("로그아웃 하시겠습니까?")) {
+      localStorage.removeItem("accessToken");
+      router.replace("/login");
+    }
   };
 
   // Dummy event data based on UI elements
@@ -76,7 +100,11 @@ export default function SuperAdminDashboard() {
           <Link href="/settings" title="설정" className="hover:text-white transition-colors p-2 rounded-full hover:bg-white/10">
             <Settings className="w-5 h-5" />
           </Link>
-          <button title="로그아웃" className="hover:text-white transition-colors p-2 rounded-full hover:bg-white/10">
+          <button 
+            title="로그아웃" 
+            onClick={handleLogout}
+            className="hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
+          >
             <LogOut className="w-5 h-5" />
           </button>
         </div>
@@ -94,7 +122,7 @@ export default function SuperAdminDashboard() {
             + 행사 추가하기
           </Button>
           <div className="text-lg font-bold text-[#111111]">
-            홍길동님, 환영합니다.
+            {userName}님, 환영합니다.
           </div>
         </div>
 
