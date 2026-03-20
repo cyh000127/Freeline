@@ -1,0 +1,200 @@
+pipeline {
+    agent {
+        label 'build-agent-01'
+    }
+
+    options {
+        gitLabConnection('lab-ssafy') 
+    }
+
+    triggers {
+        gitlab(
+            triggerOnPush: true,
+            triggerOnMergeRequest: true,
+            branchFilterType: 'NameBasedFilter',
+            includeBranchesSpec: 'main'
+        )
+    }
+
+    environment {
+        COMPOSE_FILE = "${env.WORKSPACE}/infra/frontend/docker-compose.yml"
+        
+        USER_IMAGE = "freeline-frontend"
+        BOOTH_IMAGE = "freeline-booth"
+        SUPER_IMAGE = "freeline-super"
+        
+        DOCKER_TAG = "${env.BUILD_ID}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Determine Changes') {
+            steps {
+                script {
+                    def changes = sh(
+                        script: "git diff --name-only HEAD~1 HEAD || true",
+                        returnStdout: true
+                    ).trim()
+                    
+                    env.BUILD_USER = "false"
+                    env.BUILD_BOOTH = "false"
+                    env.BUILD_SUPER = "false"
+
+                    if (!changes) {
+                        // 만약 첫 빌드이거나 diff가 안 잡히는 상황이면 모두 빌드
+                        env.BUILD_USER = "true"
+                        env.BUILD_BOOTH = "true"
+                        env.BUILD_SUPER = "true"
+                    } else {
+                        if (changes.contains("fe/freeline_user/") || changes.contains("fe/types/")) {
+                            env.BUILD_USER = "true"
+                        }
+                        if (changes.contains("fe/freeline-booth/") || changes.contains("fe/types/")) {
+                            env.BUILD_BOOTH = "true"
+                        }
+                        if (changes.contains("fe/freeline-super/") || changes.contains("fe/types/")) {
+                            env.BUILD_SUPER = "true"
+                        }
+                    }
+
+                    if (env.BUILD_USER == "false" && env.BUILD_BOOTH == "false" && env.BUILD_SUPER == "false") {
+                        echo "fe/ 폴더 관련 앱 변경 없음. 파이프라인 스킵."
+                        currentBuild.result = 'NOT_BUILT'
+                        error("No relevant changes in fe/")
+                    }
+
+                    echo "Build User: ${env.BUILD_USER}, Build Booth: ${env.BUILD_BOOTH}, Build Super: ${env.BUILD_SUPER}"
+                    echo "Changed files:\n${changes}"
+                }
+            }
+        }
+
+        stage('Build freeline_user') {
+            when { expression { env.BUILD_USER == "true" } }
+            steps {
+                withInfisical(
+                    configuration: [
+                        infisicalCredentialId: 'infisical-universal-auth',
+                        infisicalEnvironmentSlug: 'prod',
+                        infisicalProjectSlug: 'freeline',
+                        infisicalUrl: 'https://j14a207.p.ssafy.io:8443'
+                    ],
+                    infisicalSecrets: [
+                        infisicalSecret(
+                            includeImports: true,
+                            path: '/fe', 
+                            secretValues: []
+                        )
+                    ]
+                ) {
+                    dir('fe/freeline_user') {
+                        sh "docker build -t ${USER_IMAGE}:${DOCKER_TAG} ."
+                        sh "docker tag ${USER_IMAGE}:${DOCKER_TAG} ${USER_IMAGE}:latest"
+                    }
+                }
+            }
+        }
+
+        stage('Build freeline-booth') {
+            when { expression { env.BUILD_BOOTH == "true" } }
+            steps {
+                withInfisical(
+                    configuration: [
+                        infisicalCredentialId: 'infisical-universal-auth',
+                        infisicalEnvironmentSlug: 'prod',
+                        infisicalProjectSlug: 'freeline',
+                        infisicalUrl: 'https://j14a207.p.ssafy.io:8443'
+                    ],
+                    infisicalSecrets: [
+                        infisicalSecret(
+                            includeImports: true,
+                            path: '/fe', 
+                            secretValues: []
+                        )
+                    ]
+                ) {
+                    dir('fe/freeline-booth') {
+                        sh "docker build -t ${BOOTH_IMAGE}:${DOCKER_TAG} ."
+                        sh "docker tag ${BOOTH_IMAGE}:${DOCKER_TAG} ${BOOTH_IMAGE}:latest"
+                    }
+                }
+            }
+        }
+
+        stage('Build freeline-super') {
+            when { expression { env.BUILD_SUPER == "true" } }
+            steps {
+                withInfisical(
+                    configuration: [
+                        infisicalCredentialId: 'infisical-universal-auth',
+                        infisicalEnvironmentSlug: 'prod',
+                        infisicalProjectSlug: 'freeline',
+                        infisicalUrl: 'https://j14a207.p.ssafy.io:8443'
+                    ],
+                    infisicalSecrets: [
+                        infisicalSecret(
+                            includeImports: true,
+                            path: '/fe', 
+                            secretValues: []
+                        )
+                    ]
+                ) {
+                    dir('fe/freeline-super') {
+                        sh "docker build -t ${SUPER_IMAGE}:${DOCKER_TAG} ."
+                        sh "docker tag ${SUPER_IMAGE}:${DOCKER_TAG} ${SUPER_IMAGE}:latest"
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            when {
+                expression { env.gitlabMergeRequestIid == null && env.gitlabBranch == 'main' }
+            }
+            steps {
+                // 수정된 docker-compose 서비스를 모두 올림
+                sh "docker compose -f ${COMPOSE_FILE} up -d"
+                
+                echo "Waiting for frontends to stabilize..."
+                sh '''
+                    for i in $(seq 1 15); do
+                        if curl -sf http://freeline-frontend:80 > /dev/null && \
+                           curl -sf http://freeline-booth:3000 > /dev/null && \
+                           curl -sf http://freeline-super:3000 > /dev/null; then
+                            echo "\\nFrontends are UP!"
+                            exit 0
+                        fi
+                        echo -n "."
+                        sleep 2
+                    done
+                    echo "\\nSome frontends failed to start in time or stay unhealthy."
+                    exit 1
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            updateGitlabCommitStatus name: 'build', state: 'success'
+        }
+        notBuilt {
+            updateGitlabCommitStatus name: 'build', state: 'success'
+        }
+        aborted {
+            updateGitlabCommitStatus name: 'build', state: 'canceled'
+        }
+        failure {
+            updateGitlabCommitStatus name: 'build', state: 'failed'
+        }
+        cleanup {
+            sh 'docker image prune -f --filter "until=24h" || true'
+            cleanWs()
+        }
+    }
+}

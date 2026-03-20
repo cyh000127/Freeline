@@ -6,10 +6,22 @@ pipeline {
         string(name: 'SSH_CREDENTIALS_ID', defaultValue: 'infra-ssh-key', description: 'Jenkins SSH Credentials ID')
     }
 
+    options {
+        gitLabConnection('lab-ssafy') 
+    }
+
+    triggers {
+        gitlab(
+            triggerOnPush: true,
+            triggerOnMergeRequest: true,
+            branchFilterType: 'NameBasedFilter',
+            includeBranchesSpec: 'main'
+        )
+    }
+
     environment {
         INFRA_DIR    = 'infra'
         HOSTS_FILE   = 'infra/hosts.conf'
-        // 배포 순서 정의: networks는 반드시 먼저, nginx는 마지막
         DEPLOY_ORDER = 'networks,infisical,jenkins,monitoring,backend,frontend,nginx'
     }
 
@@ -94,7 +106,7 @@ pipeline {
 
         stage('Ensure Networks on All Hosts') {
             when {
-                expression { env.CHANGED_COMPONENTS }
+                expression { env.CHANGED_COMPONENTS && env.gitlabMergeRequestIid == null && (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main') }
             }
             steps {
                 script {
@@ -112,7 +124,7 @@ pipeline {
 
         stage('Deploy Components') {
             when {
-                expression { env.CHANGED_COMPONENTS }
+                expression { env.CHANGED_COMPONENTS && env.gitlabMergeRequestIid == null && (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main') }
             }
             steps {
                 script {

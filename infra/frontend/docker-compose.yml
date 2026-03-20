@@ -8,6 +8,24 @@ services:
     networks:
       - infra-public
 
+  freeline-booth:
+    image: freeline-booth:latest
+    container_name: freeline-booth
+    restart: always
+    environment:
+      - TZ=Asia/Seoul
+    networks:
+      - infra-public
+
+  freeline-super:
+    image: freeline-super:latest
+    container_name: freeline-super
+    restart: always
+    environment:
+      - TZ=Asia/Seoul
+    networks:
+      - infra-public
+
 networks:
   infra-public:
     external: true
