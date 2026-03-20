@@ -48,7 +48,11 @@ public class SecurityConfig {
                                     "/api/v1/auth/email/**",
                                     "/api/v1/auth/refresh",
                                     "/api/v1/auth/booth-login",
+<<<<<<< be/Freeline/src/main/java/com/freeline/common/config/SecurityConfig.java
                                     "/api/v1/auth/visitor-login"
+=======
+
+>>>>>>> be/Freeline/src/main/java/com/freeline/common/config/SecurityConfig.java
                             ).permitAll()
                             .requestMatchers(
                                     "/swagger-ui/**",
