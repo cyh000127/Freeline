@@ -31,16 +31,12 @@ public class SecurityConfig {
         try {
             http
                     .cors(Customizer.withDefaults())
-                    // 1. 불필요한 기본 설정 비활성화
                     .csrf(AbstractHttpConfigurer::disable)
                     .httpBasic(AbstractHttpConfigurer::disable)
                     .formLogin(AbstractHttpConfigurer::disable)
                     .logout(AbstractHttpConfigurer::disable)
-
-                    // 세션 정책
                     .sessionManagement(session ->
                             session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
                     .authorizeHttpRequests(auth -> auth
                             .requestMatchers(
                                     "/api/v1/auth/login",
@@ -48,11 +44,7 @@ public class SecurityConfig {
                                     "/api/v1/auth/email/**",
                                     "/api/v1/auth/refresh",
                                     "/api/v1/auth/booth-login",
-<<<<<<< be/Freeline/src/main/java/com/freeline/common/config/SecurityConfig.java
                                     "/api/v1/auth/visitor-login"
-=======
-
->>>>>>> be/Freeline/src/main/java/com/freeline/common/config/SecurityConfig.java
                             ).permitAll()
                             .requestMatchers(
                                     "/swagger-ui/**",
@@ -62,7 +54,6 @@ public class SecurityConfig {
                             ).permitAll()
                             .anyRequest().authenticated()
                     )
-
                     .addFilterBefore(
                             new JwtAuthenticationFilter(jwtProvider, redisTemplate),
                             UsernamePasswordAuthenticationFilter.class
