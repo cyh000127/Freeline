@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import Image from "next/image";
 import { KeyRound, Lock, User } from "lucide-react";
 
 export default function LoginPage() {
@@ -10,7 +11,7 @@ export default function LoginPage() {
         {/* Header Section */}
         <div className="bg-[#2D2A4A] px-8 py-10 text-center text-white">
           <div className="flex items-center justify-center gap-2 text-2xl font-bold tracking-tight">
-            <img src="/assets/logo.png" alt="줄서잇 매니저 로고" className="h-6 w-auto object-contain" />
+            <Image src="/booth/assets/logo.png" alt="줄서잇 매니저 로고" width={100} height={24} priority className="h-6 w-auto object-contain" />
             줄서잇 매니저
           </div>
           <p className="mt-2 text-xs text-gray-300 font-medium">
