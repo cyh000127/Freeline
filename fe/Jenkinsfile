@@ -154,7 +154,7 @@ pipeline {
 
         stage('Deploy') {
             when {
-                expression { env.gitlabMergeRequestIid == null && env.gitlabBranch == 'main' }
+                expression { env.gitlabMergeRequestIid == null && (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main') }
             }
             steps {
                 // 수정된 docker-compose 서비스를 모두 올림

@@ -105,7 +105,7 @@ pipeline {
 
         stage('Docker Build') {
             when {
-                expression { env.gitlabMergeRequestIid == null && env.gitlabBranch == 'main' }
+                expression { env.gitlabMergeRequestIid == null && (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main') }
             }
             steps {
                 dir('be/Freeline') {
@@ -116,7 +116,7 @@ pipeline {
 
         stage('Deploy') {
             when {
-                expression { env.gitlabMergeRequestIid == null && env.gitlabBranch == 'main' }
+                expression { env.gitlabMergeRequestIid == null && (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main') }
             }
             steps {
                 withInfisical(
