@@ -22,8 +22,8 @@ export default function ExperienceCard({ data, onPrimaryPress }: Props) {
       {/* Title */}
       <Text style={[styles.title, { color: palette.text }]}>{data.boothName}</Text>
 
-      {/* Pending (QR) */}
-      {data.status === 'pending' && (
+      {/* Called (QR) */}
+      {data.status === 'called' && (
         <>
           <Text style={styles.desc}>입장 5분 전입니다. 도착 인증을 진행해주세요.</Text>
 
@@ -43,7 +43,7 @@ export default function ExperienceCard({ data, onPrimaryPress }: Props) {
       )}
 
       {/* Active / Warning / Overdue */}
-      {data.status !== 'pending' && (
+      {data.status !== 'called' && (
         <>
           <Text style={[styles.time, { color: palette.text }]}>
             이용시간: {data.elapsedTime}
@@ -73,8 +73,8 @@ function getPalette(status: ExperienceState['status']) {
       return palette.warning;
     case 'overdue':
       return palette.overdue;
-    case 'pending':
-      return palette.pending;
+    case 'called':
+      return palette.called;
     default:
       return palette.active;
   }
@@ -146,7 +146,9 @@ const styles = StyleSheet.create({
   },
 
   emptyText: {
-    color: '#9CA3AF',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#000000',
   },
 });
 
@@ -166,7 +168,7 @@ const palette = {
     text: '#FF4D4F',
     button: '#FF4D4F',
   },
-  pending: {
+  called: {
     bg: '#F3F4F6',
     text: '#6B7280',
     button: '#6D28D9',

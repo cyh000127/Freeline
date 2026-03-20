@@ -22,7 +22,7 @@ const mainTabs: {
 
 export default function BottomTabBar({ activeTab, onTabPress }: BottomTabBarProps) {
   return (
-    <View pointerEvents="box-none" style={styles.wrapper}>
+    <View style={styles.wrapper}>
       <View style={styles.row}>
         <View style={styles.mainContainer}>
           {mainTabs.map((tab) => {
@@ -55,6 +55,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 18,
     alignItems: 'center',
+    pointerEvents: 'box-none',
   },
 
   row: {

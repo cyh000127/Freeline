@@ -1,40 +1,54 @@
-import { StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import ActionChip from './ActionChip';
 import ReservationMetaRow from './ReservationMetaRow';
+
+type Tone = 'blue' | 'green' | 'yellow' | 'red' | 'gray';
 
 type ReservationCardProps = {
   boothName: string;
   myOrderText?: string;
   estimatedWaitText?: string;
+  visitTimeText?: string;
+  boothLocationText?: string;
   statusLabel?: string;
-  statusTone?: 'blue' | 'green' | 'yellow' | 'red' | 'gray';
-  actionLabel?: string;
-  actionTone?: 'blue' | 'green' | 'yellow' | 'red' | 'gray';
-  onActionPress?: () => void;
-  expanded?: boolean;
-  details?: string[];
+  statusTone?: Tone;
+  onCardPress?: () => void;
+  expandIndicator?: React.ReactNode;
+
+  children?: React.ReactNode;
+
+  /**
+   * Shows the divider under the summary section.
+   * Useful for expandable cards that should still show
+   * the bottom line even when collapsed.
+   */
+  showDivider?: boolean;
 };
 
 export default function ReservationCard({
   boothName,
   myOrderText,
   estimatedWaitText,
+  visitTimeText,
+  boothLocationText,
   statusLabel,
   statusTone = 'blue',
-  actionLabel,
-  actionTone = 'blue',
-  onActionPress,
-  expanded = false,
-  details = [],
+  onCardPress,
+  expandIndicator,
+  children,
+  showDivider = false,
 }: ReservationCardProps) {
-  return (
-    <View style={styles.card}>
-      <View style={styles.topRow}>
-        <Text style={styles.title}>{boothName}</Text>
+  const Container = onCardPress ? Pressable : View;
 
-        {actionLabel ? (
-          <ActionChip label={actionLabel} tone={actionTone} onPress={onActionPress} />
-        ) : null}
+  return (
+    <Container style={styles.card} onPress={onCardPress}>
+      <View style={styles.topRow}>
+        <Text style={styles.title} numberOfLines={1}>
+          {boothName}
+        </Text>
+
+        {statusLabel ? <ActionChip label={statusLabel} tone={statusTone} /> : null}
       </View>
 
       <View style={styles.metaGroup}>
@@ -45,62 +59,64 @@ export default function ReservationCard({
         {estimatedWaitText ? (
           <ReservationMetaRow label="예상 대기시간:" value={estimatedWaitText} />
         ) : null}
+
+        {visitTimeText ? (
+          <ReservationMetaRow label="관람 시간:" value={visitTimeText} />
+        ) : null}
+
+        {boothLocationText ? (
+          <ReservationMetaRow label="관람 위치:" value={boothLocationText} />
+        ) : null}
       </View>
 
-      {statusLabel ? (
-        <View style={styles.statusRow}>
-          <ActionChip label={statusLabel} tone={statusTone} />
-        </View>
-      ) : null}
+      {showDivider ? <View style={styles.divider} /> : null}
 
-      {expanded && details.length > 0 ? (
-        <View style={styles.expandedSection}>
-          {details.map((detail, index) => (
-            <Text key={`${detail}-${index}`} style={styles.detailText}>
-              {detail}
-            </Text>
-          ))}
-        </View>
+      {children ? <View style={styles.content}>{children}</View> : null}
+
+      {expandIndicator ? (
+        <View style={styles.indicatorWrap}>{expandIndicator}</View>
       ) : null}
-    </View>
+    </Container>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#28234E',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10,
+    backgroundColor: '#2F2C53',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 10,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: 12,
   },
   title: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-    flexShrink: 1,
-    marginRight: 8,
+    fontSize: 17,
+    fontWeight: '800',
+    flex: 1,
+    paddingTop: 2,
   },
   metaGroup: {
-    gap: 6,
+    marginTop: 10,
+    gap: 8,
   },
-  statusRow: {
-    alignItems: 'flex-start',
+  divider: {
+    marginTop: 5,
+    marginBottom: 5,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.35)',
   },
-  expandedSection: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.15)',
-    paddingTop: 10,
-    gap: 4,
+  content: {
+    gap: 10,
   },
-  detailText: {
-    color: '#D6D6E2',
-    fontSize: 12,
-    lineHeight: 18,
+  indicatorWrap: {
+    marginTop: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

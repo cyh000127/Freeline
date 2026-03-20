@@ -54,14 +54,14 @@ const styles = StyleSheet.create({
   },
 
   bottomArea: {
-    flex: 1,
+    // flex: 1,
     marginTop: -12,
     paddingHorizontal: 20,
     paddingTop: 0,
   },
 
   card: {
-    flex: 1,
+    // flex: 1,
     backgroundColor: '#E9EAED',
     borderRadius: 24,
     paddingHorizontal: 20,

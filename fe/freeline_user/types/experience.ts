@@ -1,6 +1,6 @@
 export type ExperienceStatus =
   | 'idle' // default
-  | 'pending' // QR required
+  | 'called' // QR required
   | 'active' // in progress
   | 'warning' // almost done (yellow)
   | 'overdue'; // exceeded (red)

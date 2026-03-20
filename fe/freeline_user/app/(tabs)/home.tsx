@@ -1,11 +1,10 @@
 import { ScrollView, StyleSheet, Text, View, Pressable, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import BottomTabBar, { TabKey } from '@/components/navigation/BottomTabBar';
 import HomeBanner from '@/components/home/HomeBanner';
 // import PopularBoothCard from '@/components/home/PopularBoothCard';
-import { useQRMock } from '@/app/contexts/QRMockContext';
-import ReservationCard from '@/components/reservation/ReservationCard';
+// import { useQRMock } from '@/app/contexts/QRMockContext';
+// import ReservationCard from '@/components/reservation/ReservationCard';
 import { useExperienceMock } from '@/mocks/useExperienceMock';
 import ExperienceCard from '@/components/home/ExperienceCard';
 
@@ -20,104 +19,97 @@ const TAB_ROUTES: Record<TabKey, '/home' | '/reservation' | '/map' | '/my' | '/s
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { waitings } = useQRMock();
+  // const { waitings } = useQRMock();
 
   const handleTabPress = (tab: TabKey) => {
     router.replace(TAB_ROUTES[tab]);
   };
-  const { data, setMode } = useExperienceMock();
+  const { data } = useExperienceMock();
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.screen}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
-          <View style={styles.header}>
-            <View style={styles.brandRow}>
-              <View style={styles.logoWrap}>
-                <Image source={require('@/assets/main/logo.png')} />
-              </View>
-              <Text style={styles.brandText}>줄서잇</Text>
+    <View style={styles.screen}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <View style={styles.header}>
+          <View style={styles.brandRow}>
+            <View style={styles.logoWrap}>
+              <Image source={require('@/assets/main/logo.png')} />
             </View>
+            <Text style={styles.brandText}>줄서잇</Text>
+          </View>
 
-            <Pressable style={styles.bellButton}>
-              <Image
-                source={require('@/assets/icons/notifications.png')}
-                style={styles.icon}
-              />
+          <Pressable style={styles.bellButton}>
+            <Image
+              source={require('@/assets/icons/notifications.png')}
+              style={styles.icon}
+            />
+          </Pressable>
+        </View>
+
+        <HomeBanner />
+        <View style={styles.expSection}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionAccent} />
+            <Text style={styles.sectionTitle}>현재 체험 현황</Text>
+          </View>
+          <ExperienceCard data={data} onPrimaryPress={() => console.log('action')} />
+        </View>
+        <View style={styles.graySection}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionAccent} />
+            <Text style={styles.sectionTitle}>현재 예약 현황</Text>
+          </View>
+          {/* {waitings.length === 0 ? ( */}
+          <View style={styles.emptyBox}>
+            <Text style={styles.contentText}>
+              아직 예약한 부스가 없네요.{'\n'}지도를 보고 관심 있는 부스를 예약해보세요!
+            </Text>
+            <Pressable style={styles.purpleButton} onPress={() => router.push('/map')}>
+              <Text style={styles.btnText}>예약하러 가기</Text>
             </Pressable>
           </View>
+          {/* { ) : (
+            <View style={styles.homeCardList}>
+              {waitings.map((item) => {
+                const isDone = item.verificationState === 'done';
+                const isAvailable = item.verificationState === 'on';
 
-          <HomeBanner />
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionAccent} />
-              <Text style={styles.sectionTitle}>현재 체험 현황</Text>
+                return (
+                  <View key={item.waitingId} style={styles.reservationCardWrap}>
+                    <ReservationCard
+                      boothName={item.boothName}
+                      myOrderText={isDone ? undefined : `${item.myRank}번째`}
+                      estimatedWaitText={
+                        isDone ? undefined : isAvailable ? '지금 입장 가능' : '대기 중'
+                      }
+                      actionLabel={
+                        isDone ? '도착 인증 완료' : isAvailable ? '도착 인증' : undefined
+                      }
+                      actionTone={isDone ? 'green' : isAvailable ? 'yellow' : 'blue'}
+                      onActionPress={
+                        isAvailable && !isDone
+                          ? () =>
+                              router.push({
+                                pathname: '/qr/scan',
+                                params: {
+                                  waitingId: item.waitingId,
+                                  boothName: item.boothName,
+                                  from: 'home',
+                                },
+                              })
+                          : undefined
+                      }
+                    />
+                  </View>
+                ); 
+              })}
             </View>
-            <ExperienceCard data={data} onPrimaryPress={() => console.log('action')} />
-            {__DEV__ && (
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                {['idle', 'pending', 'active', 'warning', 'overdue'].map((m) => (
-                  <Pressable key={m} onPress={() => setMode(m as any)}>
-                    <Text>{m}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-          </View>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>현재 예약 현황</Text>
-
-            {waitings.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>현재 예약된 부스가 없습니다.</Text>
-              </View>
-            ) : (
-              <View style={styles.homeCardList}>
-                {waitings.map((item) => {
-                  const isDone = item.verificationState === 'done';
-                  const isAvailable = item.verificationState === 'on';
-
-                  return (
-                    <View key={item.waitingId} style={styles.reservationCardWrap}>
-                      <ReservationCard
-                        boothName={item.boothName}
-                        myOrderText={isDone ? undefined : `${item.myRank}번째`}
-                        estimatedWaitText={
-                          isDone ? undefined : isAvailable ? '지금 입장 가능' : '대기 중'
-                        }
-                        actionLabel={
-                          isDone
-                            ? '도착 인증 완료'
-                            : isAvailable
-                              ? '도착 인증'
-                              : undefined
-                        }
-                        actionTone={isDone ? 'green' : isAvailable ? 'yellow' : 'blue'}
-                        onActionPress={
-                          isAvailable && !isDone
-                            ? () =>
-                                router.push({
-                                  pathname: '/qr/scan',
-                                  params: {
-                                    waitingId: item.waitingId,
-                                    boothName: item.boothName,
-                                    from: 'home',
-                                  },
-                                })
-                            : undefined
-                        }
-                      />
-                    </View>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-          {/* <View style={styles.section}> */}
-          {/* <View style={styles.sectionHeader}>
+          )} */}
+        </View>
+        {/* <View style={styles.section}> */}
+        {/* <View style={styles.sectionHeader}>
               <View style={styles.sectionAccent} />
               <Text style={styles.sectionTitle}>현재 인기 부스</Text>
             </View>
@@ -127,7 +119,7 @@ export default function HomeScreen() {
               <Text style={styles.infoText}>3월 6일 16:00 기준</Text>
             </View> */}
 
-          {/* <ScrollView
+        {/* <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.popularRail}
@@ -159,19 +151,18 @@ export default function HomeScreen() {
                 reserveDisabled={false}
               />
             </ScrollView> */}
-          {/* </View> */}
-        </ScrollView>
+        {/* </View> */}
+      </ScrollView>
 
-        <BottomTabBar activeTab="home" onTabPress={handleTabPress} />
-      </View>
-    </SafeAreaView>
+      <BottomTabBar activeTab="home" onTabPress={handleTabPress} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F2F5',
+    backgroundColor: '#FFFFFF',
   },
 
   screen: {
@@ -179,20 +170,30 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
+    // paddingHorizontal: 20,
+    // paddingTop: 14,
     paddingBottom: 130,
   },
   reservationCardWrap: {
     marginBottom: 12,
+  },
+  purpleButton: {
+    backgroundColor: '#7C3AED',
+    flex: 1,
+    paddingVertical: 5,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+    alignItems: 'center',
   },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 8,
-    marginBottom: 18,
+    paddingTop: 40,
+    paddingBottom: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFFFFF',
   },
 
   brandRow: {
@@ -200,21 +201,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  section: {
-    marginTop: 20,
+  expSection: {
+    backgroundColor: 'white',
+    paddingTop: 10,
+    paddingHorizontal: 20,
+    minHeight: 200,
+  },
+
+  graySection: {
+    backgroundColor: '#F0F2F5',
+    paddingHorizontal: 20,
   },
 
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
-    marginBottom: 8,
+    // marginBottom: 8,
     color: '#111111',
   },
 
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
+    paddingTop: 10,
   },
 
   sectionAccent: {
@@ -256,6 +265,15 @@ const styles = StyleSheet.create({
     color: '#111111',
   },
 
+  contentText: {
+    paddingVertical: 20,
+    fontFamily: 'Pretendard-Bold',
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+    color: '#A09EAB',
+  },
+
   bellButton: {
     width: 40,
     height: 40,
@@ -278,7 +296,7 @@ const styles = StyleSheet.create({
   },
 
   emptyBox: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F0F2F5',
     borderRadius: 12,
     padding: 20,
     alignItems: 'center',
@@ -309,6 +327,11 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 12,
     color: '#5C5A72',
+    fontWeight: '500',
+  },
+  btnText: {
+    fontSize: 15,
+    color: 'white',
     fontWeight: '500',
   },
 

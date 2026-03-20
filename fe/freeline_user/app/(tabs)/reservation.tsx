@@ -1,8 +1,14 @@
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+
 import BottomTabBar, { TabKey } from '@/components/navigation/BottomTabBar';
 import ReservationCard from '@/components/reservation/ReservationCard';
+import ReservationCardExpandable from '@/components/reservation/ReservationCardExpandable';
+import ReservationFilterTabs, {
+  ReservationFilter,
+} from '@/components/reservation/ReservationFilterTabs';
 import { useQRMock } from '@/app/contexts/QRMockContext';
 
 const TAB_ROUTES: Record<TabKey, '/home' | '/reservation' | '/map' | '/my' | '/search'> =
@@ -14,171 +20,243 @@ const TAB_ROUTES: Record<TabKey, '/home' | '/reservation' | '/map' | '/my' | '/s
     search: '/search',
   };
 
+type ReservationStatus =
+  | 'waiting'
+  | 'called'
+  | 'registered'
+  | 'entered'
+  | 'completed'
+  | 'canceled'
+  | 'autocanceled';
+
+type ReservationViewItem = {
+  waitingId: string;
+  boothName: string;
+  myRank?: number;
+  estimatedWaitText?: string;
+  boothLocation?: string;
+  reservedAt?: string;
+  notice?: string;
+  status: ReservationStatus;
+};
+
+function mapMockToReservationStatus(verificationState?: string): ReservationStatus {
+  if (verificationState === 'done') return 'registered';
+  if (verificationState === 'on') return 'called';
+  return 'waiting';
+}
+
+function getCompactStatusUI(status: ReservationStatus) {
+  switch (status) {
+    case 'called':
+      return {
+        statusLabel: '호출됨' as const,
+        statusTone: 'yellow' as const,
+        actionLabel: 'QR 인증' as const,
+        actionTone: 'yellow' as const,
+      };
+    case 'registered':
+      return {
+        statusLabel: '등록 완료' as const,
+        statusTone: 'green' as const,
+      };
+    case 'entered':
+      return {
+        statusLabel: '입장 완료' as const,
+        statusTone: 'green' as const,
+      };
+    case 'completed':
+      return {
+        statusLabel: '완료' as const,
+        statusTone: 'green' as const,
+      };
+    case 'canceled':
+      return {
+        statusLabel: '예약 취소' as const,
+        statusTone: 'gray' as const,
+      };
+    case 'autocanceled':
+      return {
+        statusLabel: '자동 취소' as const,
+        statusTone: 'red' as const,
+      };
+    case 'waiting':
+    default:
+      return {
+        statusLabel: '정상 대기 중' as const,
+        statusTone: 'blue' as const,
+      };
+  }
+}
+
+function isFinishedStatus(status: ReservationStatus) {
+  return status === 'completed' || status === 'canceled' || status === 'autocanceled';
+}
+
 export default function ReservationScreen() {
   const router = useRouter();
-  const { waitings, resetMock } = useQRMock();
+  const { waitings } = useQRMock();
+  const [filter, setFilter] = useState<ReservationFilter>('all');
 
   const handleTabPress = (tab: TabKey) => {
     router.replace(TAB_ROUTES[tab]);
   };
 
+  const currentItems = useMemo<ReservationViewItem[]>(() => {
+    return waitings.map((item) => {
+      const status = mapMockToReservationStatus(item.verificationState);
+
+      return {
+        waitingId: item.waitingId,
+        boothName: item.boothName,
+        myRank: item.myRank,
+        estimatedWaitText:
+          status === 'registered'
+            ? '도착 인증 완료'
+            : typeof item.myRank === 'number'
+              ? '약 25분'
+              : undefined,
+        boothLocation: 'A-12',
+        reservedAt: '2026.03.06 14:30',
+        notice:
+          status === 'called'
+            ? '지금 도착 인증이 가능합니다.'
+            : '아직 도착 인증 가능 상태가 아닙니다.',
+        status,
+      };
+    });
+  }, [waitings]);
+
+  const finishedItems = useMemo<ReservationViewItem[]>(
+    () => [
+      {
+        waitingId: 'history-1',
+        boothName: 'LG CNS',
+        status: 'completed',
+        estimatedWaitText: '입장 완료',
+        reservedAt: '2026.03.05 15:10',
+      },
+      {
+        waitingId: 'history-2',
+        boothName: '한화',
+        status: 'autocanceled',
+        estimatedWaitText: '자동 취소됨',
+        reservedAt: '2026.03.05 16:00',
+      },
+    ],
+    [],
+  );
+
+  const mergedItems = useMemo(() => {
+    if (filter === 'current') return currentItems;
+    if (filter === 'finished') return finishedItems;
+    return [...currentItems, ...finishedItems];
+  }, [filter, currentItems, finishedItems]);
+  const renderReservationItem = (item: ReservationViewItem) => {
+    if (isFinishedStatus(item.status)) {
+      const ui = getCompactStatusUI(item.status);
+
+      return (
+        <ReservationCard
+          boothName={item.boothName}
+          myOrderText={typeof item.myRank === 'number' ? `${item.myRank}번째` : undefined}
+          estimatedWaitText={item.estimatedWaitText}
+          statusLabel={ui.statusLabel}
+          statusTone={ui.statusTone}
+        />
+      );
+    }
+
+    return (
+      <ReservationCardExpandable
+        item={item}
+        onQrPress={() =>
+          router.push({
+            pathname: '/qr/scan',
+            params: {
+              waitingId: item.waitingId,
+              boothName: item.boothName,
+              from: 'reservation',
+            },
+          })
+        }
+        onCancelPress={() => {
+          console.log('cancel reservation', item.waitingId);
+        }}
+      />
+    );
+  };
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.screen}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.content}
-        >
-          <View style={styles.header}>
-            <Text style={styles.title}>예약 내역</Text>
+    <View style={styles.screen}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>예약 내역</Text>
+
+          <Pressable style={styles.iconButton} onPress={() => {}}>
+            <Ionicons name="notifications-outline" size={24} color="#222222" />
+          </Pressable>
+        </View>
+
+        <ReservationFilterTabs value={filter} onChange={setFilter} />
+
+        {mergedItems.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyText}>현재 예약된 부스가 없습니다.</Text>
           </View>
-
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>현재 예약 현황</Text>
-            <Pressable onPress={resetMock}>
-              <Text style={styles.resetText}>초기화</Text>
-            </Pressable>
+        ) : (
+          <View style={styles.cardList}>
+            {mergedItems.map((item) => (
+              <View key={item.waitingId} style={styles.cardItem}>
+                {renderReservationItem(item)}
+              </View>
+            ))}
           </View>
+        )}
+      </ScrollView>
 
-          {waitings.length === 0 ? (
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>현재 예약된 부스가 없습니다.</Text>
-            </View>
-          ) : (
-            <View style={styles.cardList}>
-              {waitings.map((item) => {
-                const isDone = item.verificationState === 'done';
-                const isAvailable = item.verificationState === 'on';
-
-                return (
-                  <View key={item.waitingId} style={styles.cardItem}>
-                    <ReservationCard
-                      boothName={item.boothName}
-                      myOrderText={`${item.myRank}번`}
-                      estimatedWaitText={isDone ? '도착 인증 완료' : '약 25분'}
-                      statusLabel={
-                        isDone ? '완료' : isAvailable ? '입장 예정' : '대기 중'
-                      }
-                      statusTone={isDone ? 'green' : isAvailable ? 'yellow' : 'blue'}
-                      actionLabel={
-                        isDone ? '완료됨' : isAvailable ? '도착 인증' : '상세보기'
-                      }
-                      actionTone={isDone ? 'blue' : isAvailable ? 'green' : 'blue'}
-                      expanded={!isDone}
-                      details={
-                        isDone
-                          ? ['QR 인증이 완료되었습니다.']
-                          : [
-                              '예약 시간: 14:30',
-                              '부스 위치: A-12',
-                              isAvailable
-                                ? '지금 도착 인증이 가능합니다.'
-                                : '아직 도착 인증 가능 상태가 아닙니다.',
-                            ]
-                      }
-                      onActionPress={
-                        isDone
-                          ? undefined
-                          : isAvailable
-                            ? () =>
-                                router.push({
-                                  pathname: '/qr/scan',
-                                  params: {
-                                    waitingId: item.waitingId,
-                                    boothName: item.boothName,
-                                    from: 'reservation',
-                                  },
-                                })
-                            : undefined
-                      }
-                    />
-                  </View>
-                );
-              })}
-            </View>
-          )}
-
-          <View style={styles.pastSection}>
-            <Text style={styles.sectionTitle}>지난 예약 내역</Text>
-
-            <View style={styles.cardItem}>
-              <ReservationCard
-                boothName="LG CNS"
-                myOrderText="완료"
-                estimatedWaitText="입장 완료"
-                statusLabel="완료"
-                statusTone="green"
-                actionLabel="리뷰 작성"
-                actionTone="blue"
-              />
-            </View>
-          </View>
-        </ScrollView>
-
-        <BottomTabBar activeTab="reservation" onTabPress={handleTabPress} />
-      </View>
-    </SafeAreaView>
+      <BottomTabBar activeTab="reservation" onTabPress={handleTabPress} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
     backgroundColor: '#F0F2F5',
   },
-
-  screen: {
-    flex: 1,
-  },
-
   content: {
     paddingHorizontal: 20,
     paddingTop: 14,
     paddingBottom: 130,
   },
-
   header: {
     marginTop: 8,
     marginBottom: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-
   title: {
     fontSize: 24,
     fontWeight: '800',
     color: '#111111',
   },
-
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
   },
-
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111111',
-  },
-
-  resetText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#A09EAB',
-  },
-
   cardList: {
     marginTop: 4,
   },
-
   cardItem: {
     marginBottom: 14,
   },
-
-  pastSection: {
-    marginTop: 8,
-  },
-
   emptyBox: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -187,7 +265,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   emptyText: {
     fontSize: 14,
     fontWeight: '500',
