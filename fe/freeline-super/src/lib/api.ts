@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create a custom axios instance
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://j14a207.p.ssafy.io/api',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://j14a207.p.ssafy.io/api',
   headers: {
     'Content-Type': 'application/json',
   },

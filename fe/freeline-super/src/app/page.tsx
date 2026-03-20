@@ -1,13 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { AddEventModal } from "@/components/AddEventModal";
 import { EditEventModal } from "@/components/EditEventModal";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, Settings, LogOut } from "lucide-react";
 import { api } from "@/lib/api";
 
 export default function SuperAdminDashboard() {
+  const router = useRouter();
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    // Check for auth token, redirect to login if missing
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    if (!token) {
+      router.replace("/login");
+    } else {
+      setIsChecking(false);
+    }
+  }, [router]);
+
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [isEditEventOpen, setIsEditEventOpen] = useState(false);
@@ -36,6 +52,10 @@ export default function SuperAdminDashboard() {
   const dummyEvent1 = { id: 1, name: "AW 2026", startDate: "2026-03-06", endDate: "2026-03-08", openTime: "10:00:00", closeTime: "18:00:00", status: "CLOSED", locationAddress: "" };
   const dummyEvent2 = { id: 2, name: "AW 2026", startDate: "2026-03-16", endDate: "2026-03-18", openTime: "10:00:00", closeTime: "18:00:00", status: "OPEN", locationAddress: "" };
 
+  if (isChecking) {
+    return <div className="min-h-screen bg-[#F1F3F5]" />;
+  }
+
   return (
     <div className="min-h-screen bg-[#F1F3F5] flex flex-col">
       {/* Top Navbar */}
@@ -44,7 +64,7 @@ export default function SuperAdminDashboard() {
         
         <div className="flex flex-col items-center justify-center mt-2">
           <div className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-            <img src="/assets/logo.png" alt="줄서잇 매니저 로고" className="h-6 w-auto object-contain" />
+            <Image src="/super/assets/logo.png" alt="줄서잇 매니저 로고" width={100} height={24} className="h-6 w-auto object-contain" priority />
             줄서잇 매니저
           </div>
           <p className="mt-2 text-sm text-gray-300 font-medium">
@@ -52,9 +72,12 @@ export default function SuperAdminDashboard() {
           </p>
         </div>
 
-        <div className="w-[100px] flex justify-end">
-          <button className="text-sm font-bold hover:text-gray-300 transition-colors">
-            로그아웃
+        <div className="w-[100px] flex justify-end items-center gap-2 text-gray-300">
+          <Link href="/settings" title="설정" className="hover:text-white transition-colors p-2 rounded-full hover:bg-white/10">
+            <Settings className="w-5 h-5" />
+          </Link>
+          <button title="로그아웃" className="hover:text-white transition-colors p-2 rounded-full hover:bg-white/10">
+            <LogOut className="w-5 h-5" />
           </button>
         </div>
       </header>
