@@ -1,4 +1,4 @@
-package com.freeline.domain.boothmap.entity;
+package com.freeline.domain.booth.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -16,29 +16,28 @@ import lombok.NoArgsConstructor;
 import com.freeline.common.entity.BaseEntity;
 
 @Entity
-@Table(name = "event_maps")
+@Table(name = "booth_images")
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
-public class EventMap extends BaseEntity {
+public class BoothImage extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "event_id", nullable = false)
-    private Long eventId;
+    @Column(name = "booth_id", nullable = false)
+    private Long boothId;
 
     @Column(name = "image_path", nullable = false, length = 500)
     private String imagePath;
 
-    @Column(name = "is_visible", nullable = false)
-    private boolean visible;
+    @Column(name = "is_representative", nullable = false)
+    private boolean representative;
 
-    public void update(final String imagePath, final boolean visible) {
-        this.imagePath = imagePath;
-        this.visible = visible;
+    public void updateRepresentative(final boolean representative) {
+        this.representative = representative;
     }
 }

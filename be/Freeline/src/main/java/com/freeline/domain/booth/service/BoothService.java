@@ -6,11 +6,14 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.freeline.common.error.ErrorCode;
+import com.freeline.common.file.dto.FileInfo;
+import com.freeline.common.file.service.FileService;
 import com.freeline.domain.booth.converter.BoothConverter;
 import com.freeline.domain.booth.dto.request.BoothCreateReqDto;
 import com.freeline.domain.booth.dto.request.BoothStatusUpdateReqDto;
@@ -18,16 +21,19 @@ import com.freeline.domain.booth.dto.request.BoothUpdateReqDto;
 import com.freeline.domain.booth.dto.response.BoothCalledUserResDto;
 import com.freeline.domain.booth.dto.response.BoothCreateResDto;
 import com.freeline.domain.booth.dto.response.BoothGoodsResDto;
+import com.freeline.domain.booth.dto.response.BoothImageUploadResDto;
 import com.freeline.domain.booth.dto.response.BoothListResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueEntryResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueResDto;
 import com.freeline.domain.booth.dto.response.BoothResDto;
 import com.freeline.domain.booth.dto.response.BoothStatusResDto;
 import com.freeline.domain.booth.entity.Booth;
+import com.freeline.domain.booth.entity.BoothImage;
 import com.freeline.domain.booth.entity.BoothPolicy;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.exception.BoothException;
 import com.freeline.domain.booth.repository.BoothGoodsRepository;
+import com.freeline.domain.booth.repository.BoothImageRepository;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
@@ -39,6 +45,8 @@ import com.freeline.domain.event.repository.EventRepository;
 @Transactional
 @RequiredArgsConstructor
 public class BoothService {
+
+    private static final String BOOTH_DIRECTORY = "booth";
 
     private static final List<WaitingStatus> FRONT_QUEUE_STATUSES = List.of(
             WaitingStatus.CALLED,
@@ -53,9 +61,11 @@ public class BoothService {
 
     private final BoothRepository boothRepository;
     private final BoothGoodsRepository boothGoodsRepository;
+    private final BoothImageRepository boothImageRepository;
     private final BoothPolicyRepository boothPolicyRepository;
     private final BoothWaitingRepository boothWaitingRepository;
     private final EventRepository eventRepository;
+    private final FileService fileService;
 
     // TODO: 부스 정책 조회/설정 전용 서비스 메서드를 분리하고 BoothPolicyRepository를 직접 사용하는 흐름을 API로 노출한다.
 
@@ -139,6 +149,33 @@ public class BoothService {
         log.info("[Booth] 운영 상태 변경 완료 {id: {}, emergencyClosed: {}}", booth.getId(), booth.isEmergencyClosed());
 
         return BoothConverter.toBoothStatusResDto(booth);
+    }
+
+    public BoothImageUploadResDto uploadBoothImage(
+            final Long boothId,
+            final MultipartFile file,
+            final boolean representative
+    ) {
+        getBoothEntity(boothId);
+
+        final FileInfo uploadedFile = fileService.uploadFile(file, BOOTH_DIRECTORY);
+        final BoothImage boothImage = BoothImage.builder()
+                .boothId(boothId)
+                .imagePath(uploadedFile.fileUrl())
+                .representative(representative)
+                .build();
+        final BoothImage saved = boothImageRepository.save(boothImage);
+
+        if (representative) {
+            boothImageRepository.findAllByBoothIdOrderByIdAsc(boothId).stream()
+                    .filter(image -> !image.getId().equals(saved.getId()) && image.isRepresentative())
+                    .forEach(image -> image.updateRepresentative(false));
+        }
+
+        log.info("[Booth] image upload completed {boothImageId: {}, boothId: {}, representative: {}}",
+                saved.getId(), boothId, saved.isRepresentative());
+
+        return BoothConverter.toBoothImageUploadResDto(saved);
     }
 
     public BoothCreateResDto updateBooth(final Long boothId, final BoothUpdateReqDto request) {

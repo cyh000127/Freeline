@@ -3,6 +3,7 @@ package com.freeline.domain.event.controller;
 import jakarta.validation.Valid;
 
 import org.springframework.data.domain.Page;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -14,7 +15,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import lombok.RequiredArgsConstructor;
 
@@ -43,6 +46,18 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class EventController {
 
     private final EventService eventService;
+
+    @Operation(summary = "행사 썸네일 업로드", description = "행사 썸네일 이미지를 업로드하고 eventId에 매핑하여 저장합니다.")
+    @PostMapping(value = "/{eventId}/thumbnail", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<BaseResponse<EventUpdateResDto>> uploadThumbnail(
+            final Authentication authentication,
+            @PathVariable final Long eventId,
+            @RequestPart("file") final MultipartFile file
+    ) {
+        final Long eventAdminId = extractId(authentication);
+        final EventUpdateResDto response = eventService.uploadThumbnail(eventAdminId, eventId, file);
+        return ResponseUtils.ok(response);
+    }
 
     @Operation(summary = "행사 생성", description = "주최자가 신규 행사를 생성합니다.")
     @PostMapping

@@ -8,11 +8,14 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.freeline.common.error.ErrorCode;
+import com.freeline.common.file.dto.FileInfo;
+import com.freeline.common.file.service.FileService;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.exception.BoothException;
@@ -22,6 +25,7 @@ import com.freeline.domain.boothmap.dto.request.BoothMapAreaUpsertReqDto;
 import com.freeline.domain.boothmap.dto.response.BoothMapAreaResDto;
 import com.freeline.domain.boothmap.dto.response.BoothMapAreaUpsertResDto;
 import com.freeline.domain.boothmap.dto.response.BoothMapResDto;
+import com.freeline.domain.boothmap.dto.response.EventMapUpsertResDto;
 import com.freeline.domain.boothmap.entity.BoothMapArea;
 import com.freeline.domain.boothmap.entity.EventMap;
 import com.freeline.domain.boothmap.repository.BoothMapAreaRepository;
@@ -35,6 +39,8 @@ import com.freeline.domain.event.repository.EventRepository;
 @RequiredArgsConstructor
 public class BoothMapService {
 
+    private static final String MAP_DIRECTORY = "map";
+
     private static final List<WaitingStatus> MAP_ACTIVE_WAITING_STATUSES = List.of(
             WaitingStatus.WAITING,
             WaitingStatus.CALLED,
@@ -46,6 +52,7 @@ public class BoothMapService {
     private final BoothWaitingRepository boothWaitingRepository;
     private final EventMapRepository eventMapRepository;
     private final BoothMapAreaRepository boothMapAreaRepository;
+    private final FileService fileService;
 
     @Transactional(readOnly = true)
     public BoothMapResDto getBoothMap(final Long eventId) {
@@ -114,6 +121,40 @@ public class BoothMapService {
                 .yRatio(saved.getYRatio())
                 .widthRatio(saved.getWidthRatio())
                 .heightRatio(saved.getHeightRatio())
+                .build();
+    }
+
+    public EventMapUpsertResDto upsertEventMap(final Long eventId, final MultipartFile file, final boolean visible) {
+        validateEventExists(eventId);
+        final FileInfo uploadedFile = fileService.uploadFile(file, MAP_DIRECTORY);
+
+        final EventMap eventMap = eventMapRepository.findFirstByEventIdOrderByIdDesc(eventId)
+                .map(existing -> {
+                    existing.update(uploadedFile.fileUrl(), visible);
+                    return existing;
+                })
+                .orElseGet(() -> EventMap.builder()
+                        .eventId(eventId)
+                        .imagePath(uploadedFile.fileUrl())
+                        .visible(visible)
+                        .build());
+
+        final EventMap saved = eventMapRepository.save(eventMap);
+
+        if (visible) {
+            eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(eventId)
+                    .filter(visibleMap -> !visibleMap.getId().equals(saved.getId()))
+                    .ifPresent(visibleMap -> visibleMap.update(visibleMap.getImagePath(), false));
+        }
+
+        log.info("[BoothMap] 행사 지도 저장 완료 {eventMapId: {}, eventId: {}, visible: {}}",
+                saved.getId(), saved.getEventId(), saved.isVisible());
+
+        return EventMapUpsertResDto.builder()
+                .eventMapId(saved.getId())
+                .eventId(saved.getEventId())
+                .imagePath(saved.getImagePath())
+                .isVisible(saved.isVisible())
                 .build();
     }
 
