@@ -203,8 +203,16 @@ def getChangedFiles() {
     ).trim()
 }
 
-// main 브랜치 push일 때만 true (MR 이벤트 제외)
+// main 브랜치 push 또는 수동 실행일 때 true (MR 이벤트 제외)
 def isMainBranch() {
-    return env.gitlabMergeRequestIid == null &&
-        (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main')
+    if (env.gitlabMergeRequestIid) return false
+    if (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main') return true
+    // 수동 실행 시 (webhook 아님) 체크아웃된 브랜치로 판단
+    def branch = sh(script: 'git rev-parse --abbrev-ref HEAD 2>/dev/null || true', returnStdout: true).trim()
+    if (branch == 'HEAD') {
+        // detached HEAD일 경우 main의 커밋인지 확인
+        def onMain = sh(script: 'git branch -r --contains HEAD 2>/dev/null | grep -q origin/main && echo true || echo false', returnStdout: true).trim()
+        return onMain == 'true'
+    }
+    return branch == 'main'
 }
