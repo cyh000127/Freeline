@@ -184,9 +184,16 @@ def getChangedFiles() {
     ).trim()
 }
 
+// main 브랜치 push 또는 수동 실행일 때 true (MR 이벤트 제외)
 def isMainBranch() {
-    return env.gitlabMergeRequestIid == null &&
-        (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main')
+    if (env.gitlabMergeRequestIid) return false
+    if (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main') return true
+    def branch = sh(script: 'git rev-parse --abbrev-ref HEAD 2>/dev/null || true', returnStdout: true).trim()
+    if (branch == 'HEAD') {
+        def onMain = sh(script: 'git branch -r --contains HEAD 2>/dev/null | grep -q origin/main && echo true || echo false', returnStdout: true).trim()
+        return onMain == 'true'
+    }
+    return branch == 'main'
 }
 
 def ensureNetwork(String networkName, String host, String sshCredId) {
