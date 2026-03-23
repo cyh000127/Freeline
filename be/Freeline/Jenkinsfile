@@ -61,13 +61,15 @@ pipeline {
             steps {
                 dir('be/Freeline') {
                     sh 'chmod +x ./gradlew'
-                    sh '''
+                    sh '''set +x
                         export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
                             --client-id=$INFISICAL_CLIENT_ID \
                             --client-secret=$INFISICAL_CLIENT_SECRET \
                             --domain=$INFISICAL_URL/api \
                             --silent --plain)
+                        set -x
                         infisical run \
+                            --domain=$INFISICAL_URL/api \
                             --projectId=$INFISICAL_PROJECT_ID \
                             --env=prod --path=/be \
                             -- ./gradlew clean build
@@ -96,13 +98,15 @@ pipeline {
         stage('Deploy') {
             when { expression { isMainBranch() } }
             steps {
-                sh """
+                sh """set +x
                     export INFISICAL_TOKEN=\$(infisical login --method=universal-auth \
                         --client-id=\$INFISICAL_CLIENT_ID \
                         --client-secret=\$INFISICAL_CLIENT_SECRET \
                         --domain=\$INFISICAL_URL/api \
                         --silent --plain)
+                    set -x
                     infisical run \
+                        --domain=\$INFISICAL_URL/api \
                         --projectId=\$INFISICAL_PROJECT_ID \
                         --env=prod --path=/be \
                         -- docker compose -f ${COMPOSE_FILE} up -d --force-recreate freeline-backend
