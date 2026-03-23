@@ -31,6 +31,11 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+                script {
+                    if (env.gitlabSourceBranch) {
+                        sh "git checkout origin/${env.gitlabSourceBranch}"
+                    }
+                }
             }
         }
 
@@ -201,7 +206,6 @@ pipeline {
 
 def getChangedFiles() {
     if (env.gitlabMergeRequestIid) {
-        sh 'git fetch origin main:refs/remotes/origin/main'
         return sh(script: 'git diff --name-only origin/main...HEAD', returnStdout: true).trim()
     }
     return sh(
