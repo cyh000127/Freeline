@@ -18,6 +18,7 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
     openTime: "",
     closeTime: "",
     locationAddress: "",
+    thumbnailImageUrl: "", // 초기값을 빈 문자열로 변경
     default_stay_sec: 600,
     default_max_waiting: 30,
     default_call_count: 5,
@@ -55,6 +56,19 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
     setFormData((prev) => ({ ...prev, [name]: parseInt(value) || 0 }));
   };
 
+  const handleThumbnailChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // TODO: 이미지 업로드 API가 있으면 호출하여 URL을 받아옵니다.
+    // 현재는 로컬 미리보기를 위해 dataURL을 사용하거나 임시 경로를 지정합니다.
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData((prev) => ({ ...prev, thumbnailImageUrl: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const isFormValid =
     formData.name.trim() !== "" &&
     formData.description.trim() !== "" &&
@@ -81,16 +95,17 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
         description: formData.description,
         startDate: formData.startDate,
         endDate: formData.endDate,
-        openTime: formData.openTime,
-        closeTime: formData.closeTime,
+        openTime: formData.openTime.length === 5 ? `${formData.openTime}:00` : formData.openTime,
+        closeTime: formData.closeTime.length === 5 ? `${formData.closeTime}:00` : formData.closeTime,
         locationAddress: formData.locationAddress,
-        thumbnailImageUrl: "" // 우선 사진 업로드는 비워둡니다.
+        thumbnailImageUrl: formData.thumbnailImageUrl || null // 빈 문자열 대신 null 전송 시도
       };
 
-      const eventResponse = await api.post("/api/v1/events", eventPayload);
+      const eventResponse = await api.post("/v1/events", eventPayload);
 
-      // 서버 응답에서 생성된 이벤트 ID 추출 (API 스펙에 따라 id 또는 eventId 인지 확인)
-      const eventId = eventResponse.data?.id || eventResponse.data?.eventId;
+      // 서버 응답에서 생성된 이벤트 ID 추출 (래퍼 유무 대응)
+      const resData = eventResponse.data;
+      const eventId = resData?.data?.eventId || resData?.data?.id || resData?.eventId || resData?.id;
 
       // 2. 행사 정책 설정 API 호출
       if (eventId) {
@@ -102,15 +117,24 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
           default_defer_limit: formData.default_defer_limit
         };
 
-        await api.put(`/api/v1/events/${eventId}/policies`, policyPayload);
+        await api.put(`/v1/events/${eventId}/policies`, policyPayload);
       }
 
       alert("행사가 성공적으로 추가되었습니다.");
       onClose();
       // 추가적으로 부모 컴포넌트(리스트)에 새로고침 요청을 보낼 수 있습니다.
-    } catch (error) {
+    } catch (error: any) {
       console.error("행사 생성 중 오류 발생:", error);
-      alert("행사 생성에 실패했습니다.");
+      const serverData = error.response?.data;
+      const errorMessage = serverData?.error?.message || serverData?.message || serverData?.error || "행사 생성에 실패했습니다.";
+      
+      if (error.response?.status === 409) {
+        const detail = typeof errorMessage === 'object' ? JSON.stringify(errorMessage) : errorMessage;
+        alert(`중복된 행사가 존재하거나 생성할 수 없습니다: ${detail}`);
+      } else {
+        const detail = typeof errorMessage === 'object' ? JSON.stringify(errorMessage) : errorMessage;
+        alert(`오류가 발생했습니다: ${detail}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -335,16 +359,45 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
 
           <div className="h-px bg-gray-100 my-2" />
 
-          {/* 행사 배치도 업로드 */}
-          <div className="flex flex-col gap-2.5 pb-4">
-            <label className="text-[15px] font-bold text-gray-900">행사 배치도 업로드</label>
-            <button className="w-fit flex items-center justify-center gap-2 border-2 border-gray-300 text-gray-700 font-bold py-2.5 px-6 rounded-xl hover:bg-gray-50 transition-colors">
-              <svg fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-              업로드
-            </button>
-            <div className="text-[13px] text-gray-400 mt-1 space-y-0.5 leading-relaxed">
-              <p>•  jpeg, jpg, png만 가능</p>
-              <p>•  파일 크기 최대 10MB</p>
+          {/* 행사 포스터 업로드 */}
+          <div className="flex flex-col gap-4 pb-4">
+            <label className="text-[15px] font-bold text-gray-900">행사 포스터 업로드</label>
+            
+            <div className="flex items-center gap-6">
+              {/* 이미지 미리보기 */}
+              <div className="w-32 h-32 rounded-2xl bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden shrink-0">
+                {formData.thumbnailImageUrl ? (
+                  <img src={formData.thumbnailImageUrl} alt="Poster preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-[12px] text-gray-400 font-medium">사진 없음</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <input
+                  type="file"
+                  id="thumbnail-upload"
+                  accept="image/*"
+                  onChange={handleThumbnailChange}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="thumbnail-upload"
+                  className="w-fit flex items-center justify-center gap-2 bg-white border-2 border-[#2D2A4A] text-[#2D2A4A] font-bold py-2.5 px-6 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <svg fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                  사진 선택
+                </label>
+                <div className="text-[13px] text-gray-400 mt-1 space-y-0.5 leading-relaxed">
+                  <p>•  jpeg, jpg, png만 가능</p>
+                  <p>•  파일 10MB 이하 업로드 가능</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

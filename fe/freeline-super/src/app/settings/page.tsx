@@ -13,7 +13,7 @@ import { LogOut } from "lucide-react";
 export default function SettingsPage() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
-  
+
   useEffect(() => {
     // Check for auth token, redirect to login if missing
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
@@ -43,14 +43,14 @@ export default function SettingsPage() {
   // Profile Form
   const [name, setName] = useState("");
   const [organization, setOrganization] = useState("");
-  
+
   // Password Form
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
-  
+
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -67,7 +67,7 @@ export default function SettingsPage() {
       }
 
       await authApi.updateMe(payload);
-      alert("입력하신 정보만 수정되었습니다.");
+      alert("입력하신 정보가 수정되었습니다.");
     } catch (err: any) {
       alert(err.response?.data?.message || "수정 실패. 네트워크 로그를 확인하세요.");
       console.error(err);
@@ -99,7 +99,7 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccount = async () => {
-    if (confirm("정말로 탈퇴하시겠습니까? 돌이킬 수 없습니다.")) {
+    if (confirm("정말로 탈퇴하시겠습니까?")) {
       try {
         setIsLoading(true);
         await authApi.deleteAccount();
@@ -135,7 +135,7 @@ export default function SettingsPage() {
             ← 뒤로가기
           </Link>
         </div>
-        
+
         <div className="flex flex-col items-center justify-center mt-2">
           <div className="flex items-center gap-2 text-2xl font-bold tracking-tight">
             <Image src="/super/assets/logo.png" alt="줄서잇 매니저 로고" width={100} height={24} className="h-6 w-auto object-contain" priority />
@@ -147,8 +147,8 @@ export default function SettingsPage() {
         </div>
 
         <div className="w-[100px] flex justify-end text-gray-300 gap-2">
-          <button 
-            title="로그아웃" 
+          <button
+            title="로그아웃"
             onClick={handleLogout}
             className="hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
           >
@@ -159,7 +159,7 @@ export default function SettingsPage() {
 
       {/* Main Content */}
       <main className="flex-1 w-full max-w-3xl mx-auto px-6 py-10 flex flex-col gap-8">
-        
+
         <h1 className="text-3xl font-bold text-[#111111] tracking-tight">계정 설정</h1>
 
         {/* Profile Info Edit Section */}
@@ -168,19 +168,19 @@ export default function SettingsPage() {
           <form onSubmit={handleUpdateProfile} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">이름</label>
-              <Input 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                placeholder="변경할 이름만 입력 (미변경시 비워둠)" 
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="변경할 이름만 입력 (미변경시 비워둠)"
                 className="h-12 bg-[#F4F5F7] border-0"
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">소속 (단체/기관명)</label>
-              <Input 
-                value={organization} 
-                onChange={(e) => setOrganization(e.target.value)} 
-                placeholder="변경할 소속만 입력 (미변경시 비워둠)" 
+              <Input
+                value={organization}
+                onChange={(e) => setOrganization(e.target.value)}
+                placeholder="변경할 소속만 입력 (미변경시 비워둠)"
                 className="h-12 bg-[#F4F5F7] border-0"
               />
             </div>
@@ -198,30 +198,30 @@ export default function SettingsPage() {
           <form onSubmit={handleChangePassword} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">현재 비밀번호</label>
-              <Input 
+              <Input
                 type="password"
-                value={currentPassword} 
-                onChange={(e) => setCurrentPassword(e.target.value)} 
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
                 className="h-12 bg-[#F4F5F7] border-0"
                 required
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">새 비밀번호</label>
-              <Input 
+              <Input
                 type="password"
-                value={newPassword} 
-                onChange={(e) => setNewPassword(e.target.value)} 
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
                 className="h-12 bg-[#F4F5F7] border-0"
                 required
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">새 비밀번호 확인</label>
-              <Input 
+              <Input
                 type="password"
-                value={newPasswordConfirm} 
-                onChange={(e) => setNewPasswordConfirm(e.target.value)} 
+                value={newPasswordConfirm}
+                onChange={(e) => setNewPasswordConfirm(e.target.value)}
                 className="h-12 bg-[#F4F5F7] border-0"
                 required
               />
@@ -241,9 +241,9 @@ export default function SettingsPage() {
               <h2 className="text-xl font-bold text-red-600 mb-2">회원 탈퇴</h2>
               <p className="text-sm text-gray-500">계정을 삭제하면 관련된 모든 권한과 행사 정보가 영구적으로 사라집니다.</p>
             </div>
-            <Button 
-              type="button" 
-              onClick={handleDeleteAccount} 
+            <Button
+              type="button"
+              onClick={handleDeleteAccount}
               disabled={isLoading}
               variant="destructive"
               className="bg-red-500 hover:bg-red-600 text-white font-bold h-10 px-6 rounded-xl shrink-0"
