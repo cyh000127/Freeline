@@ -87,6 +87,7 @@ pipeline {
                                 [infisicalKey: 'JWT_SECRET'],
                                 [infisicalKey: 'MAIL_PASSWORD'],
                                 [infisicalKey: 'MAIL_USERNAME'],
+                                [infisicalKey: 'EMAIL_CODE_EXPIRE_MINUTES'],
                                 [infisicalKey: 'REDIS_HOST'],
                                 [infisicalKey: 'REDIS_PASSWORD'],
                                 [infisicalKey: 'REDIS_PORT'],
