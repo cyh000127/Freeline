@@ -93,9 +93,14 @@ public class EventService {
             final Boolean includeBooths
     ) {
         final Event event = getAuthorizedEvent(eventAdminId, eventId);
+        final String mapImageUrl = eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(eventId)
+                .or(() -> eventMapRepository.findFirstByEventIdOrderByIdDesc(eventId))
+                .map(EventMap::getImagePath)
+                .orElse(null);
 
         return EventConverter.toEventDetailResDto(
                 event,
+                mapImageUrl,
                 Boolean.TRUE.equals(includeBooths) ? Collections.emptyList() : null
         );
     }

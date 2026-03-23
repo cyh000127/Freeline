@@ -11,19 +11,19 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import lombok.RequiredArgsConstructor;
 
-import com.freeline.common.file.dto.FileInfo;
-import com.freeline.common.file.service.FileService;
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.util.ResponseUtils;
 import com.freeline.domain.boothmap.dto.request.BoothMapAreaUpsertReqDto;
 import com.freeline.domain.boothmap.dto.response.BoothMapAreaUpsertResDto;
 import com.freeline.domain.boothmap.dto.response.BoothMapResDto;
+import com.freeline.domain.boothmap.dto.response.EventMapUpsertResDto;
 import com.freeline.domain.boothmap.service.BoothMapService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,17 +35,16 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequiredArgsConstructor
 public class BoothMapController {
 
-    private static final String MAP_DIRECTORY = "map";
-
     private final BoothMapService boothMapService;
-    private final FileService fileService;
 
-    @Operation(summary = "행사 지도 이미지 업로드", description = "행사 지도 이미지를 업로드하고 파일 정보를 반환합니다.")
-    @PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<BaseResponse<FileInfo>> uploadMapImage(
-            @RequestPart("file") final MultipartFile file
+    @Operation(summary = "행사 지도 이미지 업로드 및 저장", description = "행사 지도 이미지를 업로드하고 event_maps 테이블에 저장하거나 수정합니다.")
+    @PostMapping(value = "/events/{eventId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<BaseResponse<EventMapUpsertResDto>> upsertEventMap(
+            @PathVariable final Long eventId,
+            @RequestPart("file") final MultipartFile file,
+            @RequestParam(defaultValue = "true") final Boolean isVisible
     ) {
-        final FileInfo response = fileService.uploadFile(file, MAP_DIRECTORY);
+        final EventMapUpsertResDto response = boothMapService.upsertEventMap(eventId, file, Boolean.TRUE.equals(isVisible));
         return ResponseUtils.ok(response);
     }
 
