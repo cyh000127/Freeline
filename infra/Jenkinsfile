@@ -21,7 +21,7 @@ pipeline {
     environment {
         INFRA_DIR    = 'infra'
         HOSTS_FILE   = 'infra/hosts.conf'
-        DEPLOY_ORDER = 'networks,infisical,jenkins,jenkins-agent,monitoring,monitoring-agent,backend,frontend,nginx'
+        DEPLOY_ORDER = 'networks,infisical,jenkins,jenkins-agent,monitoring,monitoring-agent,nginx'
     }
 
     stages {
@@ -29,6 +29,11 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+                script {
+                    if (env.gitlabSourceBranch) {
+                        sh "git checkout origin/${env.gitlabSourceBranch}"
+                    }
+                }
             }
         }
 
@@ -157,7 +162,6 @@ pipeline {
 // MR: origin/main 대비 전체 변경 파일, Push: 직전 커밋 대비
 def getChangedFiles() {
     if (env.gitlabMergeRequestIid) {
-        sh 'git fetch origin main:refs/remotes/origin/main'
         return sh(script: 'git diff --name-only origin/main...HEAD', returnStdout: true).trim()
     }
     return sh(
