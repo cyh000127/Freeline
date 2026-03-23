@@ -3,6 +3,7 @@ package com.freeline.domain.event.controller;
 import jakarta.validation.Valid;
 
 import org.springframework.data.domain.Page;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -14,10 +15,14 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import lombok.RequiredArgsConstructor;
 
+import com.freeline.common.file.dto.FileInfo;
+import com.freeline.common.file.service.FileService;
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.response.PageResponse;
 import com.freeline.common.util.ResponseUtils;
@@ -42,7 +47,19 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequiredArgsConstructor
 public class EventController {
 
+    private static final String EVENT_DIRECTORY = "event";
+
     private final EventService eventService;
+    private final FileService fileService;
+
+    @Operation(summary = "행사 썸네일 업로드", description = "행사 썸네일 이미지를 업로드하고 파일 정보를 반환합니다.")
+    @PostMapping(value = "/thumbnail", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<BaseResponse<FileInfo>> uploadThumbnail(
+            @RequestPart("file") final MultipartFile file
+    ) {
+        final FileInfo response = fileService.uploadFile(file, EVENT_DIRECTORY);
+        return ResponseUtils.ok(response);
+    }
 
     @Operation(summary = "행사 생성", description = "주최자가 신규 행사를 생성합니다.")
     @PostMapping
