@@ -48,7 +48,6 @@ public class BoothManagerService {
     private final BoothRepository boothRepository;
     private final BoothWaitingRepository boothWaitingRepository;
     private final WaitingService waitingService;
-    private final BoothManagerSseService boothManagerSseService;
 
     @Transactional(readOnly = true)
     public BoothManagerDashboardResDto getDashboard(final Long boothId) {
@@ -89,20 +88,15 @@ public class BoothManagerService {
     }
 
     public WaitingCallResDto callNextWaiting(final Long boothId) {
-        final WaitingCallResDto response = waitingService.callNextWaiting(boothId);
-        boothManagerSseService.publishQueueUpdated(boothId, response.waitingId(), WaitingStatus.CALLED);
-        return response;
+        return waitingService.callNextWaiting(boothId);
     }
 
     public WaitingAdmitResDto admitWaiting(final Long boothId, final Long waitingId) {
-        final WaitingAdmitResDto response = waitingService.admitWaiting(waitingId, boothId);
-        boothManagerSseService.publishQueueUpdated(boothId, waitingId, WaitingStatus.ENTERED);
-        return response;
+        return waitingService.admitWaiting(waitingId, boothId);
     }
 
     public void cancelWaiting(final Long boothId, final Long waitingId) {
         waitingService.cancelWaitingByAdmin(waitingId, boothId);
-        boothManagerSseService.publishQueueUpdated(boothId, waitingId, WaitingStatus.CANCELED);
     }
 
     private Booth getBoothEntity(final Long boothId) {

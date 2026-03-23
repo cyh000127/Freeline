@@ -111,8 +111,13 @@ public class PushNotificationService {
             final PushNotificationType notificationType
     ) {
         switch (notificationType) {
-            case FRONT_QUEUE_CALLED, QR_CHECK_REMINDER, WAITING_EXPIRED -> {
+            case FRONT_QUEUE_CALLED, QR_CHECK_REMINDER -> {
                 if (waiting.getStatus() != WaitingStatus.CALLED) {
+                    throw new PushNotificationException(ErrorCode.PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH);
+                }
+            }
+            case WAITING_EXPIRED -> {
+                if (waiting.getStatus() != WaitingStatus.EXPIRED) {
                     throw new PushNotificationException(ErrorCode.PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH);
                 }
             }

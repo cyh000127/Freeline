@@ -51,7 +51,6 @@ public class EventService {
     private final EventRepository eventRepository;
     private final EventMapRepository eventMapRepository;
     private final EventPolicyRepository eventPolicyRepository;
-    private final TimeUtils timeUtils;
 
     public EventResDto createEvent(final Long eventAdminId, final EventCreateReqDto request) {
         validateEventPeriod(request.startDate(), request.endDate());
@@ -135,7 +134,7 @@ public class EventService {
                 summary,
                 boothCongestion,
                 topWaitingBooths,
-                timeUtils.nowDateTime()
+                TimeUtils.nowDateTime()
         );
     }
 
@@ -229,7 +228,7 @@ public class EventService {
 
         eventRepository.delete(event);
 
-        final LocalDateTime deletedAt = timeUtils.nowDateTime();
+        final LocalDateTime deletedAt = TimeUtils.nowDateTime();
 
         log.info("[Event] delete completed {id: {}, adminId: {}, cascade: {}}",
                 event.getId(),
