@@ -30,13 +30,14 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Handle global API errors here (e.g., 401 Unauthorized)
-    // if (error.response?.status === 401) {
-    //   // Handle logout or redirect to login page
-    //   if (typeof window !== 'undefined') {
-    //     window.location.href = '/login';
-    //   }
-    // }
+    // Handle global API errors here (e.g., 401 Unauthorized, 403 Forbidden)
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      // Handle logout or redirect to login page
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken');
+        window.location.href = '/login';
+      }
+    }
     return Promise.reject(error);
   }
 );

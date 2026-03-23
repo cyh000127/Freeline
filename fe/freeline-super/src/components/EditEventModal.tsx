@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import DaumPostcode from "react-daum-postcode";
 import { api } from "@/lib/api";
+import { eventApi } from "@/lib/api/event";
 
 interface EditEventModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface EditEventModalProps {
 export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) {
   const [formData, setFormData] = useState({
     name: "",
+    description: "",
     status: "OPEN",
     startDate: "",
     endDate: "",
@@ -27,18 +29,60 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
 
   // Load event data when modal opens
   useEffect(() => {
-    if (isOpen && event) {
-      setFormData({
-        name: event.name || "",
-        status: event.status || "OPEN",
-        startDate: event.startDate || "",
-        endDate: event.endDate || "",
-        openTime: event.openTime || "",
-        closeTime: event.closeTime || "",
-        locationAddress: event.locationAddress || "",
-        thumbnailImageUrl: event.thumbnailImageUrl || "",
-      });
-    }
+    const fetchEventDetail = async () => {
+      if (!isOpen || !event) return;
+      
+      const eventId = event.eventId || event.id;
+      if (!eventId) return;
+
+      try {
+        setIsLoading(true);
+        // 상세 조회 API 호출
+        const response = await eventApi.getEvent(eventId);
+        let detail = null;
+        // 1. 래퍼가 있는 경우
+        if (response.data?.success && response.data?.data) {
+          detail = response.data.data;
+        } 
+        // 2. 래퍼가 없는 경우
+        else if (response.data && (response.data as any).eventId) {
+          detail = response.data;
+        }
+
+        if (detail) {
+          const d = detail as any;
+          setFormData({
+            name: d.name || "",
+            description: d.description || "",
+            status: d.status || "OPEN",
+            startDate: d.startDate || "",
+            endDate: d.endDate || "",
+            openTime: d.openTime || "",
+            closeTime: d.closeTime || "",
+            locationAddress: d.locationAddress || "",
+            thumbnailImageUrl: d.thumbnailImageUrl || "",
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch event detail:", error);
+        // 상세 조회 실패 시 목록에서 받은 데이터라도 최소한으로 채움
+        setFormData({
+          name: event.name || "",
+          description: event.description || "",
+          status: event.status || "OPEN",
+          startDate: event.startDate || "",
+          endDate: event.endDate || "",
+          openTime: event.openTime || "",
+          closeTime: event.closeTime || "",
+          locationAddress: event.locationAddress || "",
+          thumbnailImageUrl: event.thumbnailImageUrl || "",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEventDetail();
   }, [isOpen, event]);
 
   const handleComplete = (data: any) => {
@@ -59,14 +103,26 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
     setIsPostcodeOpen(false);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleThumbnailChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData((prev) => ({ ...prev, thumbnailImageUrl: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
   };
 
   // Form Validation
   const isFormValid =
     formData.name.trim() !== "" &&
+    formData.description.trim() !== "" &&
     formData.status.trim() !== "" &&
     formData.startDate !== "" &&
     formData.endDate !== "" &&
@@ -82,25 +138,33 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
 
       const payload = {
         name: formData.name,
+        description: formData.description,
         status: formData.status,
         startDate: formData.startDate,
         endDate: formData.endDate,
-        openTime: formData.openTime.length === 5 ? `${formData.openTime}:00` : formData.openTime, // Ensure HH:mm:ss format natively if needed
+        openTime: formData.openTime.length === 5 ? `${formData.openTime}:00` : formData.openTime,
         closeTime: formData.closeTime.length === 5 ? `${formData.closeTime}:00` : formData.closeTime,
         locationAddress: formData.locationAddress,
-        thumbnailImageUrl: formData.thumbnailImageUrl || "https://example.com/images/default.png", // fallback URL if empty
+        thumbnailImageUrl: formData.thumbnailImageUrl || null,
       };
 
-      // Use event ID from the passed event object, defaulting to 1 for dummy testing if undefined
-      const eventId = event.id || 1;
-      await api.patch(`/api/v1/events/${eventId}`, payload);
+      const eventId = event.eventId || event.id || 1;
+      await api.patch(`/v1/events/${eventId}`, payload);
 
       alert("행사 정보가 성공적으로 수정되었습니다.");
       onClose();
-      // TODO: refresh parent component list
-    } catch (error) {
+    } catch (error: any) {
       console.error("행사 수정 중 오류 발생:", error);
-      alert("행사 수정에 실패했습니다.");
+      const serverData = error.response?.data;
+      const errorMessage = serverData?.error?.message || serverData?.message || serverData?.error || "행사 수정에 실패했습니다.";
+      
+      if (error.response?.status === 409) {
+        const detail = typeof errorMessage === 'object' ? JSON.stringify(errorMessage) : errorMessage;
+        alert(`수정된 내용이 기존 데이터와 충돌하거나 허용되지 않습니다: ${detail}`);
+      } else {
+        const detail = typeof errorMessage === 'object' ? JSON.stringify(errorMessage) : errorMessage;
+        alert(`오류가 발생했습니다: ${detail}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -155,7 +219,21 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
                 <option value="UPCOMING">행사 준비 중</option>
                 <option value="OPEN">행사 진행 중</option>
                 <option value="CLOSED">행사 종료</option>
+                <option value="DRAFT">임시 저장(DRAFT)</option>
               </select>
+            </div>
+
+            {/* 행사 설명 */}
+            <div className="flex flex-col gap-2.5">
+              <label className="text-[15px] font-bold text-gray-900">행사 설명</label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                placeholder="행사 설명을 입력해주세요"
+                rows={3}
+                className="w-full bg-[#F3F4F6] border-none rounded-2xl p-4 text-[15px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:bg-white transition-all outline-none resize-none"
+              />
             </div>
 
             {/* 일시 */}
@@ -221,6 +299,47 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
                 >
                   주소 검색
                 </button>
+              </div>
+            </div>
+
+            {/* 포스터 업로드 */}
+            <div className="flex flex-col gap-4 pb-4">
+              <label className="text-[15px] font-bold text-gray-900">행사 포스터 수정</label>
+              
+              <div className="flex items-center gap-6">
+                <div className="w-32 h-32 rounded-2xl bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden shrink-0">
+                  {formData.thumbnailImageUrl ? (
+                    <img src={formData.thumbnailImageUrl} alt="Poster preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-[12px] text-gray-400 font-medium">사진 없음</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="file"
+                    id="thumbnail-edit-upload"
+                    accept="image/*"
+                    onChange={handleThumbnailChange}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="thumbnail-edit-upload"
+                    className="w-fit flex items-center justify-center gap-2 bg-white border-2 border-[#2D2A4A] text-[#2D2A4A] font-bold py-2.5 px-6 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
+                    <svg fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    사진 변경
+                  </label>
+                  <div className="text-[13px] text-gray-400 mt-1 space-y-0.5 leading-relaxed">
+                    <p>•  jpeg, jpg, png만 가능</p>
+                    <p>•  파일 10MB 이하 업로드 가능</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
