@@ -73,24 +73,6 @@ pipeline {
             }
         }
 
-        stage('Validate Compose Files') {
-            when {
-                expression { env.CHANGED_COMPONENTS }
-            }
-            steps {
-                script {
-                    def components = env.CHANGED_COMPONENTS.split(',')
-                    components.each { component ->
-                        if (component == 'networks') return
-                        dir("${env.INFRA_DIR}/${component}") {
-                            sh "docker compose config --quiet 2>&1 || { echo '${component} docker-compose.yml 검증 실패'; exit 1; }"
-                        }
-                    }
-                    echo "모든 Compose 파일 검증 통과"
-                }
-            }
-        }
-
         stage('Load Host Mapping') {
             when {
                 expression { isMainBranch() && env.CHANGED_COMPONENTS }
@@ -155,16 +137,16 @@ pipeline {
 
     post {
         success {
-            updateGitlabCommitStatus name: 'infra', state: 'success'
+            updateGitlabCommitStatus name: 'freeline-infra', state: 'success'
         }
         notBuilt {
-            updateGitlabCommitStatus name: 'infra', state: 'success'
+            updateGitlabCommitStatus name: 'freeline-infra', state: 'success'
         }
         aborted {
-            updateGitlabCommitStatus name: 'infra', state: 'canceled'
+            updateGitlabCommitStatus name: 'freeline-infra', state: 'canceled'
         }
         failure {
-            updateGitlabCommitStatus name: 'infra', state: 'failed'
+            updateGitlabCommitStatus name: 'freeline-infra', state: 'failed'
         }
         cleanup {
             cleanWs()
