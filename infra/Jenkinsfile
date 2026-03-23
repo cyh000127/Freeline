@@ -137,16 +137,16 @@ pipeline {
 
     post {
         success {
-            updateGitlabCommitStatus name: 'infra', state: 'success'
+            updateGitlabCommitStatus name: 'freeline-infra', state: 'success'
         }
         notBuilt {
-            updateGitlabCommitStatus name: 'infra', state: 'success'
+            updateGitlabCommitStatus name: 'freeline-infra', state: 'success'
         }
         aborted {
-            updateGitlabCommitStatus name: 'infra', state: 'canceled'
+            updateGitlabCommitStatus name: 'freeline-infra', state: 'canceled'
         }
         failure {
-            updateGitlabCommitStatus name: 'infra', state: 'failed'
+            updateGitlabCommitStatus name: 'freeline-infra', state: 'failed'
         }
         cleanup {
             cleanWs()

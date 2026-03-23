@@ -173,16 +173,16 @@ pipeline {
 
     post {
         success {
-            updateGitlabCommitStatus name: 'build', state: 'success'
+            updateGitlabCommitStatus name: 'freeline-be', state: 'success'
         }
         notBuilt {
-            updateGitlabCommitStatus name: 'build', state: 'success'
+            updateGitlabCommitStatus name: 'freeline-be', state: 'success'
         }
         aborted {
-            updateGitlabCommitStatus name: 'build', state: 'canceled'
+            updateGitlabCommitStatus name: 'freeline-be', state: 'canceled'
         }
         failure {
-            updateGitlabCommitStatus name: 'build', state: 'failed'
+            updateGitlabCommitStatus name: 'freeline-be', state: 'failed'
         }
         cleanup {
             sh 'docker image prune -f --filter "until=24h" || true'
