@@ -66,35 +66,7 @@ pipeline {
                         infisicalSecret(
                             includeImports: true,
                             path: '/be',
-                            secretValues: [
-                                [infisicalKey: 'CLOUDFLARE_ACCESS_KEY'],
-                                [infisicalKey: 'CLOUDFLARE_BUCKET'],
-                                [infisicalKey: 'CLOUDFLARE_ENDPOINT'],
-                                [infisicalKey: 'CLOUDFLARE_OUTER_PREFIX'],
-                                [infisicalKey: 'CLOUDFLARE_SECRET_KEY'],
-                                [infisicalKey: 'DB_HOST'],
-                                [infisicalKey: 'DB_NAME'],
-                                [infisicalKey: 'DB_PASSWORD'],
-                                [infisicalKey: 'DB_PORT'],
-                                [infisicalKey: 'DB_USERNAME'],
-                                [infisicalKey: 'ENCRYPTION_SECRET_KEY'],
-                                [infisicalKey: 'FIREBASE_PROJECT_ID'],
-                                [infisicalKey: 'FIREBASE_SERVICE_ACCOUNT_BASE64'],
-                                [infisicalKey: 'JWT_ACCESS_TOKEN_EXPIRATION'],
-                                [infisicalKey: 'JWT_REFRESH_TOKEN_EXPIRATION'],
-                                [infisicalKey: 'JWT_SECRET'],
-                                [infisicalKey: 'MAIL_PASSWORD'],
-                                [infisicalKey: 'MAIL_USERNAME'],
-                                [infisicalKey: 'RABBITMQ_HOST'],
-                                [infisicalKey: 'RABBITMQ_PASSWORD'],
-                                [infisicalKey: 'RABBITMQ_PORT'],
-                                [infisicalKey: 'RABBITMQ_USERNAME'],
-                                [infisicalKey: 'RABBITMQ_VIRTUAL_HOST'],
-                                [infisicalKey: 'REDIS_HOST'],
-                                [infisicalKey: 'REDIS_PASSWORD'],
-                                [infisicalKey: 'REDIS_PORT'],
-                                [infisicalKey: 'SPRING_PROFILES_ACTIVE']
-                            ]
+                            secretValues: []
                         )
                     ]
                 ) {
@@ -137,32 +109,7 @@ pipeline {
                         infisicalSecret(
                             includeImports: true,
                             path: '/be',
-                            secretValues: [
-                                [infisicalKey: 'DB_NAME'],
-                                [infisicalKey: 'DB_USERNAME'],
-                                [infisicalKey: 'DB_PASSWORD'],
-                                [infisicalKey: 'REDIS_PASSWORD'],
-                                [infisicalKey: 'JWT_SECRET'],
-                                [infisicalKey: 'JWT_ACCESS_TOKEN_EXPIRATION'],
-                                [infisicalKey: 'JWT_REFRESH_TOKEN_EXPIRATION'],
-                                [infisicalKey: 'ENCRYPTION_SECRET_KEY'],
-                                [infisicalKey: 'CLOUDFLARE_ACCESS_KEY'],
-                                [infisicalKey: 'CLOUDFLARE_BUCKET'],
-                                [infisicalKey: 'CLOUDFLARE_ENDPOINT'],
-                                [infisicalKey: 'CLOUDFLARE_OUTER_PREFIX'],
-                                [infisicalKey: 'CLOUDFLARE_SECRET_KEY'],
-                                [infisicalKey: 'FIREBASE_PROJECT_ID'],
-                                [infisicalKey: 'FIREBASE_SERVICE_ACCOUNT_BASE64'],
-                                [infisicalKey: 'MAIL_USERNAME'],
-                                [infisicalKey: 'MAIL_PASSWORD'],
-                                [infisicalKey: 'RABBITMQ_HOST'],
-                                [infisicalKey: 'RABBITMQ_PASSWORD'],
-                                [infisicalKey: 'RABBITMQ_PORT'],
-                                [infisicalKey: 'RABBITMQ_USERNAME'],
-                                [infisicalKey: 'RABBITMQ_VIRTUAL_HOST'],
-                                [infisicalKey: 'MAIL_PASSWORD'],
-                                [infisicalKey: 'SPRING_PROFILES_ACTIVE']
-                            ]
+                            secretValues: []
                         )
                     ]
                 ) {
