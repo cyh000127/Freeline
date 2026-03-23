@@ -15,6 +15,7 @@ services:
       - '--storage.tsdb.retention.time=30d'
       - '--web.external-url=https://j14a207.p.ssafy.io/prometheus/'
       - '--web.route-prefix=/prometheus/'
+      - '--web.enable-remote-write-receiver'
     networks:
       - infra-public
 

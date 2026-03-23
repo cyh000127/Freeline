@@ -21,8 +21,13 @@ infra/
 ├── infisical/               ← 시크릿 관리 서비스
 ├── jenkins/                 ← CI/CD 서버 (Master + Agent)
 ├── backend/                 ← DB, Redis, BE 서비스
-├── frontend/                ← (확장 예정)
-└── monitoring/              ← (확장 예정)
+├── frontend/                ← FE 서비스 (User, Booth, Super)
+├── monitoring/              ← Prometheus + Grafana + Node-exporter + cAdvisor
+└── loadtest/                ← k6 부하 테스트 (Prometheus remote write 연동)
+    ├── scripts/
+    │   ├── smoke-test.js    ← 기본 연결 확인 테스트
+    │   └── api-load-test.js ← API 부하 테스트 시나리오
+    └── output/              ← 테스트 결과 출력
 ```
 
 ## CI/CD 3대 원칙
