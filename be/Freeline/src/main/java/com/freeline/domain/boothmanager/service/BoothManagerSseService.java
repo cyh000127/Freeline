@@ -31,7 +31,6 @@ public class BoothManagerSseService {
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
     private final BoothManagerSseProperties boothManagerSseProperties;
-    private final TimeUtils timeUtils;
 
     public static String topic(final Long boothId) {
         return SSE_CHANNEL_PREFIX + boothId;
@@ -49,7 +48,7 @@ public class BoothManagerSseService {
         emitter.onTimeout(() -> removeEmitter(boothId, emitter));
         emitter.onError(ex -> removeEmitter(boothId, emitter));
 
-        sendEvent(emitter, "CONNECTED", BoothManagerConverter.toConnectedEventResDto(boothId, timeUtils.nowDateTime()));
+        sendEvent(emitter, "CONNECTED", BoothManagerConverter.toConnectedEventResDto(boothId, TimeUtils.nowDateTime()));
         return emitter;
     }
 
@@ -72,7 +71,7 @@ public class BoothManagerSseService {
                 boothId,
                 waitingId,
                 changedStatus,
-                timeUtils.nowDateTime()
+                TimeUtils.nowDateTime()
         );
         publishToRedis(boothId, payload);
     }

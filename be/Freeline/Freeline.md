@@ -55,13 +55,6 @@ gradlew dependencies
 
 활성 프로파일은 환경변수 `SPRING_PROFILES_ACTIVE`로 제어
 
-**로컬 Docker 실행:**
-
-```bash
-# PostgreSQL + Redis 컨테이너 실행
-docker-compose up -d
-```
-
 ## Architecture
 
 ### 레이어 구조
@@ -89,6 +82,7 @@ Entity (도메인 모델)
 com.freeline
 ├── common/                    # 공통 인프라
 │   ├── config/               # 설정 (Security, CORS, Swagger)
+│   ├── event/                # 공통 이벤트/MQ payload/publisher
 │   ├── entity/               # BaseEntity (생성/수정 시각)
 │   ├── error/                # 예외 처리
 │   │   ├── ErrorCode.java   # 에러 코드 enum (도메인별 prefix)
@@ -268,12 +262,12 @@ public void updateName(final String name) {
 - Firebase 서비스 계정 JSON 파일은 Git에 절대 커밋하지 않음
 - 로컬 개발에서는 프로젝트 루트의 `secrets/` 디렉토리 또는 프로젝트 바깥 비공개 경로에만 저장
 - 권장 파일명 예시: `service-account.json`, `freeline-firebase-service-account.json`
-- Firebase 키는 파일 내용을 직접 코드에 넣지 않고 경로만 환경변수로 주입
+- Firebase 키는 서비스 계정 JSON 원본을 Base64로 인코딩해 환경변수로만 주입
 - 환경변수:
     - `FIREBASE_PROJECT_ID`
-    - `FIREBASE_SERVICE_ACCOUNT_PATH`
+    - `FIREBASE_SERVICE_ACCOUNT_BASE64`
 - `application.yml`에서는 위 환경변수만 참조하고, 실제 JSON 경로/내용을 하드코딩하지 않음
-- 운영 환경에서는 서버 내 비공개 경로에 JSON 파일을 두고 경로만 주입
+- 운영 환경에서는 JSON 파일 자체를 두지 않고 Base64 값만 secret manager 또는 환경변수로 주입
 - 서비스 계정 JSON이 한 번이라도 Git에 올라갔다면 즉시 폐기 후 새 키를 발급받아야 함
 
 예시:
@@ -281,7 +275,7 @@ public void updateName(final String name) {
 ```yml
 firebase:
   project-id: ${FIREBASE_PROJECT_ID:}
-  service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:}
+  service-account-base64: ${FIREBASE_SERVICE_ACCOUNT_BASE64:}
 ```
 
 **로컬 환경 DB:**
@@ -375,11 +369,23 @@ firebase:
 - Actuator: 모든 엔드포인트 허용 (프로덕션에서는 제한 필요)
 - DevTools: 로컬 개발 시 자동 재시작 지원
 - Swagger URL: `http://localhost:8080/swagger-ui/index.html`
-- 시간 관련 로직은 `TimeUtils`를 주입받아서 사용한다.
+- 시간 관련 로직은 `TimeUtils` 유틸 클래스를 정적으로 사용한다.
 - `TimeUtils` 내부 기준 시간은 `LocalDateTime.now()`이며, 별도의 `Asia/Seoul` 고정값은 쓰지 않는다.
-- 현재 시각이 필요한 서비스만 `TimeUtils`를 의존하고, `BaseResponse` 같은 공통 응답 포맷은 기존 방식 그대로 둔다.
+- 현재 시각이 필요한 서비스는 `TimeUtils.nowDateTime()` 같은 정적 메서드를 직접 호출하고, `BaseResponse` 같은 공통 응답 포맷도 같은 유틸을 사용한다.
 - 기준 스키마는 `Flyway`가 아니라 `src/main/resources/ddl.sql` 단일 파일로 관리
 - 굿즈 생성 API는 JSON이 아니라 `multipart/form-data` 기반이며, `name`, `imageFile` 파트를 사용
+- waiting 상태 변화 이벤트의 공통 payload, routing key, publisher는 `common/event/waiting` 패키지에서 관리한다.
+- waiting 상태 변화 감지 공통 모듈은 `common/event/waiting` 패키지에서 관리하고, 상태가 실제로 바뀐 경우에만 이벤트 메시지를 생성한다.
+- waiting 상태 변화 공통 모듈은 `ApplicationEventPublisher`와 `@TransactionalEventListener(AFTER_COMMIT)`를 사용해 내부 이벤트를 발행하고, 커밋 이후 RabbitMQ로 전파한다.
+- QR 스캔 과정에서 waiting 호출 만료(`EXPIRED`)는 별도 상태 저장 서비스에서 `REQUIRES_NEW` 트랜잭션으로 반영해, 예외 반환 때문에 상태 변경이 롤백되지 않도록 한다.
+- RabbitMQ consumer는 공통 패키지가 아니라 실제 수행 도메인(`boothmanager`, `pushnotification`)에 둔다.
+- `boothmanager` 도메인의 SSE consumer는 waiting 이벤트를 RabbitMQ에서 받아 `BoothManagerSseService`로 넘기고, 실제 브로드캐스트는 기존 Redis/SSE 흐름을 그대로 사용한다.
+- 상태 변화 후속 처리에서 도메인 서비스는 SSE/FCM을 직접 호출하지 않고, RabbitMQ consumer 경로만 사용한다.
+- 현재 SSE 대상 waiting 이벤트는 `WAITING_CALLED`, `WAITING_REGISTERED`, `WAITING_ENTERED`, `WAITING_EXITED` 기준으로 관리한다.
+- `pushnotification` 도메인의 FCM consumer는 waiting 이벤트를 RabbitMQ에서 받아 즉시 알림을 발송하고, 지연 알림이 필요한 경우 별도 delay queue에 작업 메시지를 등록한 뒤 만료 시점에 다시 소비한다.
+- waiting RabbitMQ consumer는 기본적으로 3회까지 재시도하고, 재시도 후에도 실패하면 DLQ로 보내며 무한 재큐는 하지 않는다.
+- payload 누락이나 잘못된 상태값처럼 재시도로 해결되지 않는 경우는 예외를 던지지 않고 warn 로그 후 skip 한다.
+- delayed FCM consumer는 stale 이벤트로 인해 `NOT_FOUND`, `PUSH_NOTIFICATION_TOKEN_NOT_FOUND`, `PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH`, `INVALID_INPUT`이 발생하면 warn 후 skip 하고, 실제 인프라성 실패만 재시도/DLQ 대상으로 본다.
 
 ## Secrets Rule
 

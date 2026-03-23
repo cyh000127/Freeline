@@ -1,6 +1,10 @@
 spring:
   jackson:
     time-zone: Asia/Seoul
+  rabbitmq:
+    listener:
+      simple:
+        default-requeue-rejected: false
   data:
     redis:
       repositories:
@@ -51,11 +55,24 @@ qr:
 
 firebase:
   project-id: ${FIREBASE_PROJECT_ID:}
-  service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:}
 
 app:
   database:
     reset-on-startup: false
+  rabbitmq:
+    waiting:
+      exchange: waiting.events
+      sse-queue: waiting.sse.queue
+      fcm-queue: waiting.fcm.queue
+      dead-letter-exchange: waiting.events.dlx
+      sse-dead-letter-queue: waiting.sse.dlq
+      fcm-dead-letter-queue: waiting.fcm.dlq
+      fcm-delay-queue: waiting.fcm.delay.queue
+      fcm-delayed-queue: waiting.fcm.delayed.queue
+      sse-routing-key-pattern: waiting.sse.*
+      fcm-routing-key-pattern: waiting.fcm.*
+      fcm-delayed-routing-key: waiting.fcm.delayed
+      consumer-max-attempts: 3 # 최대 재전송 횟수 제한
 
 booth-manager:
   sse:

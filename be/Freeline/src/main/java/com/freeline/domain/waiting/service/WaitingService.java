@@ -9,6 +9,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.freeline.common.error.ErrorCode;
+import com.freeline.common.event.waiting.detector.WaitingStatusChangeCommand;
+import com.freeline.common.event.waiting.dispatcher.WaitingEventDispatcher;
+import com.freeline.common.event.waiting.model.WaitingEventType;
 import com.freeline.common.util.TimeUtils;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothPolicy;
@@ -83,7 +86,7 @@ public class WaitingService {
     private final BoothRepository boothRepository;
     private final BoothWaitingRepository boothWaitingRepository;
     private final BoothPolicyRepository boothPolicyRepository;
-    private final TimeUtils timeUtils;
+    private final WaitingEventDispatcher waitingEventDispatcher;
 
     public WaitingCreateResDto createWaiting(final Long boothId, final Long visitorId) {
         getBoothEntity(boothId);
@@ -96,8 +99,9 @@ public class WaitingService {
                 .orElse(1);
 
         final BoothWaiting saved = boothWaitingRepository.save(
-                WaitingConverter.toEntity(boothId, visitorId, nextWaitingNumber, timeUtils.nowDateTime())
+                WaitingConverter.toEntity(boothId, visitorId, nextWaitingNumber, TimeUtils.nowDateTime())
         );
+        dispatchStatusChanged(saved, "NONE", WaitingEventType.WAITING_CREATED);
         final List<BoothWaiting> activeWaitings = boothWaitingRepository
                 .findAllByVisitorIdAndStatusInOrderByRequestedAtAsc(visitorId, ACTIVE_WAITING_STATUSES);
 
@@ -133,10 +137,12 @@ public class WaitingService {
                 .orElseThrow(() -> new WaitingException(ErrorCode.CALL_CANDIDATE_NOT_FOUND));
 
         final int callValidTimeSeconds = resolveCallValidTimeSeconds(boothId);
-        final java.time.LocalDateTime calledAt = timeUtils.nowDateTime();
+        final java.time.LocalDateTime calledAt = TimeUtils.nowDateTime();
+        final String previousStatus = waiting.getStatus().name();
         waiting.updateStatus(WaitingStatus.CALLED);
         waiting.updateCalledAt(calledAt);
         waiting.updateCallExpiresAt(calledAt.plusSeconds(callValidTimeSeconds));
+        dispatchStatusChanged(waiting, previousStatus, WaitingEventType.WAITING_CALLED);
 
         log.info(
                 "[Waiting] call complete {waitingId: {}, boothId: {}, visitorId: {}, waitingNumber: {}}",
@@ -157,8 +163,10 @@ public class WaitingService {
             throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_CANCEL);
         }
 
+        final String previousStatus = waiting.getStatus().name();
         waiting.updateStatus(WaitingStatus.CANCELED);
-        waiting.updateExitedAt(timeUtils.nowDateTime());
+        waiting.updateExitedAt(TimeUtils.nowDateTime());
+        dispatchStatusChanged(waiting, previousStatus, WaitingEventType.WAITING_CANCELED);
 
         log.info(
                 "[Waiting] cancel complete {waitingId: {}, boothId: {}, visitorId: {}}",
@@ -214,8 +222,10 @@ public class WaitingService {
             throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_EXIT);
         }
 
+        final String previousStatus = waiting.getStatus().name();
         waiting.updateStatus(WaitingStatus.EXITED);
-        waiting.updateExitedAt(timeUtils.nowDateTime());
+        waiting.updateExitedAt(TimeUtils.nowDateTime());
+        dispatchStatusChanged(waiting, previousStatus, WaitingEventType.WAITING_EXITED);
 
         log.info(
                 "[Waiting] exit complete {waitingId: {}, boothId: {}, visitorId: {}}",
@@ -236,8 +246,10 @@ public class WaitingService {
             throw new WaitingException(ErrorCode.INVALID_STATUS_FOR_ADMIT);
         }
 
+        final String previousStatus = waiting.getStatus().name();
         waiting.updateStatus(WaitingStatus.ENTERED);
-        waiting.updateEnteredAt(timeUtils.nowDateTime());
+        waiting.updateEnteredAt(TimeUtils.nowDateTime());
+        dispatchStatusChanged(waiting, previousStatus, WaitingEventType.WAITING_ENTERED);
 
         log.info(
                 "[Waiting] admit complete {waitingId: {}, boothId: {}, visitorId: {}}",
@@ -271,8 +283,10 @@ public class WaitingService {
             throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_CANCEL);
         }
 
+        final String previousStatus = waiting.getStatus().name();
         waiting.updateStatus(WaitingStatus.CANCELED);
-        waiting.updateExitedAt(timeUtils.nowDateTime());
+        waiting.updateExitedAt(TimeUtils.nowDateTime());
+        dispatchStatusChanged(waiting, previousStatus, WaitingEventType.WAITING_CANCELED);
 
         log.info(
                 "[Waiting] admin cancel complete {waitingId: {}, boothId: {}, visitorId: {}}",
@@ -305,7 +319,7 @@ public class WaitingService {
         final int currentRank = Math.toIntExact(boothWaitingRepository.countByBoothIdAndStatus(boothId, WaitingStatus.WAITING));
         final int stayTimeSeconds = boothPolicyRepository.findByBoothId(boothId)
                 .map(BoothPolicy::getStayTime)
-                .filter(value -> value != null && value > 0)
+                .filter(value -> value > 0)
                 .orElse(DEFAULT_STAY_TIME_SECONDS);
         final int avgStayTimeMinutes = stayTimeSeconds > 0
                 ? Math.toIntExact(Math.ceilDiv((long) stayTimeSeconds, SECONDS_PER_MINUTE))
@@ -403,14 +417,14 @@ public class WaitingService {
     private int resolveDeferLimit(final Long boothId) {
         return boothPolicyRepository.findByBoothId(boothId)
                 .map(BoothPolicy::getDeferLimit)
-                .filter(value -> value != null && value >= 0)
+                .filter(value -> value >= 0)
                 .orElse(DEFAULT_DEFER_LIMIT);
     }
 
     private int resolveCallValidTimeSeconds(final Long boothId) {
         return boothPolicyRepository.findByBoothId(boothId)
                 .map(BoothPolicy::getCallValidTime)
-                .filter(value -> value != null && value > 0)
+                .filter(value -> value > 0)
                 .orElse(DEFAULT_CALL_VALID_TIME_SECONDS);
     }
 
@@ -418,5 +432,22 @@ public class WaitingService {
         final int sourceWaitingNumber = source.getWaitingNumber();
         source.updateWaitingNumber(target.getWaitingNumber());
         target.updateWaitingNumber(sourceWaitingNumber);
+    }
+
+    private void dispatchStatusChanged(
+            final BoothWaiting waiting,
+            final String previousStatus,
+            final WaitingEventType eventType
+    ) {
+        waitingEventDispatcher.dispatch(
+                new WaitingStatusChangeCommand(
+                        eventType,
+                        waiting.getId(),
+                        waiting.getBoothId(),
+                        waiting.getVisitorId(),
+                        previousStatus,
+                        waiting.getStatus().name()
+                )
+        );
     }
 }
