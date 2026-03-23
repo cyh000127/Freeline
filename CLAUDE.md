@@ -98,5 +98,7 @@ Three Jenkins pipelines (`be/Jenkinsfile`, `fe/Jenkinsfile`, `infra/Jenkinsfile`
 ### Configuration
 - Backend profiles: `local` (defaults in `application-local.yml`) and `live` (env vars via Infisical)
 - Secrets managed by Infisical (self-hosted)
+
+  
 - Swagger UI available at `/swagger-ui.html`
 - Prometheus metrics at `/metrics/prometheus`
