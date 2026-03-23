@@ -36,6 +36,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+                updateGitlabCommitStatus name: 'freeline-fe', state: 'pending'
                 script {
                     if (env.gitlabSourceBranch) {
                         sh "git checkout origin/${env.gitlabSourceBranch}"
