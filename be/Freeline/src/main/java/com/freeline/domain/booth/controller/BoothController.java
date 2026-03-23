@@ -4,6 +4,7 @@ import java.util.List;
 
 import jakarta.validation.Valid;
 
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,10 +13,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import lombok.RequiredArgsConstructor;
 
+import com.freeline.common.file.dto.FileInfo;
+import com.freeline.common.file.service.FileService;
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.util.ResponseUtils;
 import com.freeline.domain.booth.dto.request.BoothCreateReqDto;
@@ -37,10 +42,22 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequiredArgsConstructor
 public class BoothController {
 
+    private static final String BOOTH_DIRECTORY = "booth";
+
     private final BoothService boothService;
+    private final FileService fileService;
 
     // TODO: 부스 정책 조회 API (`GET /api/v1/booths/{boothId}/policy`)를 추가한다.
     // TODO: 부스 정책 설정 API (`PATCH /api/v1/booths/{boothId}/policy`)를 추가한다.
+
+    @Operation(summary = "부스 이미지 업로드", description = "부스 이미지를 업로드하고 파일 정보를 반환합니다.")
+    @PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<BaseResponse<FileInfo>> uploadBoothImage(
+            @RequestPart("file") final MultipartFile file
+    ) {
+        final FileInfo response = fileService.uploadFile(file, BOOTH_DIRECTORY);
+        return ResponseUtils.ok(response);
+    }
 
     @Operation(summary = "부스 등록", description = "특정 행사에 새로운 부스를 등록합니다.")
     @PostMapping("/events/{eventId}")
