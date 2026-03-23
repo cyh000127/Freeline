@@ -6,21 +6,19 @@ pipeline {
     }
 
     options {
-        gitLabConnection('lab-ssafy') 
+        gitLabConnection('lab-ssafy')
     }
 
     environment {
         IMAGE_NAME = 'freeline-backend'
         COMPOSE_FILE = "${WORKSPACE}/infra/backend/docker-compose.yml"
-        INFISICAL_PROJECT_ID = 'b029b0c5-7661-4cb4-b8c2-cbe72de03a4a'
     }
 
     triggers {
         gitlab(
             triggerOnPush: true,
             triggerOnMergeRequest: true,
-            branchFilterType: 'NameBasedFilter',
-            includeBranchesSpec: 'main'
+            branchFilterType: 'All'
         )
     }
 
@@ -34,20 +32,19 @@ pipeline {
 
         stage('Change Detection') {
             steps {
+                script {
                     if (params.FORCE_REDEPLOY) {
                         echo "FORCE_REDEPLOY 활성화됨. 변경 감지 스킵."
-                    } else {
-                        def changes = sh(
-                            script: "git diff --name-only HEAD~1 HEAD | grep '^be/' || true",
-                            returnStdout: true
-                        ).trim()
-                        if (!changes) {
-                            echo "be/ 폴더 변경 없음. 파이프라인 스킵."
-                            currentBuild.result = 'NOT_BUILT'
-                            error("No relevant changes in be/")
-                        }
-                        echo "변경 감지된 파일:\n${changes}"
+                        return
                     }
+                    def changes = getChangedFiles().split('\n').findAll { it.startsWith('be/') }
+                    if (!changes) {
+                        echo "be/ 폴더 변경 없음. 파이프라인 스킵."
+                        currentBuild.result = 'NOT_BUILT'
+                        error("No relevant changes in be/")
+                    }
+                    echo "변경 감지된 파일:\n${changes.join('\n')}"
+                }
             }
         }
 
@@ -95,7 +92,7 @@ pipeline {
                 ) {
                     dir('be/Freeline') {
                         sh 'chmod +x ./gradlew'
-                        sh "./gradlew clean build"
+                        sh './gradlew clean build'
                     }
                 }
             }
@@ -110,9 +107,7 @@ pipeline {
         }
 
         stage('Docker Build') {
-            when {
-                expression { env.gitlabMergeRequestIid == null && (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main') }
-            }
+            when { expression { isMainBranch() } }
             steps {
                 dir('be/Freeline') {
                     sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} -t ${IMAGE_NAME}:latest ."
@@ -121,9 +116,7 @@ pipeline {
         }
 
         stage('Deploy') {
-            when {
-                expression { env.gitlabMergeRequestIid == null && (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main') }
-            }
+            when { expression { isMainBranch() } }
             steps {
                 withInfisical(
                     configuration: [
@@ -171,7 +164,7 @@ pipeline {
                         echo -n "."
                         sleep 2
                     done
-                    echo "\\nBackend failed to start in time or is unhealthy."
+                    echo "\\nBackend failed to start in time."
                     exit 1
                 '''
             }
@@ -196,4 +189,22 @@ pipeline {
             cleanWs()
         }
     }
+}
+
+// MR: origin/main 대비 전체 변경 파일, Push: 직전 커밋 대비
+def getChangedFiles() {
+    if (env.gitlabMergeRequestIid) {
+        sh 'git fetch origin main:refs/remotes/origin/main'
+        return sh(script: 'git diff --name-only origin/main...HEAD', returnStdout: true).trim()
+    }
+    return sh(
+        script: 'git diff --name-only HEAD~1 HEAD 2>/dev/null || git log --name-only --pretty=format: -1 HEAD',
+        returnStdout: true
+    ).trim()
+}
+
+// main 브랜치 push일 때만 true (MR 이벤트 제외)
+def isMainBranch() {
+    return env.gitlabMergeRequestIid == null &&
+        (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main')
 }

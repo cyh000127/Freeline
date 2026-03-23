@@ -7,47 +7,96 @@ pipeline {
     }
 
     options {
-        gitLabConnection('lab-ssafy') 
+        gitLabConnection('lab-ssafy')
     }
 
     triggers {
         gitlab(
             triggerOnPush: true,
             triggerOnMergeRequest: true,
-            branchFilterType: 'NameBasedFilter',
-            includeBranchesSpec: 'main'
+            branchFilterType: 'All'
         )
     }
 
     environment {
         INFRA_DIR    = 'infra'
         HOSTS_FILE   = 'infra/hosts.conf'
-        DEPLOY_ORDER = 'networks,infisical,jenkins,monitoring,backend,frontend,nginx'
+        DEPLOY_ORDER = 'networks,infisical,jenkins,jenkins-agent,monitoring,monitoring-agent,backend,frontend,nginx'
     }
 
     stages {
 
-        stage('Change Detection') {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Detect Changes') {
             steps {
                 script {
-                    def changes = sh(
-                        script: "git diff --name-only HEAD~1 HEAD | grep '^infra/' || true",
-                        returnStdout: true
-                    ).trim()
-                    if (!changes && !params.DEPLOY_ALL) {
+                    def changes = getChangedFiles()
+                    def infraChanges = changes.split('\n').findAll { it.startsWith('infra/') }
+
+                    if (!infraChanges && !params.DEPLOY_ALL) {
                         echo "infra/ 폴더 변경 없음. 파이프라인 스킵."
                         currentBuild.result = 'NOT_BUILT'
                         error("No relevant changes in infra/")
                     }
-                    echo "변경 감지된 파일:\n${changes}"
+
+                    echo "변경 감지된 파일:\n${infraChanges.join('\n')}"
+
+                    def orderedComponents = env.DEPLOY_ORDER.split(',').toList()
+
+                    if (params.DEPLOY_ALL) {
+                        echo "DEPLOY_ALL: 모든 컴포넌트 배포 대상"
+                        env.CHANGED_COMPONENTS = orderedComponents.findAll { comp ->
+                            fileExists("${env.INFRA_DIR}/${comp}/docker-compose.yml")
+                        }.join(',')
+                    } else {
+                        def changedSet = [] as Set
+                        infraChanges.each { file ->
+                            def component = file.split('/')[1]
+                            if (fileExists("${env.INFRA_DIR}/${component}/docker-compose.yml")) {
+                                changedSet.add(component)
+                            }
+                        }
+                        env.CHANGED_COMPONENTS = orderedComponents.findAll { changedSet.contains(it) }.join(',')
+                    }
+
+                    if (!env.CHANGED_COMPONENTS) {
+                        echo "변경된 인프라 컴포넌트 없음. 배포 스킵."
+                    } else {
+                        echo "배포 대상 (순서 보장): ${env.CHANGED_COMPONENTS}"
+                    }
+                }
+            }
+        }
+
+        stage('Validate Compose Files') {
+            when {
+                expression { env.CHANGED_COMPONENTS }
+            }
+            steps {
+                script {
+                    def components = env.CHANGED_COMPONENTS.split(',')
+                    components.each { component ->
+                        if (component == 'networks') return
+                        dir("${env.INFRA_DIR}/${component}") {
+                            sh "docker compose config --quiet 2>&1 || { echo '${component} docker-compose.yml 검증 실패'; exit 1; }"
+                        }
+                    }
+                    echo "모든 Compose 파일 검증 통과"
                 }
             }
         }
 
         stage('Load Host Mapping') {
+            when {
+                expression { isMainBranch() && env.CHANGED_COMPONENTS }
+            }
             steps {
                 script {
-                    // hosts.conf를 읽어 컴포넌트→호스트 맵 생성
                     def hostMap = [:]
                     def lines = readFile(env.HOSTS_FILE).split('\n')
                     lines.each { line ->
@@ -65,48 +114,9 @@ pipeline {
             }
         }
 
-        stage('Detect Changes') {
-            steps {
-                script {
-                    def orderedComponents = env.DEPLOY_ORDER.split(',').toList()
-
-                    if (params.DEPLOY_ALL) {
-                        echo "DEPLOY_ALL: 모든 컴포넌트 배포 대상"
-                        env.CHANGED_COMPONENTS = orderedComponents.findAll { comp ->
-                            fileExists("${env.INFRA_DIR}/${comp}/docker-compose.yml")
-                        }.join(',')
-                    } else {
-                        def changedFiles = sh(
-                            script: "git diff --name-only ${env.GIT_PREVIOUS_COMMIT ?: 'HEAD~1'} HEAD",
-                            returnStdout: true
-                        ).trim().split('\n')
-
-                        def changedSet = [] as Set
-                        changedFiles.each { file ->
-                            if (file.startsWith("${env.INFRA_DIR}/")) {
-                                def component = file.split('/')[1]
-                                if (fileExists("${env.INFRA_DIR}/${component}/docker-compose.yml")) {
-                                    changedSet.add(component)
-                                }
-                            }
-                        }
-
-                        // 정의된 순서대로 정렬하여 의존성 보장
-                        env.CHANGED_COMPONENTS = orderedComponents.findAll { changedSet.contains(it) }.join(',')
-                    }
-
-                    if (!env.CHANGED_COMPONENTS) {
-                        echo "변경된 인프라 컴포넌트 없음. 배포 스킵."
-                    } else {
-                        echo "배포 대상 (순서 보장): ${env.CHANGED_COMPONENTS}"
-                    }
-                }
-            }
-        }
-
         stage('Ensure Networks on All Hosts') {
             when {
-                expression { env.CHANGED_COMPONENTS && env.gitlabMergeRequestIid == null && (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main') }
+                expression { isMainBranch() && env.CHANGED_COMPONENTS }
             }
             steps {
                 script {
@@ -115,7 +125,6 @@ pipeline {
 
                     targetHosts.each { host ->
                         echo "네트워크 확인: ${host}"
-                        // docker network create는 이미 존재하면 무시 (Agent 재시작 방지)
                         ensureNetwork('infra-public', host, params.SSH_CREDENTIALS_ID)
                     }
                 }
@@ -124,7 +133,7 @@ pipeline {
 
         stage('Deploy Components') {
             when {
-                expression { env.CHANGED_COMPONENTS && env.gitlabMergeRequestIid == null && (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main') }
+                expression { isMainBranch() && env.CHANGED_COMPONENTS }
             }
             steps {
                 script {
@@ -132,7 +141,7 @@ pipeline {
                     def components = env.CHANGED_COMPONENTS.split(',')
 
                     components.each { component ->
-                        if (component == 'networks') return // 이미 위에서 처리
+                        if (component == 'networks') return
 
                         def targetHost = hostMap[component] ?: 'localhost'
                         stage("Deploy: ${component} → ${targetHost}") {
@@ -146,7 +155,6 @@ pipeline {
 
     post {
         success {
-            echo '✅ Infrastructure CI/CD completed successfully.'
             updateGitlabCommitStatus name: 'infra', state: 'success'
         }
         notBuilt {
@@ -156,15 +164,31 @@ pipeline {
             updateGitlabCommitStatus name: 'infra', state: 'canceled'
         }
         failure {
-            echo '❌ Infrastructure CI/CD failed. Please check logs.'
             updateGitlabCommitStatus name: 'infra', state: 'failed'
+        }
+        cleanup {
+            cleanWs()
         }
     }
 }
 
-// ──────────────────────────────────────────────
-// Helper: Docker 네트워크를 안전하게 생성 (이미 있으면 무시)
-// ──────────────────────────────────────────────
+// MR: origin/main 대비 전체 변경 파일, Push: 직전 커밋 대비
+def getChangedFiles() {
+    if (env.gitlabMergeRequestIid) {
+        sh 'git fetch origin main:refs/remotes/origin/main'
+        return sh(script: 'git diff --name-only origin/main...HEAD', returnStdout: true).trim()
+    }
+    return sh(
+        script: 'git diff --name-only HEAD~1 HEAD 2>/dev/null || git log --name-only --pretty=format: -1 HEAD',
+        returnStdout: true
+    ).trim()
+}
+
+def isMainBranch() {
+    return env.gitlabMergeRequestIid == null &&
+        (env.BRANCH_NAME == 'main' || env.gitlabBranch == 'main')
+}
+
 def ensureNetwork(String networkName, String host, String sshCredId) {
     def cmd = "docker network create ${networkName} 2>/dev/null || echo 'Network ${networkName} already exists'"
     if (host == 'localhost' || host == '127.0.0.1') {
@@ -176,9 +200,6 @@ def ensureNetwork(String networkName, String host, String sshCredId) {
     }
 }
 
-// ──────────────────────────────────────────────
-// Helper: 컴포넌트를 로컬 또는 원격 호스트에 배포
-// ──────────────────────────────────────────────
 def deployComponent(String component, String host, String sshCredId) {
     if (host == 'localhost' || host == '127.0.0.1') {
         sh "infra/scripts/deploy.sh ${component}"
