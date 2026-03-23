@@ -12,6 +12,8 @@ pipeline {
     environment {
         IMAGE_NAME = 'freeline-backend'
         COMPOSE_FILE = "${WORKSPACE}/infra/backend/docker-compose.yml"
+        INFISICAL_URL = 'https://j14a207.p.ssafy.io:8443'
+        INFISICAL_PROJECT_ID = credentials('infisical-project-id')
     }
 
     triggers {
@@ -55,52 +57,24 @@ pipeline {
 
         stage('Test & Build') {
             steps {
-                withInfisical(
-                    configuration: [
-                        infisicalCredentialId: 'infisical-universal-auth',
-                        infisicalEnvironmentSlug: 'prod',
-                        infisicalProjectSlug: 'freeline',
-                        infisicalUrl: 'https://j14a207.p.ssafy.io:8443'
-                    ],
-                    infisicalSecrets: [
-                        infisicalSecret(
-                            includeImports: true,
-                            path: '/be',
-                            secretValues: [
-                                [infisicalKey: 'CLOUDFLARE_ACCESS_KEY'],
-                                [infisicalKey: 'CLOUDFLARE_BUCKET'],
-                                [infisicalKey: 'CLOUDFLARE_ENDPOINT'],
-                                [infisicalKey: 'CLOUDFLARE_OUTER_PREFIX'],
-                                [infisicalKey: 'CLOUDFLARE_SECRET_KEY'],
-                                [infisicalKey: 'DB_HOST'],
-                                [infisicalKey: 'DB_NAME'],
-                                [infisicalKey: 'DB_PASSWORD'],
-                                [infisicalKey: 'DB_PORT'],
-                                [infisicalKey: 'DB_USERNAME'],
-                                [infisicalKey: 'ENCRYPTION_SECRET_KEY'],
-                                [infisicalKey: 'FIREBASE_PROJECT_ID'],
-                                [infisicalKey: 'FIREBASE_SERVICE_ACCOUNT_BASE64'],
-                                [infisicalKey: 'JWT_ACCESS_TOKEN_EXPIRATION'],
-                                [infisicalKey: 'JWT_REFRESH_TOKEN_EXPIRATION'],
-                                [infisicalKey: 'JWT_SECRET'],
-                                [infisicalKey: 'MAIL_PASSWORD'],
-                                [infisicalKey: 'MAIL_USERNAME'],
-                                [infisicalKey: 'RABBITMQ_HOST'],
-                                [infisicalKey: 'RABBITMQ_PASSWORD'],
-                                [infisicalKey: 'RABBITMQ_PORT'],
-                                [infisicalKey: 'RABBITMQ_USERNAME'],
-                                [infisicalKey: 'RABBITMQ_VIRTUAL_HOST'],
-                                [infisicalKey: 'REDIS_HOST'],
-                                [infisicalKey: 'REDIS_PASSWORD'],
-                                [infisicalKey: 'REDIS_PORT'],
-                                [infisicalKey: 'SPRING_PROFILES_ACTIVE']
-                            ]
-                        )
-                    ]
-                ) {
+                withCredentials([usernamePassword(
+                    credentialsId: 'infisical-universal-auth-up',
+                    usernameVariable: 'INFISICAL_CLIENT_ID',
+                    passwordVariable: 'INFISICAL_CLIENT_SECRET'
+                )]) {
                     dir('be/Freeline') {
                         sh 'chmod +x ./gradlew'
-                        sh './gradlew clean build'
+                        sh '''
+                            export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
+                                --client-id=$INFISICAL_CLIENT_ID \
+                                --client-secret=$INFISICAL_CLIENT_SECRET \
+                                --domain=$INFISICAL_URL/api \
+                                --silent --plain)
+                            infisical run \
+                                --projectId=$INFISICAL_PROJECT_ID \
+                                --env=prod --path=/be \
+                                -- ./gradlew clean build
+                        '''
                     }
                 }
             }
@@ -126,47 +100,22 @@ pipeline {
         stage('Deploy') {
             when { expression { isMainBranch() } }
             steps {
-                withInfisical(
-                    configuration: [
-                        infisicalCredentialId: 'infisical-universal-auth',
-                        infisicalEnvironmentSlug: 'prod',
-                        infisicalProjectSlug: 'freeline',
-                        infisicalUrl: 'https://j14a207.p.ssafy.io:8443'
-                    ],
-                    infisicalSecrets: [
-                        infisicalSecret(
-                            includeImports: true,
-                            path: '/be',
-                            secretValues: [
-                                [infisicalKey: 'DB_NAME'],
-                                [infisicalKey: 'DB_USERNAME'],
-                                [infisicalKey: 'DB_PASSWORD'],
-                                [infisicalKey: 'REDIS_PASSWORD'],
-                                [infisicalKey: 'JWT_SECRET'],
-                                [infisicalKey: 'JWT_ACCESS_TOKEN_EXPIRATION'],
-                                [infisicalKey: 'JWT_REFRESH_TOKEN_EXPIRATION'],
-                                [infisicalKey: 'ENCRYPTION_SECRET_KEY'],
-                                [infisicalKey: 'CLOUDFLARE_ACCESS_KEY'],
-                                [infisicalKey: 'CLOUDFLARE_BUCKET'],
-                                [infisicalKey: 'CLOUDFLARE_ENDPOINT'],
-                                [infisicalKey: 'CLOUDFLARE_OUTER_PREFIX'],
-                                [infisicalKey: 'CLOUDFLARE_SECRET_KEY'],
-                                [infisicalKey: 'FIREBASE_PROJECT_ID'],
-                                [infisicalKey: 'FIREBASE_SERVICE_ACCOUNT_BASE64'],
-                                [infisicalKey: 'MAIL_USERNAME'],
-                                [infisicalKey: 'MAIL_PASSWORD'],
-                                [infisicalKey: 'RABBITMQ_HOST'],
-                                [infisicalKey: 'RABBITMQ_PASSWORD'],
-                                [infisicalKey: 'RABBITMQ_PORT'],
-                                [infisicalKey: 'RABBITMQ_USERNAME'],
-                                [infisicalKey: 'RABBITMQ_VIRTUAL_HOST'],
-                                [infisicalKey: 'MAIL_PASSWORD'],
-                                [infisicalKey: 'SPRING_PROFILES_ACTIVE']
-                            ]
-                        )
-                    ]
-                ) {
-                    sh "docker compose -f ${COMPOSE_FILE} up -d --force-recreate freeline-backend"
+                withCredentials([usernamePassword(
+                    credentialsId: 'infisical-universal-auth-up',
+                    usernameVariable: 'INFISICAL_CLIENT_ID',
+                    passwordVariable: 'INFISICAL_CLIENT_SECRET'
+                )]) {
+                    sh """
+                        export INFISICAL_TOKEN=\$(infisical login --method=universal-auth \
+                            --client-id=\$INFISICAL_CLIENT_ID \
+                            --client-secret=\$INFISICAL_CLIENT_SECRET \
+                            --domain=\$INFISICAL_URL/api \
+                            --silent --plain)
+                        infisical run \
+                            --projectId=\$INFISICAL_PROJECT_ID \
+                            --env=prod --path=/be \
+                            -- docker compose -f ${COMPOSE_FILE} up -d --force-recreate freeline-backend
+                    """
                 }
                 echo "Waiting for backend to stabilize..."
                 sh '''
