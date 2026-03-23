@@ -37,7 +37,7 @@ public class BoothMapController {
 
     private final BoothMapService boothMapService;
 
-    @Operation(summary = "행사 지도 이미지 업로드 및 저장", description = "행사 지도 이미지를 업로드하고 event_maps 테이블에 저장하거나 수정합니다.")
+    @Operation(summary = "행사 지도 이미지 업로드", description = "행사 지도 이미지를 업로드하고 eventId에 매핑하여 저장합니다.")
     @PostMapping(value = "/events/{eventId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BaseResponse<EventMapUpsertResDto>> upsertEventMap(
             @PathVariable final Long eventId,

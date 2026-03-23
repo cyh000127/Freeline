@@ -21,8 +21,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import lombok.RequiredArgsConstructor;
 
-import com.freeline.common.file.dto.FileInfo;
-import com.freeline.common.file.service.FileService;
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.response.PageResponse;
 import com.freeline.common.util.ResponseUtils;
@@ -47,17 +45,17 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequiredArgsConstructor
 public class EventController {
 
-    private static final String EVENT_DIRECTORY = "event";
-
     private final EventService eventService;
-    private final FileService fileService;
 
-    @Operation(summary = "행사 썸네일 업로드", description = "행사 썸네일 이미지를 업로드하고 파일 정보를 반환합니다.")
-    @PostMapping(value = "/thumbnail", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<BaseResponse<FileInfo>> uploadThumbnail(
+    @Operation(summary = "행사 썸네일 업로드", description = "행사 썸네일 이미지를 업로드하고 eventId에 매핑하여 저장합니다.")
+    @PostMapping(value = "/{eventId}/thumbnail", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<BaseResponse<EventUpdateResDto>> uploadThumbnail(
+            final Authentication authentication,
+            @PathVariable final Long eventId,
             @RequestPart("file") final MultipartFile file
     ) {
-        final FileInfo response = fileService.uploadFile(file, EVENT_DIRECTORY);
+        final Long eventAdminId = extractId(authentication);
+        final EventUpdateResDto response = eventService.uploadThumbnail(eventAdminId, eventId, file);
         return ResponseUtils.ok(response);
     }
 

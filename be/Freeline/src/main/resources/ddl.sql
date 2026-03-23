@@ -182,7 +182,25 @@ CREATE TABLE IF NOT EXISTS booth_goods (
 
 
 -- =========================================================
--- 10. VISITOR
+-- 10. BOOTH IMAGE
+-- =========================================================
+CREATE TABLE IF NOT EXISTS booth_images (
+    id BIGSERIAL PRIMARY KEY,
+    booth_id BIGINT NOT NULL,
+    image_path VARCHAR(500) NOT NULL,
+    is_representative BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_booth_images_booth
+        FOREIGN KEY (booth_id)
+        REFERENCES booths (id)
+        ON DELETE CASCADE
+);
+
+
+-- =========================================================
+-- 11. VISITOR
 -- =========================================================
 CREATE TABLE IF NOT EXISTS visitors (
     id BIGSERIAL PRIMARY KEY,
@@ -202,7 +220,7 @@ CREATE TABLE IF NOT EXISTS visitors (
 
 
 -- =========================================================
--- 11. BOOTH WAITING
+-- 12. BOOTH WAITING
 -- =========================================================
 CREATE TABLE IF NOT EXISTS booth_waiting (
     id BIGSERIAL PRIMARY KEY,
@@ -232,7 +250,7 @@ CREATE TABLE IF NOT EXISTS booth_waiting (
 
 
 -- =========================================================
--- 12. BOOTH QR
+-- 13. BOOTH QR
 -- =========================================================
 CREATE TABLE IF NOT EXISTS booth_qr (
     id BIGSERIAL PRIMARY KEY,
@@ -258,7 +276,7 @@ CREATE INDEX IF NOT EXISTS idx_booth_qr_booth_status
 
 
 -- =========================================================
--- 13. FCM TOKEN
+-- 14. FCM TOKEN
 -- =========================================================
 CREATE TABLE IF NOT EXISTS fcm_token (
     id BIGSERIAL PRIMARY KEY,
@@ -281,7 +299,7 @@ CREATE INDEX IF NOT EXISTS idx_fcm_token_visitor_id
 
 
 -- =========================================================
--- 14. EVENT MAP AREA
+-- 15. EVENT MAP AREA
 -- =========================================================
 CREATE TABLE IF NOT EXISTS booth_map_areas (
     id BIGSERIAL PRIMARY KEY,
