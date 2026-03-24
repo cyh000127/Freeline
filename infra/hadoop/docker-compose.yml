@@ -4,13 +4,12 @@ services:
     container_name: hadoop-namenode
     hostname: namenode
     restart: always
-    command: bash -c "if [ ! -d /hadoop/dfs/name/current ]; then hdfs namenode -format -force; fi && hdfs namenode"
+    command: bash -c "if [ ! -f /hadoop/dfs/name/current/VERSION ]; then rm -rf /hadoop/dfs/name/* && hdfs namenode -format -force -nonInteractive; fi && hdfs namenode"
     ports:
       - "9870:9870"
     environment:
       TZ: Asia/Seoul
       HADOOP_HOME: /opt/hadoop
-      ENSURE_NAMENODE_DIR: /hadoop/dfs/name
     volumes:
       - hadoop-namenode-data:/hadoop/dfs/name
       - ./config/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
