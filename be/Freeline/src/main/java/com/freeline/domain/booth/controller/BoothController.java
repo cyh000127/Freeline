@@ -29,6 +29,7 @@ import com.freeline.domain.booth.dto.response.BoothCreateResDto;
 import com.freeline.domain.booth.dto.response.BoothCsvUploadResDto;
 import com.freeline.domain.booth.dto.response.BoothImageUploadResDto;
 import com.freeline.domain.booth.dto.response.BoothListResDto;
+import com.freeline.domain.booth.dto.response.BoothPolicyResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueResDto;
 import com.freeline.domain.booth.dto.response.BoothResDto;
 import com.freeline.domain.booth.dto.response.BoothStatusResDto;
@@ -45,7 +46,6 @@ public class BoothController {
 
     private final BoothService boothService;
 
-    // TODO: 부스 정책 조회 API (`GET /api/v1/booths/{boothId}/policy`)를 추가한다.
     // TODO: 부스 정책 설정 API (`PATCH /api/v1/booths/{boothId}/policy`)를 추가한다.
 
     @Operation(summary = "부스 이미지 업로드", description = "부스 이미지를 업로드하고 boothId와 매핑하여 저장합니다.")
@@ -113,6 +113,15 @@ public class BoothController {
             @PathVariable final Long boothId
     ) {
         final BoothQueueResDto response = boothService.getBoothQueue(boothId);
+        return ResponseUtils.ok(response);
+    }
+
+    @Operation(summary = "부스 정책 조회", description = "특정 부스에 현재 적용 중인 대기열 운영 정책을 조회합니다.")
+    @GetMapping("/{boothId}/policy")
+    public ResponseEntity<BaseResponse<BoothPolicyResDto>> getBoothPolicy(
+            @PathVariable final Long boothId
+    ) {
+        final BoothPolicyResDto response = boothService.getBoothPolicy(boothId);
         return ResponseUtils.ok(response);
     }
 

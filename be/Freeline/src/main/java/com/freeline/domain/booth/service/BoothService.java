@@ -32,6 +32,7 @@ import com.freeline.domain.booth.dto.response.BoothCsvUploadResDto;
 import com.freeline.domain.booth.dto.response.BoothGoodsResDto;
 import com.freeline.domain.booth.dto.response.BoothImageUploadResDto;
 import com.freeline.domain.booth.dto.response.BoothListResDto;
+import com.freeline.domain.booth.dto.response.BoothPolicyResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueEntryResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueResDto;
 import com.freeline.domain.booth.dto.response.BoothResDto;
@@ -47,6 +48,7 @@ import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
 import com.freeline.domain.event.exception.EventException;
+import com.freeline.domain.event.repository.EventPolicyRepository;
 import com.freeline.domain.event.repository.EventRepository;
 
 @Slf4j
@@ -75,6 +77,7 @@ public class BoothService {
     private final BoothPolicyRepository boothPolicyRepository;
     private final BoothWaitingRepository boothWaitingRepository;
     private final EventRepository eventRepository;
+    private final EventPolicyRepository eventPolicyRepository;
     private final FileService fileService;
 
     // TODO: 부스 정책 조회/설정 전용 서비스 메서드를 분리하고 BoothPolicyRepository를 직접 사용하는 흐름을 API로 노출한다.
@@ -169,6 +172,17 @@ public class BoothService {
                 .frontQueue(frontQueue)
                 .currentCalledUser(currentCalledUser)
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public BoothPolicyResDto getBoothPolicy(final Long boothId) {
+        final Booth booth = getBoothEntity(boothId);
+
+        return boothPolicyRepository.findByBoothId(boothId)
+                .map(boothPolicy -> BoothConverter.toBoothPolicyResDto(boothId, boothPolicy))
+                .orElseGet(() -> eventPolicyRepository.findByEvent_Id(booth.getEventId())
+                        .map(eventPolicy -> BoothConverter.toBoothPolicyResDto(boothId, eventPolicy))
+                        .orElseThrow(() -> new BoothException(ErrorCode.NOT_FOUND)));
     }
 
     public BoothStatusResDto updateBoothStatus(final Long boothId, final BoothStatusUpdateReqDto request) {
