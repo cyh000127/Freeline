@@ -1,5 +1,6 @@
 package com.freeline.domain.waiting.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -139,7 +140,7 @@ public class WaitingService {
                 .orElseThrow(() -> new WaitingException(ErrorCode.CALL_CANDIDATE_NOT_FOUND));
 
         final int callValidTimeSeconds = resolveCallValidTimeSeconds(boothId);
-        final java.time.LocalDateTime calledAt = TimeUtils.nowDateTime();
+        final LocalDateTime calledAt = TimeUtils.nowDateTime();
         final String previousStatus = waiting.getStatus().name();
         waiting.updateStatus(WaitingStatus.CALLED);
         waiting.updateCalledAt(calledAt);
@@ -218,8 +219,6 @@ public class WaitingService {
     public WaitingExitResDto exitWaiting(final Long waitingId, final Long visitorId) {
         final BoothWaiting waiting = getWaitingEntity(waitingId);
         validateWaitingOwner(waiting, visitorId);
-        // TODO: ENTERED -> EXITED 이후 BoothManagerSseService에 퇴장 이벤트를 보내 부스 관리자 화면을 갱신한다.
-
         if (waiting.getStatus() != WaitingStatus.ENTERED) {
             throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_EXIT);
         }
@@ -242,8 +241,6 @@ public class WaitingService {
     public WaitingAdmitResDto admitWaiting(final Long waitingId, final Long boothId) {
         final BoothWaiting waiting = getWaitingEntity(waitingId);
         validateWaitingBooth(waiting, boothId);
-        // TODO: REGISTERED -> ENTERED 이후 부스 관리자 전용 이벤트 타입으로 세분화할지 결정하고 SSE 브로드캐스트를 통합한다.
-
         if (waiting.getStatus() != WaitingStatus.REGISTERED) {
             throw new WaitingException(ErrorCode.INVALID_STATUS_FOR_ADMIT);
         }
@@ -279,8 +276,6 @@ public class WaitingService {
     public void cancelWaitingByAdmin(final Long waitingId, final Long boothId) {
         final BoothWaiting waiting = getWaitingEntity(waitingId);
         validateWaitingBooth(waiting, boothId);
-        // TODO: 관리자 취소 이후 BoothManagerSseService를 통해 프론트/이용중 목록과 요약 통계를 함께 갱신한다.
-
         if (ADMIN_CANCEL_BLOCKED_STATUSES.contains(waiting.getStatus())) {
             throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_CANCEL);
         }

@@ -24,7 +24,6 @@ import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
-import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
 import com.freeline.domain.qr.dto.request.QrScanReqDto;
 import com.freeline.domain.qr.dto.response.BoothQrResDto;
 import com.freeline.domain.qr.entity.BoothQr;
@@ -32,6 +31,7 @@ import com.freeline.domain.qr.entity.BoothQrStatus;
 import com.freeline.domain.qr.entity.QrPurpose;
 import com.freeline.domain.qr.exception.QrException;
 import com.freeline.domain.qr.repository.BoothQrRepository;
+import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
 import com.freeline.domain.waiting.service.WaitingStatusPersistenceService;
 
 @ExtendWith(MockitoExtension.class)
@@ -232,7 +232,7 @@ class QrServiceTest {
                 .qrKey("fixed-key")
                 .payloadVersion("v1")
                 .issuedAt(LocalDateTime.of(2026, 3, 12, 10, 0))
-                .expiresAt(LocalDateTime.now().plusDays(1))
+                .expiresAt(FIXED_NOW.plusDays(1))
                 .status(BoothQrStatus.ACTIVE)
                 .build();
 

@@ -21,6 +21,7 @@ import com.freeline.common.event.waiting.detector.WaitingStatusChangeDetector;
 import com.freeline.common.event.waiting.dispatcher.WaitingEventDispatcher;
 import com.freeline.common.event.waiting.model.WaitingEventChannel;
 import com.freeline.common.event.waiting.model.WaitingEventMessage;
+import com.freeline.common.event.waiting.model.WaitingEventSnapshot;
 import com.freeline.common.event.waiting.model.WaitingEventType;
 import com.freeline.common.event.waiting.publisher.WaitingEventPublishListener;
 import com.freeline.common.event.waiting.publisher.WaitingEventPublisher;
@@ -30,6 +31,7 @@ import com.freeline.domain.booth.entity.BoothWaiting;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.boothmanager.dto.response.BoothManagerSseEventResDto;
 import com.freeline.domain.boothmanager.service.BoothManagerSseService;
 import com.freeline.domain.boothmanager.service.BoothManagerWaitingEventConsumer;
 import com.freeline.domain.pushnotification.entity.PushNotificationType;
@@ -96,7 +98,16 @@ class WaitingRabbitMqFlowTest {
                 12L,
                 21L,
                 WaitingStatus.WAITING.name(),
-                WaitingStatus.CALLED.name()
+                WaitingStatus.CALLED.name(),
+                WaitingEventSnapshot.builder()
+                        .waitingId(301L)
+                        .waitingNumber(7)
+                        .visitorId(21L)
+                        .visitorName("김싸피")
+                        .status("CALLED")
+                        .arrivalChecked(false)
+                        .calledAt(FIXED_NOW)
+                        .build()
         );
         final BoothWaiting waiting = BoothWaiting.builder()
                 .id(301L)
@@ -119,7 +130,14 @@ class WaitingRabbitMqFlowTest {
         sseConsumer.consume(message);
         fcmConsumer.consume(message);
 
-        Mockito.verify(boothManagerSseService).publishQueueUpdated(12L, 301L, WaitingStatus.CALLED);
+        final ArgumentCaptor<BoothManagerSseEventResDto> calledCaptor =
+                ArgumentCaptor.forClass(BoothManagerSseEventResDto.class);
+        Mockito.verify(boothManagerSseService).publishQueueUpdated(calledCaptor.capture());
+        Assertions.assertThat(calledCaptor.getValue().eventType()).isEqualTo("WAITING_CALLED");
+        Assertions.assertThat(calledCaptor.getValue().operation()).isEqualTo("UPSERT");
+        Assertions.assertThat(calledCaptor.getValue().section()).isEqualTo("FRONT_QUEUE");
+        Assertions.assertThat(calledCaptor.getValue().item()).isNotNull();
+        Assertions.assertThat(calledCaptor.getValue().item().waitingNumber()).isEqualTo(7);
         Mockito.verify(pushNotificationService).sendNotification(
                 Mockito.eq(301L),
                 Mockito.argThat(request -> request.notificationType() == PushNotificationType.FRONT_QUEUE_CALLED)
@@ -151,7 +169,16 @@ class WaitingRabbitMqFlowTest {
                 12L,
                 21L,
                 WaitingStatus.REGISTERED.name(),
-                WaitingStatus.ENTERED.name()
+                WaitingStatus.ENTERED.name(),
+                WaitingEventSnapshot.builder()
+                        .waitingId(302L)
+                        .waitingNumber(2)
+                        .visitorId(21L)
+                        .visitorName("김싸피")
+                        .status("ENTERED")
+                        .arrivalChecked(false)
+                        .enteredAt(FIXED_NOW)
+                        .build()
         );
         final BoothWaiting waiting = BoothWaiting.builder()
                 .id(302L)
@@ -180,7 +207,15 @@ class WaitingRabbitMqFlowTest {
         sseConsumer.consume(message);
         fcmConsumer.consume(message);
 
-        Mockito.verify(boothManagerSseService).publishQueueUpdated(12L, 302L, WaitingStatus.ENTERED);
+        final ArgumentCaptor<BoothManagerSseEventResDto> enteredCaptor =
+                ArgumentCaptor.forClass(BoothManagerSseEventResDto.class);
+        Mockito.verify(boothManagerSseService).publishQueueUpdated(enteredCaptor.capture());
+        Assertions.assertThat(enteredCaptor.getValue().eventType()).isEqualTo("WAITING_ENTERED");
+        Assertions.assertThat(enteredCaptor.getValue().operation()).isEqualTo("MOVE");
+        Assertions.assertThat(enteredCaptor.getValue().previousSection()).isEqualTo("FRONT_QUEUE");
+        Assertions.assertThat(enteredCaptor.getValue().section()).isEqualTo("IN_USE");
+        Assertions.assertThat(enteredCaptor.getValue().item()).isNotNull();
+        Assertions.assertThat(enteredCaptor.getValue().item().status()).isEqualTo("ENTERED");
         Mockito.verifyNoInteractions(pushNotificationService);
         Mockito.verify(waitingFcmDelayPublisher).publish(
                 Mockito.argThat(task -> task.notificationType() == PushNotificationType.EXIT_ACTION_REQUIRED
@@ -200,7 +235,7 @@ class WaitingRabbitMqFlowTest {
         Assertions.assertThat(captor.getValue()).isInstanceOf(WaitingEventMessage.class);
         final WaitingEventMessage message = (WaitingEventMessage) captor.getValue();
         Assertions.assertThat(message.schemaVersion()).isEqualTo(1);
-        Assertions.assertThat(message.snapshot()).isNull();
+        Assertions.assertThat(message.snapshot()).isNotNull();
         return message;
     }
 }

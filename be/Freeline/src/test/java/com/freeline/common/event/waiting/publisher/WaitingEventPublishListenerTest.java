@@ -13,6 +13,8 @@ import com.freeline.common.event.waiting.model.WaitingEventType;
 
 class WaitingEventPublishListenerTest {
 
+    private static final LocalDateTime FIXED_OCCURRED_AT = LocalDateTime.of(2026, 3, 24, 15, 0);
+
     private final WaitingEventPublisher waitingEventPublisher = Mockito.mock(WaitingEventPublisher.class);
     private final WaitingEventPublishListener waitingEventPublishListener =
             new WaitingEventPublishListener(waitingEventPublisher);
@@ -40,14 +42,14 @@ class WaitingEventPublishListenerTest {
     }
 
     @Test
-    @DisplayName("FCM 대상 이벤트면 FCM 채널만 발행한다")
-    void fcm_대상_이벤트면_fcm_채널만_발행한다() {
+    @DisplayName("SSE와 FCM 대상 이벤트면 두 채널 모두 발행한다")
+    void sse와_fcm_대상_이벤트면_두_채널_모두_발행한다_호출만료() {
         final WaitingEventMessage message = createMessage(WaitingEventType.WAITING_EXPIRED);
 
         waitingEventPublishListener.handle(message);
 
+        Mockito.verify(waitingEventPublisher).publish(WaitingEventChannel.SSE, message);
         Mockito.verify(waitingEventPublisher).publish(WaitingEventChannel.FCM, message);
-        Mockito.verify(waitingEventPublisher, Mockito.never()).publish(WaitingEventChannel.SSE, message);
     }
 
     private WaitingEventMessage createMessage(final WaitingEventType eventType) {
@@ -60,7 +62,7 @@ class WaitingEventPublishListenerTest {
                 .visitorId(3L)
                 .previousStatus("WAITING")
                 .currentStatus("CALLED")
-                .occurredAt(LocalDateTime.now())
+                .occurredAt(FIXED_OCCURRED_AT)
                 .snapshot(null)
                 .build();
     }
