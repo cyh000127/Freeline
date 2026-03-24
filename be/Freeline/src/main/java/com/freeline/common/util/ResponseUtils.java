@@ -15,6 +15,11 @@ public class ResponseUtils {
         return ResponseEntity.ok(BaseResponse.ok(data));
     }
 
+    public <T> ResponseEntity<BaseResponse<T>> ok(T data, String message) {
+
+        return ResponseEntity.ok(BaseResponse.ok(data, message));
+    }
+
     public <T> ResponseEntity<BaseResponse<T>> created(T data) {
         return ResponseEntity.status(HttpStatus.CREATED).body(BaseResponse.created(data));
     }

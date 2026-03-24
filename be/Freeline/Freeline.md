@@ -376,16 +376,20 @@ firebase:
 - 굿즈 생성 API는 JSON이 아니라 `multipart/form-data` 기반이며, `name`, `imageFile` 파트를 사용
 - waiting 상태 변화 이벤트의 공통 payload, routing key, publisher는 `common/event/waiting` 패키지에서 관리한다.
 - waiting 상태 변화 감지 공통 모듈은 `common/event/waiting` 패키지에서 관리하고, 상태가 실제로 바뀐 경우에만 이벤트 메시지를 생성한다.
-- waiting 상태 변화 공통 모듈은 `ApplicationEventPublisher`와 `@TransactionalEventListener(AFTER_COMMIT)`를 사용해 내부 이벤트를 발행하고, 커밋 이후 RabbitMQ로 전파한다.
+- waiting 상태 변화 공통 모듈은 `ApplicationEventPublisher`와 `@TransactionalEventListener(AFTER_COMMIT)`를 사용해 내부 이벤트를 발행하고, 커밋 이후
+  RabbitMQ로 전파한다.
 - QR 스캔 과정에서 waiting 호출 만료(`EXPIRED`)는 별도 상태 저장 서비스에서 `REQUIRES_NEW` 트랜잭션으로 반영해, 예외 반환 때문에 상태 변경이 롤백되지 않도록 한다.
 - RabbitMQ consumer는 공통 패키지가 아니라 실제 수행 도메인(`boothmanager`, `pushnotification`)에 둔다.
-- `boothmanager` 도메인의 SSE consumer는 waiting 이벤트를 RabbitMQ에서 받아 `BoothManagerSseService`로 넘기고, 실제 브로드캐스트는 기존 Redis/SSE 흐름을 그대로 사용한다.
+- `boothmanager` 도메인의 SSE consumer는 waiting 이벤트를 RabbitMQ에서 받아 `BoothManagerSseService`로 넘기고, 실제 브로드캐스트는 기존 Redis/SSE
+  흐름을 그대로 사용한다.
 - 상태 변화 후속 처리에서 도메인 서비스는 SSE/FCM을 직접 호출하지 않고, RabbitMQ consumer 경로만 사용한다.
 - 현재 SSE 대상 waiting 이벤트는 `WAITING_CALLED`, `WAITING_REGISTERED`, `WAITING_ENTERED`, `WAITING_EXITED` 기준으로 관리한다.
-- `pushnotification` 도메인의 FCM consumer는 waiting 이벤트를 RabbitMQ에서 받아 즉시 알림을 발송하고, 지연 알림이 필요한 경우 별도 delay queue에 작업 메시지를 등록한 뒤 만료 시점에 다시 소비한다.
+- `pushnotification` 도메인의 FCM consumer는 waiting 이벤트를 RabbitMQ에서 받아 즉시 알림을 발송하고, 지연 알림이 필요한 경우 별도 delay queue에 작업 메시지를
+  등록한 뒤 만료 시점에 다시 소비한다.
 - waiting RabbitMQ consumer는 기본적으로 3회까지 재시도하고, 재시도 후에도 실패하면 DLQ로 보내며 무한 재큐는 하지 않는다.
 - payload 누락이나 잘못된 상태값처럼 재시도로 해결되지 않는 경우는 예외를 던지지 않고 warn 로그 후 skip 한다.
-- delayed FCM consumer는 stale 이벤트로 인해 `NOT_FOUND`, `PUSH_NOTIFICATION_TOKEN_NOT_FOUND`, `PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH`, `INVALID_INPUT`이 발생하면 warn 후 skip 하고, 실제 인프라성 실패만 재시도/DLQ 대상으로 본다.
+- delayed FCM consumer는 stale 이벤트로 인해 `NOT_FOUND`, `PUSH_NOTIFICATION_TOKEN_NOT_FOUND`,
+  `PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH`, `INVALID_INPUT`이 발생하면 warn 후 skip 하고, 실제 인프라성 실패만 재시도/DLQ 대상으로 본다.
 
 ## Secrets Rule
 

@@ -108,8 +108,7 @@ public enum ErrorCode {
     PUSH_NOTIFICATION_TOKEN_NOT_FOUND(HttpStatus.NOT_FOUND, "P-001", "저장된 FCM 토큰을 찾을 수 없습니다."),
     PUSH_NOTIFICATION_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "P-002", "FCM 발송 설정이 아직 준비되지 않았습니다."),
     PUSH_NOTIFICATION_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "P-003", "푸시 알림 발송에 실패했습니다."),
-    PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH(HttpStatus.BAD_REQUEST, "P-004", "현재 대기 상태에서는 해당 알림을 보낼 수 없습니다.")
-    ;
+    PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH(HttpStatus.BAD_REQUEST, "P-004", "현재 대기 상태에서는 해당 알림을 보낼 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;

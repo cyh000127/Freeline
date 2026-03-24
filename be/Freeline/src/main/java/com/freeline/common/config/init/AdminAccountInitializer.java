@@ -54,7 +54,6 @@ public class AdminAccountInitializer implements ApplicationRunner {
                 .password(passwordEncoder.encode(DEFAULT_PASSWORD))
                 .name(EVENT_ADMIN_NAME)
                 .organization(EVENT_ADMIN_ORGANIZATION)
-                .verified(true)
                 .build();
 
         log.info(

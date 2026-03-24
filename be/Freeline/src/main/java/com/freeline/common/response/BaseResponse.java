@@ -15,6 +15,7 @@ public record BaseResponse<T>(
         @JsonIgnore
         HttpStatus httpStatus,
         boolean success,
+        String message,
         T data,
         ErrorResponse error,
         @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Seoul")
@@ -25,9 +26,14 @@ public record BaseResponse<T>(
      * HTTP 200 OK
      */
     public static <T> BaseResponse<T> ok(final T data) {
+        return ok(data, "성공적으로 처리되었습니다."); // 기본 메시지 설정
+    }
+
+    public static <T> BaseResponse<T> ok(final T data, final String message) {
         return BaseResponse.<T>builder()
                 .httpStatus(HttpStatus.OK)
                 .success(true)
+                .message(message)
                 .data(data)
                 .error(null)
                 .timestamp(TimeUtils.nowDateTime())
