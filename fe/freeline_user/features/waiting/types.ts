@@ -62,3 +62,17 @@ export interface WaitingExitData {
   status: 'EXITED';
   exited_at: string;
 }
+
+export interface QrScanRequest {
+  qrCode: string;
+}
+
+export interface QrScanData {
+  qrId: number;
+  boothId: number;
+  waitingId: number;
+  visitorId: number;
+  previousStatus: WaitingStatus;
+  currentStatus: WaitingStatus;
+  registeredAt: string;
+}

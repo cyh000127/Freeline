@@ -27,14 +27,7 @@ const TAB_ROUTES: Record<TabKey, '/home' | '/reservation' | '/map' | '/my' | '/s
     search: '/search',
   };
 
-type ReservationStatus =
-  | 'WAITING'
-  | 'CALLED'
-  | 'REGISTERED'
-  | 'ENTERED'
-  | 'EXITED'
-  | 'CANCELED'
-  | 'AUTO_CANCELED';
+type ReservationStatus = WaitingStatus;
 
 type ReservationViewItem = {
   waitingId: string;
@@ -106,7 +99,7 @@ export default function ReservationScreen() {
   const [creating, setCreating] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
 
-  const accessToken = 'PUT_YOUR_ACCESS_TOKEN_HERE';
+  const accessToken = 'TEMPORARY_TOKEN';
 
   const handleTabPress = (tab: TabKey) => {
     router.replace(TAB_ROUTES[tab]);
