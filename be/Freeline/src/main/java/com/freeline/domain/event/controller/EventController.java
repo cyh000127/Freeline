@@ -90,7 +90,8 @@ public class EventController {
             @RequestParam(defaultValue = "0") final int page,
             @RequestParam(defaultValue = "10") final int size
     ) {
-        final Page<EventListResDto> response = eventService.getEvents(status, page, size);
+        final Long eventAdminId = extractId(authentication);
+        final Page<EventListResDto> response = eventService.getEvents(eventAdminId, status, page, size);
         return ResponseUtils.page(response);
     }
 

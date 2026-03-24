@@ -127,16 +127,16 @@ class EventServiceTest {
         setBaseEntityField(event, "createdAt", LocalDateTime.of(2026, 3, 10, 14, 0));
 
         final Page<Event> eventPage = new PageImpl<>(List.of(event), pageable, 1);
-        Mockito.when(eventRepository.findAll(pageable)).thenReturn(eventPage);
+        Mockito.when(eventRepository.findAllByEventAdminId(100L, pageable)).thenReturn(eventPage);
 
-        final Page<EventListResDto> result = eventService.getEvents("ALL", 0, 10);
+        final Page<EventListResDto> result = eventService.getEvents(100L, "ALL", 0, 10);
 
         Assertions.assertThat(result.getContent()).hasSize(1);
         Assertions.assertThat(result.getContent().getFirst().eventId()).isEqualTo(1L);
         Assertions.assertThat(result.getContent().getFirst().status()).isEqualTo(EventStatus.DRAFT.name());
         Assertions.assertThat(result.getContent().getFirst().thumbnailImageUrl())
                 .isEqualTo("https://cdn.freeline.com/thumb.jpg");
-        Mockito.verify(eventRepository).findAll(pageable);
+        Mockito.verify(eventRepository).findAllByEventAdminId(100L, pageable);
     }
 
     @Test
@@ -146,19 +146,19 @@ class EventServiceTest {
         setBaseEntityField(event, "createdAt", LocalDateTime.of(2026, 3, 10, 15, 0));
 
         final Page<Event> eventPage = new PageImpl<>(List.of(event), pageable, 1);
-        Mockito.when(eventRepository.findAllByStatus(EventStatus.OPEN, pageable)).thenReturn(eventPage);
+        Mockito.when(eventRepository.findAllByEventAdminIdAndStatus(100L, EventStatus.OPEN, pageable)).thenReturn(eventPage);
 
-        final Page<EventListResDto> result = eventService.getEvents("OPEN", 0, 10);
+        final Page<EventListResDto> result = eventService.getEvents(100L, "OPEN", 0, 10);
 
         Assertions.assertThat(result.getContent()).hasSize(1);
         Assertions.assertThat(result.getContent().getFirst().eventId()).isEqualTo(2L);
         Assertions.assertThat(result.getContent().getFirst().status()).isEqualTo(EventStatus.OPEN.name());
-        Mockito.verify(eventRepository).findAllByStatus(EventStatus.OPEN, pageable);
+        Mockito.verify(eventRepository).findAllByEventAdminIdAndStatus(100L, EventStatus.OPEN, pageable);
     }
 
     @Test
     void getEvents_failForInvalidStatus() {
-        Assertions.assertThatThrownBy(() -> eventService.getEvents("INVALID", 0, 10))
+        Assertions.assertThatThrownBy(() -> eventService.getEvents(100L, "INVALID", 0, 10))
                 .isInstanceOfSatisfying(EventException.class, ex ->
                         Assertions.assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
     }
