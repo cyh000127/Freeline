@@ -10,6 +10,8 @@ services:
       TZ: Asia/Seoul
     volumes:
       - freeline-db-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
     networks:
       - infra-public
     healthcheck:
@@ -27,6 +29,8 @@ services:
     command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - freeline-redis-data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
     networks:
       - infra-public
     healthcheck:
@@ -46,6 +50,9 @@ services:
       TZ: Asia/Seoul
     volumes:
       - freeline-rabbitmq-data:/var/lib/rabbitmq
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
     networks:
       - infra-public
     healthcheck:
