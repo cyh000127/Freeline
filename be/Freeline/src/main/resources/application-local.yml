@@ -33,6 +33,9 @@ spring:
             enable: true
 hdfs:
   webhdfs-url: http://localhost:9870
+  hive-url: jdbc:hive2://localhost:10000/freeline
+  hive-user: hive
+  hive-password: hive
 
 auth:
   email-code-expire-minutes: ${EMAIL_CODE_EXPIRE_MINUTES:10}

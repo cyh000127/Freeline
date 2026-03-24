@@ -76,6 +76,9 @@ app:
 
 hdfs:
   webhdfs-url: ${HDFS_WEBHDFS_URL:http://namenode:9870}
+  hive-url: ${HDFS_HIVE_URL:jdbc:hive2://hive-server:10000/freeline}
+  hive-user: ${HDFS_HIVE_USER:hive}
+  hive-password: ${HDFS_HIVE_PASSWORD:hive}
   base-path: /data
 
 booth-manager:
