@@ -709,3 +709,80 @@ CREATE TABLE IF NOT EXISTS booth_map_areas
 
 CREATE INDEX IF NOT EXISTS idx_booth_waiting_booth_visitor_status
     ON booth_waiting (booth_id, visitor_id, status);
+
+-- =========================================================
+-- REPORT ANALYSIS RESULTS
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS event_summary_results
+(
+    id                  BIGSERIAL PRIMARY KEY,
+    event_id            BIGINT       NOT NULL,
+    total_visitors      BIGINT,
+    total_registrations BIGINT,
+    avg_waiting_seconds DOUBLE PRECISION,
+    overall_dropout_rate DOUBLE PRECISION,
+    peak_hour           VARCHAR(30),
+    analyzed_at         VARCHAR(50)
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_summary_results_event_id
+    ON event_summary_results (event_id);
+
+CREATE TABLE IF NOT EXISTS booth_performance_results
+(
+    id              BIGSERIAL PRIMARY KEY,
+    event_id        BIGINT       NOT NULL,
+    booth_id        BIGINT       NOT NULL,
+    booth_name      VARCHAR(100),
+    view_count      BIGINT,
+    register_count  BIGINT,
+    dropout_count   BIGINT,
+    conversion_rate DOUBLE PRECISION,
+    dropout_rate    DOUBLE PRECISION,
+    analyzed_at     VARCHAR(50)
+);
+
+CREATE INDEX IF NOT EXISTS idx_booth_performance_results_event_id
+    ON booth_performance_results (event_id);
+
+CREATE TABLE IF NOT EXISTS hourly_traffic_results
+(
+    id                BIGSERIAL PRIMARY KEY,
+    event_id          BIGINT NOT NULL,
+    datetime_hour     VARCHAR(30),
+    active_user_count BIGINT,
+    register_count    BIGINT,
+    analyzed_at       VARCHAR(50)
+);
+
+CREATE INDEX IF NOT EXISTS idx_hourly_traffic_results_event_id
+    ON hourly_traffic_results (event_id);
+
+CREATE TABLE IF NOT EXISTS visitor_path_results
+(
+    id            BIGSERIAL PRIMARY KEY,
+    event_id      BIGINT NOT NULL,
+    path_string   TEXT,
+    visitor_count BIGINT,
+    analyzed_at   VARCHAR(50)
+);
+
+CREATE INDEX IF NOT EXISTS idx_visitor_path_results_event_id
+    ON visitor_path_results (event_id);
+
+CREATE TABLE IF NOT EXISTS problem_spot_results
+(
+    id           BIGSERIAL PRIMARY KEY,
+    event_id     BIGINT NOT NULL,
+    issue_type   VARCHAR(50),
+    target_id    VARCHAR(50),
+    target_name  VARCHAR(100),
+    severity     VARCHAR(30),
+    issue_metric DOUBLE PRECISION,
+    description  TEXT,
+    analyzed_at  VARCHAR(50)
+);
+
+CREATE INDEX IF NOT EXISTS idx_problem_spot_results_event_id
+    ON problem_spot_results (event_id);
