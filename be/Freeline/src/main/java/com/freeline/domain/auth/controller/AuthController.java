@@ -59,8 +59,7 @@ public class AuthController {
             @RequestParam final String email
     ) {
         CheckIdResDto response = authService.checkId(email);
-        String message = response.isAvailable() ? "사용 가능한 아이디입니다." : "이미 사용 중인 아이디입니다.";
-        return ResponseUtils.ok(response, message);
+        return ResponseUtils.ok(response);
     }
 
     /**
@@ -84,7 +83,7 @@ public class AuthController {
             @Valid @RequestBody final VisitorEnterReqDto request
     ) {
         LoginResDto response = authService.visitorEnter(request);
-        return ResponseUtils.ok(response, "방문자 인증에 성공했습니다.");
+        return ResponseUtils.ok(response);
     }
 
     /**
