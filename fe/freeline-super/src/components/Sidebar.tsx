@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Store,
-  Users,
+  BarChart3,
   Settings,
   ArrowLeft
 } from "lucide-react";
@@ -24,7 +24,7 @@ export function Sidebar({ userName, role, eventId }: SidebarProps) {
   const navItems = [
     { name: "대시보드", icon: LayoutDashboard, href: `/events/${eventId || ''}`, exact: true },
     { name: "부스 계정 관리", icon: Store, href: `/events/${eventId || ''}/booths`, exact: false },
-    { name: "사용자 통계", icon: Users, href: `/events/${eventId || ''}/stats`, exact: false },
+    { name: "분석 리포트", icon: BarChart3, href: `/events/${eventId || ''}/report`, exact: false },
     { name: "환경 설정", icon: Settings, href: `/events/${eventId || ''}/settings`, exact: false },
   ];
 
