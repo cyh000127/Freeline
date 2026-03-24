@@ -12,14 +12,13 @@ import lombok.extern.slf4j.Slf4j;
 
 import com.freeline.common.event.waiting.model.WaitingEventMessage;
 import com.freeline.common.util.TimeUtils;
-import com.freeline.domain.booth.entity.BoothPolicy;
 import com.freeline.domain.booth.entity.BoothWaiting;
 import com.freeline.domain.booth.entity.WaitingStatus;
-import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
 import com.freeline.domain.pushnotification.dto.message.WaitingFcmTaskMessage;
 import com.freeline.domain.pushnotification.dto.request.PushNotificationSendReqDto;
 import com.freeline.domain.pushnotification.entity.PushNotificationType;
+import com.freeline.domain.waiting.service.WaitingPolicyResolver;
 
 @Slf4j
 @Component
@@ -29,7 +28,7 @@ public class WaitingFcmEventConsumer {
     private final PushNotificationService pushNotificationService;
     private final WaitingFcmDelayPublisher waitingFcmDelayPublisher;
     private final BoothWaitingRepository boothWaitingRepository;
-    private final BoothPolicyRepository boothPolicyRepository;
+    private final WaitingPolicyResolver waitingPolicyResolver;
 
     @RabbitListener(
             queues = "${app.rabbitmq.waiting.fcm-queue:waiting.fcm.queue}",
@@ -139,10 +138,7 @@ public class WaitingFcmEventConsumer {
             return null;
         }
 
-        final int callValidTime = boothPolicyRepository.findByBoothId(waiting.getBoothId())
-                .map(BoothPolicy::getCallValidTime)
-                .filter(value -> value > 0)
-                .orElse(180);
+        final int callValidTime = waitingPolicyResolver.resolveCallValidTimeSeconds(waiting.getBoothId(), 180);
 
         return waiting.getCalledAt().plusSeconds(callValidTime);
     }
@@ -152,10 +148,7 @@ public class WaitingFcmEventConsumer {
             return Duration.ZERO;
         }
 
-        final int stayTimeSeconds = boothPolicyRepository.findByBoothId(waiting.getBoothId())
-                .map(BoothPolicy::getStayTime)
-                .filter(value -> value > 0)
-                .orElse(0);
+        final int stayTimeSeconds = waitingPolicyResolver.resolveStayTimeSeconds(waiting.getBoothId(), 0);
 
         if (stayTimeSeconds <= 0) {
             return Duration.ZERO;

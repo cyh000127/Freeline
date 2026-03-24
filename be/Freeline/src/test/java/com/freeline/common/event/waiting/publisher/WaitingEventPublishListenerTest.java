@@ -52,6 +52,17 @@ class WaitingEventPublishListenerTest {
         Mockito.verify(waitingEventPublisher).publish(WaitingEventChannel.FCM, message);
     }
 
+    @Test
+    @DisplayName("취소 이벤트는 SSE 채널만 발행한다")
+    void 취소_이벤트는_sse_채널만_발행한다() {
+        final WaitingEventMessage message = createMessage(WaitingEventType.WAITING_CANCELED);
+
+        waitingEventPublishListener.handle(message);
+
+        Mockito.verify(waitingEventPublisher).publish(WaitingEventChannel.SSE, message);
+        Mockito.verify(waitingEventPublisher, Mockito.never()).publish(WaitingEventChannel.FCM, message);
+    }
+
     private WaitingEventMessage createMessage(final WaitingEventType eventType) {
         return WaitingEventMessage.builder()
                 .schemaVersion(1)

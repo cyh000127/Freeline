@@ -15,12 +15,10 @@ import com.freeline.common.event.waiting.dispatcher.WaitingEventDispatcher;
 import com.freeline.common.event.waiting.model.WaitingEventType;
 import com.freeline.common.util.TimeUtils;
 import com.freeline.domain.booth.entity.Booth;
-import com.freeline.domain.booth.entity.BoothPolicy;
 import com.freeline.domain.booth.entity.BoothWaiting;
 import com.freeline.domain.booth.entity.VisitorQueueStatus;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.exception.BoothException;
-import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
 import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
@@ -87,9 +85,9 @@ public class WaitingService {
 
     private final BoothRepository boothRepository;
     private final BoothWaitingRepository boothWaitingRepository;
-    private final BoothPolicyRepository boothPolicyRepository;
     private final WaitingEventDispatcher waitingEventDispatcher;
     private final WaitingEventSnapshotAssembler waitingEventSnapshotAssembler;
+    private final WaitingPolicyResolver waitingPolicyResolver;
 
     public WaitingCreateResDto createWaiting(final Long boothId, final Long visitorId) {
         getBoothEntity(boothId);
@@ -314,10 +312,7 @@ public class WaitingService {
         getBoothEntity(boothId);
 
         final int currentRank = Math.toIntExact(boothWaitingRepository.countByBoothIdAndStatus(boothId, WaitingStatus.WAITING));
-        final int stayTimeSeconds = boothPolicyRepository.findByBoothId(boothId)
-                .map(BoothPolicy::getStayTime)
-                .filter(value -> value > 0)
-                .orElse(DEFAULT_STAY_TIME_SECONDS);
+        final int stayTimeSeconds = waitingPolicyResolver.resolveStayTimeSeconds(boothId, DEFAULT_STAY_TIME_SECONDS);
         final int avgStayTimeMinutes = stayTimeSeconds > 0
                 ? Math.toIntExact(Math.ceilDiv((long) stayTimeSeconds, SECONDS_PER_MINUTE))
                 : 0;
@@ -412,17 +407,11 @@ public class WaitingService {
     }
 
     private int resolveDeferLimit(final Long boothId) {
-        return boothPolicyRepository.findByBoothId(boothId)
-                .map(BoothPolicy::getDeferLimit)
-                .filter(value -> value >= 0)
-                .orElse(DEFAULT_DEFER_LIMIT);
+        return waitingPolicyResolver.resolveDeferLimit(boothId, DEFAULT_DEFER_LIMIT);
     }
 
     private int resolveCallValidTimeSeconds(final Long boothId) {
-        return boothPolicyRepository.findByBoothId(boothId)
-                .map(BoothPolicy::getCallValidTime)
-                .filter(value -> value > 0)
-                .orElse(DEFAULT_CALL_VALID_TIME_SECONDS);
+        return waitingPolicyResolver.resolveCallValidTimeSeconds(boothId, DEFAULT_CALL_VALID_TIME_SECONDS);
     }
 
     private void swapWaitingNumbers(final BoothWaiting source, final BoothWaiting target) {

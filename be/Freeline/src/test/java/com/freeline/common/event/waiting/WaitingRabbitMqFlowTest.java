@@ -30,14 +30,17 @@ import com.freeline.domain.booth.entity.BoothPolicy;
 import com.freeline.domain.booth.entity.BoothWaiting;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
+import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
 import com.freeline.domain.boothmanager.dto.response.BoothManagerSseEventResDto;
 import com.freeline.domain.boothmanager.service.BoothManagerSseService;
 import com.freeline.domain.boothmanager.service.BoothManagerWaitingEventConsumer;
+import com.freeline.domain.event.repository.EventPolicyRepository;
 import com.freeline.domain.pushnotification.entity.PushNotificationType;
 import com.freeline.domain.pushnotification.service.PushNotificationService;
 import com.freeline.domain.pushnotification.service.WaitingFcmDelayPublisher;
 import com.freeline.domain.pushnotification.service.WaitingFcmEventConsumer;
+import com.freeline.domain.waiting.service.WaitingPolicyResolver;
 
 @ExtendWith(MockitoExtension.class)
 class WaitingRabbitMqFlowTest {
@@ -65,6 +68,12 @@ class WaitingRabbitMqFlowTest {
     @Mock
     private BoothPolicyRepository boothPolicyRepository;
 
+    @Mock
+    private BoothRepository boothRepository;
+
+    @Mock
+    private EventPolicyRepository eventPolicyRepository;
+
     private MockedStatic<TimeUtils> timeUtilsMock;
 
     @BeforeEach
@@ -89,7 +98,11 @@ class WaitingRabbitMqFlowTest {
                 pushNotificationService,
                 waitingFcmDelayPublisher,
                 boothWaitingRepository,
-                boothPolicyRepository
+                new WaitingPolicyResolver(
+                        boothRepository,
+                        boothPolicyRepository,
+                        eventPolicyRepository
+                )
         );
 
         final WaitingStatusChangeCommand command = new WaitingStatusChangeCommand(
@@ -160,7 +173,11 @@ class WaitingRabbitMqFlowTest {
                 pushNotificationService,
                 waitingFcmDelayPublisher,
                 boothWaitingRepository,
-                boothPolicyRepository
+                new WaitingPolicyResolver(
+                        boothRepository,
+                        boothPolicyRepository,
+                        eventPolicyRepository
+                )
         );
 
         final WaitingStatusChangeCommand command = new WaitingStatusChangeCommand(

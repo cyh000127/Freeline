@@ -383,7 +383,7 @@ firebase:
 - `boothmanager` 도메인의 SSE consumer는 waiting 이벤트를 RabbitMQ에서 받아 `BoothManagerSseService`로 넘기고, 실제 브로드캐스트는 기존 Redis/SSE
   흐름을 그대로 사용한다.
 - 상태 변화 후속 처리에서 도메인 서비스는 SSE/FCM을 직접 호출하지 않고, RabbitMQ consumer 경로만 사용한다.
-- 현재 SSE 대상 waiting 이벤트는 `WAITING_CALLED`, `WAITING_REGISTERED`, `WAITING_ENTERED`, `WAITING_EXITED` 기준으로 관리한다.
+- 현재 SSE 대상 waiting 이벤트는 `WAITING_CALLED`, `WAITING_REGISTERED`, `WAITING_ENTERED`, `WAITING_EXITED`, `WAITING_EXPIRED`, `WAITING_CANCELED` 기준으로 관리한다.
 - `pushnotification` 도메인의 FCM consumer는 waiting 이벤트를 RabbitMQ에서 받아 즉시 알림을 발송하고, 지연 알림이 필요한 경우 별도 delay queue에 작업 메시지를
   등록한 뒤 만료 시점에 다시 소비한다.
 - waiting RabbitMQ consumer는 기본적으로 3회까지 재시도하고, 재시도 후에도 실패하면 DLQ로 보내며 무한 재큐는 하지 않는다.

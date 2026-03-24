@@ -10,7 +10,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -29,6 +28,9 @@ import com.freeline.domain.booth.exception.BoothException;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.event.entity.Event;
+import com.freeline.domain.event.entity.EventPolicy;
+import com.freeline.domain.event.repository.EventPolicyRepository;
 import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
@@ -74,12 +76,14 @@ class WaitingServiceTest {
     private BoothPolicyRepository boothPolicyRepository;
 
     @Mock
+    private EventPolicyRepository eventPolicyRepository;
+
+    @Mock
     private WaitingEventDispatcher waitingEventDispatcher;
 
     @Spy
     private WaitingEventSnapshotAssembler waitingEventSnapshotAssembler;
 
-    @InjectMocks
     private WaitingService waitingService;
 
     private MockedStatic<TimeUtils> timeUtilsMock;
@@ -90,6 +94,17 @@ class WaitingServiceTest {
         timeUtilsMock.when(TimeUtils::nowDateTime).thenReturn(FIXED_NOW);
         timeUtilsMock.when(TimeUtils::today).thenReturn(FIXED_NOW.toLocalDate());
         timeUtilsMock.when(TimeUtils::nowTime).thenReturn(FIXED_NOW.toLocalTime());
+        waitingService = new WaitingService(
+                boothRepository,
+                boothWaitingRepository,
+                waitingEventDispatcher,
+                waitingEventSnapshotAssembler,
+                new WaitingPolicyResolver(
+                        boothRepository,
+                        boothPolicyRepository,
+                        eventPolicyRepository
+                )
+        );
     }
 
     @AfterEach
@@ -512,6 +527,31 @@ class WaitingServiceTest {
         Assertions.assertThat(result.currentRank()).isEqualTo(7);
         Assertions.assertThat(result.avgStayTime()).isEqualTo(10);
         Assertions.assertThat(result.estimatedMinutes()).isEqualTo(70);
+    }
+
+    @Test
+    void getExpectedWaitingTime_success_whenEventPolicyFallbackApplies() {
+        final Booth booth = createBooth(12L, "Goods Booth");
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatus(12L, WaitingStatus.WAITING)).thenReturn(4L);
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.empty());
+        Mockito.when(eventPolicyRepository.findByEvent_Id(3L)).thenReturn(Optional.of(
+                EventPolicy.builder()
+                        .id(1L)
+                        .event(Event.builder().id(3L).build())
+                        .defaultStaySec(300)
+                        .defaultMaxWaiting(100)
+                        .defaultCallCount(5)
+                        .defaultCallTtl(180)
+                        .defaultDeferLimit(2)
+                        .build()
+        ));
+
+        final WaitingExpectedTimeResDto result = waitingService.getExpectedWaitingTime(12L);
+
+        Assertions.assertThat(result.avgStayTime()).isEqualTo(5);
+        Assertions.assertThat(result.estimatedMinutes()).isEqualTo(20);
     }
 
     @Test
