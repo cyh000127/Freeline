@@ -36,6 +36,10 @@ spring:
       max-file-size: 100MB
       max-request-size: 500MB
 
+auth:
+  email-code-expire-minutes: 10
+  email-verify-ttl-minutes: 10
+
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION}
