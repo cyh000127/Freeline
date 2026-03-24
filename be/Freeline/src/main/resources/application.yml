@@ -74,6 +74,10 @@ app:
       fcm-delayed-routing-key: waiting.fcm.delayed
       consumer-max-attempts: 3 # 최대 재전송 횟수 제한
 
+hdfs:
+  webhdfs-url: ${HDFS_WEBHDFS_URL:http://namenode:9870}
+  base-path: /data
+
 booth-manager:
   sse:
     timeout-millis: 3600000

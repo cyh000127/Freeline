@@ -31,6 +31,9 @@ spring:
           auth: true
           starttls:
             enable: true
+hdfs:
+  webhdfs-url: http://localhost:9870
+
 auth:
   email-code-expire-minutes: ${EMAIL_CODE_EXPIRE_MINUTES:10}
   email-verify-ttl-minutes: 10
