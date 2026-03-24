@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { Menu, PackageOpen, Users, Settings } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Menu, PackageOpen, Users, Settings, LogOut } from "lucide-react";
 
 const navigation = [
   { name: "대시보드", href: "/", icon: Menu },
@@ -14,6 +14,12 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    localStorage.removeItem("accessToken");
+    router.push("/login");
+  };
 
   return (
     <div className="flex w-[240px] flex-col bg-[#2D2A4A] text-white">
@@ -37,11 +43,11 @@ export function Sidebar() {
               href={item.href}
               className={`flex items-center gap-4 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                 isActive
-                  ? "text-lime-400 font-bold"
+                  ? "bg-white/10 text-lime-400 font-bold"
                   : "text-gray-300 hover:bg-white/5 hover:text-white"
               }`}
             >
-              <item.icon className={`h-5 w-5 ${isActive ? "text-lime-400" : ""}`} />
+              <item.icon className="w-5 h-5" />
               {item.name}
             </Link>
           );
@@ -59,10 +65,17 @@ export function Sidebar() {
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#2D2A4A]">
               👤
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col flex-1">
               <span className="text-sm font-bold">관리자</span>
               <span className="text-sm text-gray-300">김싸피 팀장</span>
             </div>
+            <button
+              onClick={handleLogout}
+              className="p-2 text-gray-400 hover:text-rose-400 hover:bg-white/5 rounded-lg transition-colors"
+              title="로그아웃"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
           </div>
           <div className="mt-4 text-center">
             <span className="text-lg font-bold text-[#D9F950]">A-01 부스</span>
