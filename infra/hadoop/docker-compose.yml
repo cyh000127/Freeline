@@ -1,0 +1,108 @@
+services:
+  namenode:
+    image: apache/hadoop:3.4.1
+    container_name: hadoop-namenode
+    hostname: namenode
+    restart: always
+    command: hdfs namenode
+    ports:
+      - "9870:9870"
+    environment:
+      TZ: Asia/Seoul
+      HADOOP_HOME: /opt/hadoop
+      ENSURE_NAMENODE_DIR: /hadoop/dfs/name
+    volumes:
+      - hadoop-namenode-data:/hadoop/dfs/name
+      - ./config/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
+      - ./config/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml
+    networks:
+      - infra-public
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:9870/ || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  datanode:
+    image: apache/hadoop:3.4.1
+    container_name: hadoop-datanode
+    hostname: datanode
+    restart: always
+    command: hdfs datanode
+    depends_on:
+      namenode:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Seoul
+      HADOOP_HOME: /opt/hadoop
+    volumes:
+      - hadoop-datanode-data:/hadoop/dfs/data
+      - ./config/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
+      - ./config/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml
+    networks:
+      - infra-public
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:9864/ || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  resourcemanager:
+    image: apache/hadoop:3.4.1
+    container_name: hadoop-resourcemanager
+    hostname: resourcemanager
+    restart: always
+    command: yarn resourcemanager
+    depends_on:
+      namenode:
+        condition: service_healthy
+    ports:
+      - "8088:8088"
+    environment:
+      TZ: Asia/Seoul
+      HADOOP_HOME: /opt/hadoop
+    volumes:
+      - ./config/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
+      - ./config/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml
+      - ./config/mapred-site.xml:/opt/hadoop/etc/hadoop/mapred-site.xml
+      - ./config/yarn-site.xml:/opt/hadoop/etc/hadoop/yarn-site.xml
+    networks:
+      - infra-public
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8088/ws/v1/cluster/info || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  nodemanager:
+    image: apache/hadoop:3.4.1
+    container_name: hadoop-nodemanager
+    hostname: nodemanager
+    restart: always
+    command: yarn nodemanager
+    depends_on:
+      resourcemanager:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Seoul
+      HADOOP_HOME: /opt/hadoop
+    volumes:
+      - ./config/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
+      - ./config/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml
+      - ./config/mapred-site.xml:/opt/hadoop/etc/hadoop/mapred-site.xml
+      - ./config/yarn-site.xml:/opt/hadoop/etc/hadoop/yarn-site.xml
+    networks:
+      - infra-public
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8042/node || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  hadoop-namenode-data:
+  hadoop-datanode-data:
+
+networks:
+  infra-public:
+    external: true
