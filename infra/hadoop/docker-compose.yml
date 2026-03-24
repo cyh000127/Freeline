@@ -152,10 +152,11 @@ services:
     networks:
       - infra-public
     healthcheck:
-      test: [ "CMD-SHELL", "nc -z localhost 9083 || exit 1" ]
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/9083' || exit 1" ]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 15
+      start_period: 60s
 
   hive-server:
     image: apache/hive:4.0.1
@@ -182,10 +183,11 @@ services:
     networks:
       - infra-public
     healthcheck:
-      test: [ "CMD-SHELL", "nc -z localhost 10000 || exit 1" ]
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/10000' || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 15
+      start_period: 60s
 
 volumes:
   hadoop-namenode-data:
