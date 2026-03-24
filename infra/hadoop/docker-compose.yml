@@ -123,11 +123,13 @@ services:
       retries: 5
 
   hive-metastore:
-    image: apache/hive:4.0.1
+    build:
+      context: .
+      dockerfile: hive-metastore.Dockerfile
+    image: freeline-hive-metastore:4.0.1
     container_name: hive-metastore
     hostname: hive-metastore
     restart: always
-    entrypoint: sh -c "if [ ! -f /opt/hive/lib/postgresql.jar ]; then curl -fSL -o /opt/hive/lib/postgresql.jar https://jdbc.postgresql.org/download/postgresql-42.7.5.jar; fi && /entrypoint.sh"
     depends_on:
       hive-metastore-db:
         condition: service_healthy
