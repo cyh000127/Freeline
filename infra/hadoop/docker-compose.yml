@@ -15,13 +15,15 @@ services:
       - hadoop-namenode-data:/hadoop/dfs/name
       - ./config/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
       - ./config/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml
+      - ./scripts/init-hdfs.sh:/scripts/init-hdfs.sh:ro
     networks:
       - infra-public
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:9870/ || exit 1" ]
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/9870' || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 30s
 
   datanode:
     image: apache/hadoop:3.4.1
@@ -42,10 +44,11 @@ services:
     networks:
       - infra-public
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:9864/ || exit 1" ]
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/9864' || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 30s
 
   resourcemanager:
     image: apache/hadoop:3.4.1
@@ -69,10 +72,11 @@ services:
     networks:
       - infra-public
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:8088/ws/v1/cluster/info || exit 1" ]
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/8088' || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 30s
 
   nodemanager:
     image: apache/hadoop:3.4.1
@@ -94,10 +98,11 @@ services:
     networks:
       - infra-public
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:8042/node || exit 1" ]
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/8042' || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 30s
 
   hive-metastore-db:
     image: postgres:18.3-alpine
@@ -171,6 +176,7 @@ services:
     volumes:
       - ./config/core-site.xml:/opt/hive/conf/core-site.xml
       - ./config/hdfs-site.xml:/opt/hive/conf/hdfs-site.xml
+      - ./scripts/init-hive.sql:/scripts/init-hive.sql:ro
     networks:
       - infra-public
     healthcheck:
