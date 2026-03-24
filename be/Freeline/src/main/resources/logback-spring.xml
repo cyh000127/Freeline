@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- 기본 콘솔 출력 (Spring Boot 기본 동작 유지) -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!-- 행동 로그 전용 파일 Appender (시간별 롤링) -->
+    <appender name="ACTION_LOG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/action/action.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/action/action.%d{yyyy-MM-dd-HH}.log</fileNamePattern>
+            <maxHistory>168</maxHistory>
+            <totalSizeCap>10GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS}\t%msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- ACTION_LOG 로거: 파일에만 기록, 콘솔에는 출력하지 않음 -->
+    <logger name="ACTION_LOG" level="INFO" additivity="false">
+        <appender-ref ref="ACTION_LOG_FILE"/>
+    </logger>
+
+    <!-- 루트 로거 -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>
