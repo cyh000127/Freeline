@@ -114,7 +114,8 @@ public enum ErrorCode {
      * Report Error (R-xxx)
      */
     HDFS_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "R-001", "HDFS 데이터 업로드에 실패했습니다."),
-    REPORT_EVENT_NOT_CLOSED(HttpStatus.BAD_REQUEST, "R-002", "종료된 행사만 리포트를 생성할 수 있습니다.");
+    REPORT_EVENT_NOT_CLOSED(HttpStatus.BAD_REQUEST, "R-002", "종료된 행사만 리포트를 생성할 수 있습니다."),
+    REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "R-003", "해당 행사의 리포트 데이터를 찾을 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
