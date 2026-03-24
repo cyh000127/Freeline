@@ -51,6 +51,26 @@ public class WaitingPolicyResolver {
                 .orElse(defaultValue);
     }
 
+    public int resolveMaxWaitingCount(final Long boothId, final int defaultValue) {
+        return boothPolicyRepository.findByBoothId(boothId)
+                .map(BoothPolicy::getMaxWaitingCount)
+                .filter(value -> value >= 0)
+                .or(() -> findEventPolicy(boothId)
+                        .map(EventPolicy::getDefaultMaxWaiting)
+                        .filter(value -> value >= 0))
+                .orElse(defaultValue);
+    }
+
+    public int resolveCallCount(final Long boothId, final int defaultValue) {
+        return boothPolicyRepository.findByBoothId(boothId)
+                .map(BoothPolicy::getCallCount)
+                .filter(value -> value > 0)
+                .or(() -> findEventPolicy(boothId)
+                        .map(EventPolicy::getDefaultCallCount)
+                        .filter(value -> value > 0))
+                .orElse(defaultValue);
+    }
+
     private Optional<EventPolicy> findEventPolicy(final Long boothId) {
         return boothRepository.findById(boothId)
                 .map(Booth::getEventId)

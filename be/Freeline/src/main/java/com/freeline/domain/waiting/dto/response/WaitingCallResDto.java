@@ -1,6 +1,7 @@
 package com.freeline.domain.waiting.dto.response;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import lombok.Builder;
 
@@ -25,6 +26,12 @@ public record WaitingCallResDto(
         LocalDateTime calledAt,
 
         @Schema(description = "호출 만료 시각", example = "2026-03-16T14:33:00")
-        LocalDateTime expiresAt
+        LocalDateTime expiresAt,
+
+        @Schema(description = "이번 호출에서 호출된 인원 수", example = "3")
+        Integer calledCount,
+
+        @Schema(description = "이번 호출에서 호출된 대기 ID 목록", example = "[301, 302, 303]")
+        List<Long> waitingIds
 ) {
 }

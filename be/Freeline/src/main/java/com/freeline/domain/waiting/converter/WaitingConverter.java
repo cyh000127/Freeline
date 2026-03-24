@@ -110,13 +110,19 @@ public class WaitingConverter {
                 .build();
     }
 
-    public WaitingCallResDto toWaitingCallResDto(final BoothWaiting waiting) {
+    public WaitingCallResDto toWaitingCallResDto(final List<BoothWaiting> calledWaitings) {
+        final BoothWaiting firstWaiting = calledWaitings.getFirst();
+
         return WaitingCallResDto.builder()
-                .waitingId(waiting.getId())
-                .waitingNum(waiting.getWaitingNumber())
-                .status(waiting.getStatus().name())
-                .calledAt(waiting.getCalledAt())
-                .expiresAt(waiting.getCallExpiresAt())
+                .waitingId(firstWaiting.getId())
+                .waitingNum(firstWaiting.getWaitingNumber())
+                .status(firstWaiting.getStatus().name())
+                .calledAt(firstWaiting.getCalledAt())
+                .expiresAt(firstWaiting.getCallExpiresAt())
+                .calledCount(calledWaitings.size())
+                .waitingIds(calledWaitings.stream()
+                        .map(BoothWaiting::getId)
+                        .toList())
                 .build();
     }
 
