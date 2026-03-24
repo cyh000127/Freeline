@@ -34,7 +34,7 @@ export default function QRScanScreen() {
 
         {/* TEMP BUTTON for testing flow */}
         <Pressable style={styles.mockButton} onPress={handleMockSuccess}>
-          <Text style={styles.mockText}>[Mock Scan Success]</Text>
+          <Text style={styles.mockText}>[스캔하기]</Text>
         </Pressable>
       </View>
     </QRScanModalLayout>
