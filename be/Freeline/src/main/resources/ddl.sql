@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS event_admins
 (
     255
 ),
-    organization VARCHAR
+    company VARCHAR
 (
     255
 ),
@@ -291,9 +291,17 @@ CREATE TABLE IF NOT EXISTS booth_admins
 (
     120
 ) NOT NULL,
-    is_email_sent BOOLEAN NOT NULL DEFAULT FALSE,
-    is_account_issued BOOLEAN NOT NULL DEFAULT FALSE,
-    is_active BOOLEAN NOT NULL DEFAULT FALSE,
+    company VARCHAR
+(
+    100
+),
+    status VARCHAR
+(
+    20
+) NOT NULL DEFAULT 'CREATED',
+    last_login_at TIMESTAMP,
+    is_password_changed BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_booth_admins_booth
@@ -401,19 +409,35 @@ CREATE TABLE IF NOT EXISTS booth_goods
 -- =========================================================
 -- 10. BOOTH IMAGE
 -- =========================================================
-CREATE TABLE IF NOT EXISTS booth_images (
-    id BIGSERIAL PRIMARY KEY,
-    booth_id BIGINT NOT NULL,
-    image_path VARCHAR(500) NOT NULL,
+CREATE TABLE IF NOT EXISTS booth_images
+(
+    id
+    BIGSERIAL
+    PRIMARY
+    KEY,
+    booth_id
+    BIGINT
+    NOT
+    NULL,
+    image_path
+    VARCHAR
+(
+    500
+) NOT NULL,
     is_representative BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
     CONSTRAINT fk_booth_images_booth
-        FOREIGN KEY (booth_id)
-        REFERENCES booths (id)
-        ON DELETE CASCADE
-);
+    FOREIGN KEY
+(
+    booth_id
+)
+    REFERENCES booths
+(
+    id
+)
+    ON DELETE CASCADE
+    );
 
 
 -- =========================================================

@@ -7,6 +7,6 @@ public record SignupResDto(
         Long id,
         String email,
         String name,
-        String organization
+        String company
 ) {
 }

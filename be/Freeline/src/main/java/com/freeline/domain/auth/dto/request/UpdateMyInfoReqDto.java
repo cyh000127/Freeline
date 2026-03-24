@@ -7,6 +7,6 @@ public record UpdateMyInfoReqDto(
         String name,
 
         @NotBlank
-        String organization
+        String company
 ) {
 }
