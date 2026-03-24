@@ -40,7 +40,8 @@ public class GlobalExceptionHandler {
     ) {
         LoggingUtils.logException("정의되지 않은 예외 발생", ex, request);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.INTERNAL_SERVER_ERROR, request);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(BaseResponse.fail(response, HttpStatus.INTERNAL_SERVER_ERROR));
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(BaseResponse.fail(response, HttpStatus.INTERNAL_SERVER_ERROR));
     }
 
     @ExceptionHandler(BusinessException.class)
@@ -50,7 +51,19 @@ public class GlobalExceptionHandler {
     ) {
         LoggingUtils.logException("BusinessException 발생", ex, request);
         final ErrorResponse response = ErrorResponse.of(ex.getErrorCode(), request);
-        return ResponseEntity.status(ex.getErrorCode().getHttpStatus()).body(BaseResponse.fail(response, ex.getErrorCode().getHttpStatus()));
+        return ResponseEntity.status(ex.getErrorCode().getHttpStatus())
+                .body(BaseResponse.fail(response, ex.getErrorCode().getHttpStatus()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<BaseResponse<ErrorResponse>> handleIllegalArgumentException(
+            final IllegalArgumentException ex,
+            final HttpServletRequest request
+    ) {
+        LoggingUtils.logException("IllegalArgumentException 발생", ex, request);
+        final ErrorResponse response = ErrorResponse.of(request, ErrorCode.INVALID_INPUT, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(BaseResponse.fail(response, HttpStatus.BAD_REQUEST));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -93,7 +106,8 @@ public class GlobalExceptionHandler {
     ) {
         LoggingUtils.logException("HttpRequestMethodNotSupportedException 발생", ex, request);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED, request);
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(BaseResponse.fail(response, HttpStatus.METHOD_NOT_ALLOWED));
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(BaseResponse.fail(response, HttpStatus.METHOD_NOT_ALLOWED));
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
@@ -103,7 +117,8 @@ public class GlobalExceptionHandler {
     ) {
         LoggingUtils.logException("HttpMediaTypeNotSupportedException 발생", ex, request);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.UNSUPPORTED_MEDIA_TYPE, request);
-        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(BaseResponse.fail(response, HttpStatus.UNSUPPORTED_MEDIA_TYPE));
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(BaseResponse.fail(response, HttpStatus.UNSUPPORTED_MEDIA_TYPE));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
@@ -164,7 +179,8 @@ public class GlobalExceptionHandler {
     ) {
         LoggingUtils.logException("DataAccessException 발생", ex, request);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.INTERNAL_SERVER_ERROR, request);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(BaseResponse.fail(response, HttpStatus.INTERNAL_SERVER_ERROR));
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(BaseResponse.fail(response, HttpStatus.INTERNAL_SERVER_ERROR));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

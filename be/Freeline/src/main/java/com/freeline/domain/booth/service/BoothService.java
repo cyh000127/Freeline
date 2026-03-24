@@ -4,13 +4,16 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,6 +25,8 @@ import com.freeline.common.error.ErrorCode;
 import com.freeline.common.error.exception.BusinessException;
 import com.freeline.common.file.dto.FileInfo;
 import com.freeline.common.file.service.FileService;
+import com.freeline.domain.auth.entity.BoothAdmin;
+import com.freeline.domain.auth.repository.BoothAdminRepository;
 import com.freeline.domain.booth.converter.BoothConverter;
 import com.freeline.domain.booth.dto.request.BoothCreateReqDto;
 import com.freeline.domain.booth.dto.request.BoothPolicyUpdateReqDto;
@@ -60,6 +65,12 @@ public class BoothService {
 
     private static final String BOOTH_DIRECTORY = "booth";
     private static final DateTimeFormatter CSV_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final int CSV_COLUMN_COUNT = 7;
+    private static final int RANDOM_PASSWORD_LENGTH = 8;
+    private static final String PASSWORD_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private static final String PASSWORD_DIGITS = "0123456789";
+    private static final String PASSWORD_ALLOW_BASE = PASSWORD_ALPHABET + PASSWORD_DIGITS;
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private static final List<WaitingStatus> FRONT_QUEUE_STATUSES = List.of(
             WaitingStatus.CALLED,
@@ -77,11 +88,11 @@ public class BoothService {
     private final BoothImageRepository boothImageRepository;
     private final BoothPolicyRepository boothPolicyRepository;
     private final BoothWaitingRepository boothWaitingRepository;
+    private final BoothAdminRepository boothAdminRepository;
     private final EventRepository eventRepository;
     private final EventPolicyRepository eventPolicyRepository;
     private final FileService fileService;
-
-    // TODO: 부스 정책 조회/설정 전용 서비스 메서드를 분리하고 BoothPolicyRepository를 직접 사용하는 흐름을 API로 노출한다.
+    private final PasswordEncoder passwordEncoder;
 
     public BoothCreateResDto createBooth(final Long eventId, final BoothCreateReqDto request) {
         validateEventExists(eventId);
@@ -103,14 +114,28 @@ public class BoothService {
             throw new BusinessException(ErrorCode.FILE_EMPTY);
         }
 
-        final List<Booth> booths = parseBoothsFromCsv(eventId, file);
-        boothRepository.saveAll(booths);
+        final List<ParsedBoothCsvRow> parsedRows = parseBoothsFromCsv(file);
+        final List<Booth> booths = parsedRows.stream()
+                .map(row -> Booth.builder()
+                        .eventId(eventId)
+                        .name(row.boothName())
+                        .locationCode(row.locationCode())
+                        .openTime(row.openTime())
+                        .closeTime(row.closeTime())
+                        .emergencyClosed(false)
+                        .build())
+                .toList();
+        final List<Booth> savedBooths = boothRepository.saveAll(booths);
+        final List<BoothAdmin> boothAdmins = createBoothAdmins(eventId, parsedRows, savedBooths);
+        boothAdminRepository.saveAll(boothAdmins);
 
-        log.info("[Booth] CSV bulk upload completed {eventId: {}, count: {}}", eventId, booths.size());
+        log.info("[Booth] CSV bulk upload completed {eventId: {}, boothCount: {}, boothAdminCount: {}}",
+                eventId, savedBooths.size(), boothAdmins.size());
 
         return BoothCsvUploadResDto.builder()
                 .eventId(eventId)
-                .importedCount(booths.size())
+                .importedCount(savedBooths.size())
+                .adminCreatedCount(boothAdmins.size())
                 .build();
     }
 
@@ -280,8 +305,8 @@ public class BoothService {
         }
     }
 
-    private List<Booth> parseBoothsFromCsv(final Long eventId, final MultipartFile file) {
-        final List<Booth> booths = new ArrayList<>();
+    private List<ParsedBoothCsvRow> parseBoothsFromCsv(final MultipartFile file) {
+        final List<ParsedBoothCsvRow> rows = new ArrayList<>();
 
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
@@ -299,39 +324,75 @@ public class BoothService {
                     continue;
                 }
 
-                booths.add(parseBoothRow(eventId, line, lineNumber));
+                rows.add(parseBoothRow(line, lineNumber));
             }
         } catch (IOException ex) {
             throw new IllegalArgumentException("CSV 파일을 읽는 중 오류가 발생했습니다.", ex);
         }
 
-        return booths;
+        return rows;
     }
 
-    private Booth parseBoothRow(final Long eventId, final String line, final int lineNumber) {
+    private ParsedBoothCsvRow parseBoothRow(final String line, final int lineNumber) {
         final String[] columns = line.split(",", -1);
-        final String name = getColumn(columns, 0);
-
-        if (name == null) {
-            throw new IllegalArgumentException("CSV 파싱 오류: " + lineNumber + "번째 줄의 name 값이 비어 있습니다.");
+        if (columns.length != CSV_COLUMN_COUNT) {
+            throw new IllegalArgumentException("CSV 파싱 오류: " + lineNumber + "번째 줄은 7개 컬럼이어야 합니다.");
         }
 
+        final String boothName = getColumn(columns, 0);
         final String locationCode = getColumn(columns, 1);
         final LocalTime openTime = parseCsvTime(getColumn(columns, 2), "openTime", lineNumber);
         final LocalTime closeTime = parseCsvTime(getColumn(columns, 3), "closeTime", lineNumber);
+        final String adminName = getColumn(columns, 4);
+        final String adminEmail = getColumn(columns, 5);
+        final String adminCompany = getColumn(columns, 6);
 
-        if (openTime != null && closeTime != null && !closeTime.isAfter(openTime)) {
-            throw new IllegalArgumentException("CSV 파싱 오류: " + lineNumber + "번째 줄의 운영 시간이 잘못되었습니다.");
+        if (boothName == null) {
+            throw new IllegalArgumentException("CSV 파싱 오류: " + lineNumber + "번째 줄의 boothName 값이 비어 있습니다.");
         }
 
-        return Booth.builder()
-                .eventId(eventId)
-                .name(name)
-                .locationCode(locationCode)
-                .openTime(openTime)
-                .closeTime(closeTime)
-                .emergencyClosed(false)
-                .build();
+        if (adminEmail == null) {
+            throw new IllegalArgumentException("CSV 파싱 오류: " + lineNumber + "번째 줄의 adminEmail 값이 비어 있습니다.");
+        }
+
+        if (openTime != null && closeTime != null && !closeTime.isAfter(openTime)) {
+            throw new IllegalArgumentException("CSV 파싱 오류: " + lineNumber + "번째 줄의 운영 시간이 올바르지 않습니다.");
+        }
+
+        return new ParsedBoothCsvRow(
+                boothName,
+                locationCode,
+                openTime,
+                closeTime,
+                adminName,
+                adminEmail,
+                adminCompany
+        );
+    }
+
+    private List<BoothAdmin> createBoothAdmins(
+            final Long eventId,
+            final List<ParsedBoothCsvRow> parsedRows,
+            final List<Booth> savedBooths
+    ) {
+        final List<BoothAdmin> boothAdmins = new ArrayList<>();
+
+        for (int i = 0; i < parsedRows.size(); i++) {
+            final ParsedBoothCsvRow row = parsedRows.get(i);
+            final Booth booth = savedBooths.get(i);
+            final String rawPassword = generateRandomPassword();
+
+            boothAdmins.add(BoothAdmin.builder()
+                    .boothId(booth.getId())
+                    .loginId(generateLoginId(eventId))
+                    .password(passwordEncoder.encode(rawPassword))
+                    .name(row.adminName())
+                    .email(row.adminEmail())
+                    .company(row.adminCompany())
+                    .build());
+        }
+
+        return boothAdmins;
     }
 
     private String getColumn(final String[] columns, final int index) {
@@ -343,6 +404,40 @@ public class BoothService {
         return value.isEmpty() ? null : value;
     }
 
+    private String generateLoginId(final Long eventId) {
+        String loginId;
+
+        do {
+            loginId = "event" + eventId + "_" + UUID.randomUUID().toString().substring(0, 8);
+        } while (boothAdminRepository.findByLoginId(loginId).isPresent());
+
+        return loginId;
+    }
+
+    private String generateRandomPassword() {
+        final List<Character> passwordCharacters = new ArrayList<>();
+        passwordCharacters.add(PASSWORD_ALPHABET.charAt(RANDOM.nextInt(PASSWORD_ALPHABET.length())));
+        passwordCharacters.add(PASSWORD_DIGITS.charAt(RANDOM.nextInt(PASSWORD_DIGITS.length())));
+
+        while (passwordCharacters.size() < RANDOM_PASSWORD_LENGTH) {
+            passwordCharacters.add(PASSWORD_ALLOW_BASE.charAt(RANDOM.nextInt(PASSWORD_ALLOW_BASE.length())));
+        }
+
+        for (int i = passwordCharacters.size() - 1; i > 0; i--) {
+            final int swapIndex = RANDOM.nextInt(i + 1);
+            final char current = passwordCharacters.get(i);
+            passwordCharacters.set(i, passwordCharacters.get(swapIndex));
+            passwordCharacters.set(swapIndex, current);
+        }
+
+        final StringBuilder password = new StringBuilder(RANDOM_PASSWORD_LENGTH);
+        for (char character : passwordCharacters) {
+            password.append(character);
+        }
+
+        return password.toString();
+    }
+
     private LocalTime parseCsvTime(final String value, final String fieldName, final int lineNumber) {
         if (value == null) {
             return null;
@@ -352,9 +447,20 @@ public class BoothService {
             return LocalTime.parse(value, CSV_TIME_FORMATTER);
         } catch (DateTimeParseException ex) {
             throw new IllegalArgumentException(
-                    "CSV 파싱 오류: " + lineNumber + "번째 줄의 " + fieldName + " 형식이 잘못되었습니다.",
+                    "CSV 파싱 오류: " + lineNumber + "번째 줄의 " + fieldName + " 형식이 올바르지 않습니다.",
                     ex
             );
         }
+    }
+
+    private record ParsedBoothCsvRow(
+            String boothName,
+            String locationCode,
+            LocalTime openTime,
+            LocalTime closeTime,
+            String adminName,
+            String adminEmail,
+            String adminCompany
+    ) {
     }
 }
