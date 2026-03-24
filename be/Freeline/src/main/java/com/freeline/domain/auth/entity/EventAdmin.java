@@ -1,5 +1,6 @@
 package com.freeline.domain.auth.entity;
 
+import jakarta.annotation.Nonnull;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -33,14 +34,16 @@ public class EventAdmin extends BaseEntity {
     private String password;
 
     private String name;
-    private String organization;
 
-    public void updateInfo(String name, String organization) {
+    @Column(name = "company")
+    private String company;
+
+    public void updateInfo(@Nonnull String name, @Nonnull String company) {
         this.name = name;
-        this.organization = organization;
+        this.company = company;
     }
 
-    public void changePassword(String password) {
+    public void changePassword(@Nonnull String password) {
         this.password = password;
     }
 }

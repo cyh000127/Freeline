@@ -6,6 +6,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import jakarta.annotation.Nonnull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -20,14 +21,14 @@ public class AdminAccountInitializer implements ApplicationRunner {
     private static final String DEFAULT_PASSWORD = "1234";
     private static final String EVENT_ADMIN_EMAIL = "admin@test.com";
     private static final String EVENT_ADMIN_NAME = "총괄테스터";
-    private static final String EVENT_ADMIN_ORGANIZATION = "Freeline";
+    private static final String EVENT_ADMIN_COMPANY = "Freeline";
 
     private final EventAdminRepository eventAdminRepository;
     private final PasswordEncoder passwordEncoder;
     private final TransactionTemplate transactionTemplate;
 
     @Override
-    public void run(final ApplicationArguments args) {
+    public void run(@Nonnull final ApplicationArguments args) {
         log.info("[AdminAccountInitializer] Startup seed check started. email={}", EVENT_ADMIN_EMAIL);
 
         try {
@@ -53,14 +54,14 @@ public class AdminAccountInitializer implements ApplicationRunner {
                 .email(EVENT_ADMIN_EMAIL)
                 .password(passwordEncoder.encode(DEFAULT_PASSWORD))
                 .name(EVENT_ADMIN_NAME)
-                .organization(EVENT_ADMIN_ORGANIZATION)
+                .company(EVENT_ADMIN_COMPANY)
                 .build();
 
         log.info(
-                "[AdminAccountInitializer] Creating default EventAdmin. email={}, name={}, organization={}",
+                "[AdminAccountInitializer] Creating default EventAdmin. email={}, name={}, company={}",
                 EVENT_ADMIN_EMAIL,
                 EVENT_ADMIN_NAME,
-                EVENT_ADMIN_ORGANIZATION
+                EVENT_ADMIN_COMPANY
         );
 
         final EventAdmin saved = eventAdminRepository.saveAndFlush(eventAdmin);

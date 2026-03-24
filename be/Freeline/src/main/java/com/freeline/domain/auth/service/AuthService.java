@@ -172,8 +172,9 @@ public class AuthService {
             BoothAdmin boothAdmin = boothAdminOpt.get();
             validatePassword(req.password(), boothAdmin.getPassword());
             if (!boothAdmin.isActive()) {
-                boothAdmin.activateAccount();
+                throw new AuthException(ErrorCode.ACCESS_DENIED);
             }
+            boothAdmin.recordLogin();
             return generateLoginResponse(boothAdmin.getId(), Role.BOOTH_ADMIN, boothAdmin.getLoginId());
         }
         throw new AuthException(ErrorCode.USER_NOT_FOUND);
@@ -212,7 +213,7 @@ public class AuthService {
     public MyInfoResDto updateMyInfo(final Long userId, final UpdateMyInfoReqDto req) {
         EventAdmin eventAdmin = eventAdminRepository.findById(userId)
                 .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
-        eventAdmin.updateInfo(req.name(), req.organization());
+        eventAdmin.updateInfo(req.name(), req.company());
         return authConverter.toMyInfoResDto(eventAdmin);
     }
 
@@ -226,7 +227,7 @@ public class AuthService {
         if (!passwordEncoder.matches(req.currentPassword(), eventAdmin.getPassword())) {
             throw new AuthException(ErrorCode.PASSWORD_MISMATCH);
         }
-        eventAdmin.changePassword(passwordEncoder.encode(req.newPassword()));
+        eventAdmin.changePassword(java.util.Objects.requireNonNull(passwordEncoder.encode(req.newPassword())));
         log.info("[Auth] Password changed for event admin: {}", eventAdmin.getEmail());
     }
 
@@ -284,8 +285,8 @@ public class AuthService {
         }
         for (BoothAdmin admin : admins) {
             String rawPassword = createRandomPassword();
-            admin.changePassword(passwordEncoder.encode(rawPassword));
-            admin.markEmailAsSent();
+            admin.changePassword(java.util.Objects.requireNonNull(passwordEncoder.encode(rawPassword)));
+            admin.markAsMailed();
             sendLoginInfoEmail(admin.getEmail(), admin.getLoginId(), rawPassword);
         }
     }
@@ -308,10 +309,10 @@ public class AuthService {
                         .loginId(admin.getLoginId())
                         .email(admin.getEmail())
                         .name(admin.getName())
-                        .isEmailSent(admin.isEmailSent())
-                        .isAccountIssued(admin.isAccountIssued())
+                        .company(admin.getCompany())
+                        .status(admin.getStatus())
                         .isActive(admin.isActive())
-                        .isProfileComplete(admin.getName() != null)
+                        .lastLoginAt(admin.getLastLoginAt())
                         .build())
                 .toList();
     }
@@ -379,7 +380,7 @@ public class AuthService {
         String rawPassword = createRandomPassword();
         BoothAdmin boothAdmin = BoothAdmin.builder()
                 .boothId(boothId).loginId(loginId).password(passwordEncoder.encode(rawPassword))
-                .email(item.email()).accountIssued(true).build();
+                .email(item.email()).build();
         BoothAdmin saved = boothAdminRepository.save(boothAdmin);
         log.info("[Auth] Auto created booth admin, loginId: {}", loginId);
         return BoothAdminCreateResDto.builder()

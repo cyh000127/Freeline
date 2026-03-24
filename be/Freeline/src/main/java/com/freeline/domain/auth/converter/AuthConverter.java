@@ -17,7 +17,7 @@ public class AuthConverter {
                 .id(eventAdmin.getId())
                 .email(eventAdmin.getEmail())
                 .name(eventAdmin.getName())
-                .organization(eventAdmin.getOrganization())
+                .company(eventAdmin.getCompany())
                 .build();
     }
 
@@ -34,7 +34,7 @@ public class AuthConverter {
                 .id(eventAdmin.getId())
                 .email(eventAdmin.getEmail())
                 .name(eventAdmin.getName())
-                .organization(eventAdmin.getOrganization())
+                .company(eventAdmin.getCompany())
                 .build();
     }
 
@@ -43,7 +43,7 @@ public class AuthConverter {
                 .email(req.email())
                 .password(encodedPassword)
                 .name(req.name())
-                .organization(req.organization())
+                .company(req.company())
                 .build();
     }
 }

@@ -20,6 +20,7 @@ public record SignupReqDto(
         String name,
 
         @NotBlank(message = "소속은 필수입니다.")
-        String organization
+        @io.swagger.v3.oas.annotations.media.Schema(description = "소속 회사")
+        String company
 ) {
 }

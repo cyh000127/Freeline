@@ -7,6 +7,6 @@ public record MyInfoResDto(
         Long id,
         String email,
         String name,
-        String organization
+        String company
 ) {
 }

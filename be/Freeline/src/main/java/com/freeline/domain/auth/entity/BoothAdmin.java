@@ -1,7 +1,12 @@
 package com.freeline.domain.auth.entity;
 
+import java.time.LocalDateTime;
+
+import jakarta.annotation.Nonnull;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -43,17 +48,24 @@ public class BoothAdmin extends BaseEntity {
     @Column(name = "email", nullable = false, length = 120)
     private String email;
 
-    @Column(name = "is_email_sent", nullable = false)
-    @Builder.Default
-    private boolean emailSent = false;
+    @Column(name = "company", length = 100)
+    private String company;
 
-    @Column(name = "is_account_issued", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
-    private boolean accountIssued = false;
+    private BoothAdminStatus status = BoothAdminStatus.CREATED;
+
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
+
+    @Column(name = "is_password_changed", nullable = false)
+    @Builder.Default
+    private boolean passwordChanged = false;
 
     @Column(name = "is_active", nullable = false)
     @Builder.Default
-    private boolean active = false;
+    private boolean active = true;
 
     @Column(name = "booth_id", nullable = false)
     private Long boothId;
@@ -62,15 +74,22 @@ public class BoothAdmin extends BaseEntity {
     @JoinColumn(name = "booth_id", insertable = false, updatable = false)
     private Booth booth;
 
-    public void changePassword(final String password) {
+    public void changePassword(@Nonnull final String password) {
         this.password = password;
+        this.passwordChanged = true;
+        this.status = BoothAdminStatus.COMPLETED;
     }
 
-    public void markEmailAsSent() {
-        this.emailSent = true;
+    public void markAsMailed() {
+        if (this.status == BoothAdminStatus.CREATED) {
+            this.status = BoothAdminStatus.MAILED;
+        }
     }
 
-    public void activateAccount() {
-        this.active = true;
+    public void recordLogin() {
+        this.lastLoginAt = LocalDateTime.now();
+        if (this.status == BoothAdminStatus.CREATED || this.status == BoothAdminStatus.MAILED) {
+            this.status = BoothAdminStatus.LOGGED_IN;
+        }
     }
 }
