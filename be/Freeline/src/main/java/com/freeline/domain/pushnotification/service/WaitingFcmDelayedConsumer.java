@@ -45,16 +45,22 @@ public class WaitingFcmDelayedConsumer {
             return;
         }
 
-        final WaitingStatus expectedStatus = resolveExpectedStatus(message);
-        if (expectedStatus != null && !pushNotificationService.isWaitingStatus(message.waitingId(), expectedStatus)) {
-            log.warn(
-                    "[PushNotification] delayed task skipped due to stale waiting status {eventId: {}, waitingId: {}, expectedStatus: {}, notificationType: {}}",
-                    message.eventId(),
-                    message.waitingId(),
-                    expectedStatus,
-                    message.notificationType()
-            );
-            return;
+        if (StringUtils.hasText(message.expectedStatus())) {
+            final WaitingStatus expectedStatus = resolveExpectedStatus(message);
+            if (expectedStatus == null) {
+                return;
+            }
+
+            if (!pushNotificationService.isWaitingStatus(message.waitingId(), expectedStatus)) {
+                log.warn(
+                        "[PushNotification] delayed task skipped due to stale waiting status {eventId: {}, waitingId: {}, expectedStatus: {}, notificationType: {}}",
+                        message.eventId(),
+                        message.waitingId(),
+                        expectedStatus,
+                        message.notificationType()
+                );
+                return;
+            }
         }
 
         try {

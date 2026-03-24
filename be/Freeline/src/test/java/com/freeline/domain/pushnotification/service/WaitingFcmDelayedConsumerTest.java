@@ -150,6 +150,27 @@ class WaitingFcmDelayedConsumerTest {
     }
 
     @Test
+    void consume_invalidExpectedStatus_skipsBeforeSend() {
+        final WaitingFcmDelayedConsumer consumer = new WaitingFcmDelayedConsumer(pushNotificationService);
+        final WaitingFcmTaskMessage message = WaitingFcmTaskMessage.builder()
+                .eventId(UUID.randomUUID())
+                .waitingId(301L)
+                .boothId(12L)
+                .visitorId(21L)
+                .expectedStatus("INVALID_STATUS")
+                .notificationType(PushNotificationType.QR_CHECK_REMINDER)
+                .build();
+
+        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+
+        consumer.consume(message);
+
+        Mockito.verify(pushNotificationService).isConfigured();
+        Mockito.verify(pushNotificationService, Mockito.never()).isWaitingStatus(Mockito.anyLong(), Mockito.any());
+        Mockito.verify(pushNotificationService, Mockito.never()).sendNotification(Mockito.anyLong(), Mockito.any());
+    }
+
+    @Test
     void consume_notConfiguredException_skips() {
         final WaitingFcmDelayedConsumer consumer = new WaitingFcmDelayedConsumer(pushNotificationService);
         final WaitingFcmTaskMessage message = WaitingFcmTaskMessage.builder()
