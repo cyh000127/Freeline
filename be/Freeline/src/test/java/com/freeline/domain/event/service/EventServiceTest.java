@@ -24,6 +24,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
 import com.freeline.common.error.ErrorCode;
+import com.freeline.common.file.service.FileService;
+import com.freeline.common.file.util.CloudflareStorageUtil;
 import com.freeline.domain.boothmap.entity.EventMap;
 import com.freeline.domain.boothmap.repository.EventMapRepository;
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
@@ -55,6 +57,12 @@ class EventServiceTest {
     @Mock
     private EventPolicyRepository eventPolicyRepository;
 
+    @Mock
+    private FileService fileService;
+
+    @Mock
+    private CloudflareStorageUtil cloudflareStorageUtil;
+
     @InjectMocks
     private EventService eventService;
 
@@ -69,6 +77,7 @@ class EventServiceTest {
                 .closeTime(LocalTime.of(18, 0))
                 .locationAddress("Seoul Gangnam-gu Teheran-ro 123")
                 .thumbnailImageUrl("https://example.com/images/event-thumbnail.png")
+                .thumbnailImageFile(null)
                 .build();
 
         final Event savedEvent = Event.builder()
@@ -85,13 +94,13 @@ class EventServiceTest {
                 .status(EventStatus.DRAFT)
                 .build();
 
-        Mockito.when(eventRepository.save(Mockito.any(Event.class))).thenReturn(savedEvent);
+        Mockito.when(eventRepository.saveAndFlush(Mockito.any(Event.class))).thenReturn(savedEvent);
 
         final EventResDto result = eventService.createEvent(100L, request);
 
         Assertions.assertThat(result.eventId()).isEqualTo(1L);
         Assertions.assertThat(result.status()).isEqualTo(EventStatus.DRAFT.name());
-        Mockito.verify(eventRepository).save(Mockito.any(Event.class));
+        Mockito.verify(eventRepository).saveAndFlush(Mockito.any(Event.class));
     }
 
     @Test
