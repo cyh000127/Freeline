@@ -4,7 +4,7 @@ services:
     container_name: hadoop-namenode
     hostname: namenode
     restart: always
-    command: hdfs namenode
+    command: bash -c "if [ ! -d /hadoop/dfs/name/current ]; then hdfs namenode -format -force; fi && hdfs namenode"
     ports:
       - "9870:9870"
     environment:
