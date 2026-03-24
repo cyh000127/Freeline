@@ -3,15 +3,16 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Card } from "@/components/ui/card";
-import { PauseCircle, XCircle, Plus, X } from "lucide-react";
-import { getGoodsList, createGoods, updateGoodsStatus, Goods } from "@/lib/api/goods";
+import { PauseCircle, XCircle, Plus, X, Trash2 } from "lucide-react";
+import { getGoodsList, createGoods, updateGoodsStatus, deleteGoods, Goods } from "@/lib/api/goods";
 
 export default function GoodsPage() {
   const [goods, setGoods] = useState<Goods[]>([]);
   const [filter, setFilter] = useState<"ALL" | "ON_SALE" | "SOLD_OUT">("ALL");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newGoodsName, setNewGoodsName] = useState("");
-  const [newGoodsImage, setNewGoodsImage] = useState("");
+  const [newGoodsImage, setNewGoodsImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
   // For testing purposes, we hardcode boothId to 1.
@@ -28,8 +29,12 @@ export default function GoodsPage() {
       if (res.success && res.data) {
         setGoods(res.data);
       }
-    } catch (error) {
-      console.error("Failed to fetch goods:", error);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        setGoods([]);
+      } else {
+        console.error("Failed to fetch goods:", error);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -52,19 +57,35 @@ export default function GoodsPage() {
     }
   };
 
-  const handleCreateGoods = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newGoodsName || !newGoodsImage) {
-      alert("이름과 이미지 URL을 모두 입력해주세요.");
+  const handleDeleteGoods = async (goodsId: number) => {
+    if (!window.confirm("정말로 이 굿즈를 삭제하시겠습니까? (삭제 후 복구할 수 없습니다)")) {
       return;
     }
     
     try {
-      await createGoods(boothId, { name: newGoodsName, imageUrl: newGoodsImage });
+      await deleteGoods(goodsId);
+      alert("굿즈가 성공적으로 삭제되었습니다.");
+      setGoods((prev) => prev.filter((g) => g.goodsId !== goodsId));
+    } catch (error) {
+      console.error("Failed to delete goods:", error);
+      alert("굿즈 삭제에 실패했습니다.");
+    }
+  };
+
+  const handleCreateGoods = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newGoodsName || !newGoodsImage) {
+      alert("이름과 이미지를 모두 등록해주세요.");
+      return;
+    }
+    
+    try {
+      await createGoods(boothId, { name: newGoodsName, imageFile: newGoodsImage });
       alert("굿즈가 성공적으로 추가되었습니다.");
       setIsModalOpen(false);
       setNewGoodsName("");
-      setNewGoodsImage("");
+      setNewGoodsImage(null);
+      setPreviewUrl("");
       fetchGoods(); // Refresh list
     } catch (error) {
       console.error("Failed to create goods:", error);
@@ -176,10 +197,19 @@ export default function GoodsPage() {
             {filteredGoods.map((item) => (
               <Card
                 key={item.goodsId}
-                className={`flex flex-col shadow-sm border-0 p-5 ${
+                className={`group relative flex flex-col shadow-sm border-0 p-5 ${
                   item.isSoldOut ? "bg-rose-50" : "bg-emerald-50"
                 }`}
               >
+                {/* Delete Button (Appears on hover or always visible, we make it always visible but subtle) */}
+                <button
+                  onClick={() => handleDeleteGoods(item.goodsId)}
+                  className="absolute top-3 right-3 p-2 rounded-full text-gray-400 hover:text-rose-500 hover:bg-white/60 transition-colors z-10"
+                  title="굿즈 삭제"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+
                 {/* Title */}
                 <div className="text-center font-bold text-gray-900 mb-4 text-lg">
                   {item.name}
@@ -249,30 +279,43 @@ export default function GoodsPage() {
               
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  이미지 URL
+                  이미지 첨부
                 </label>
-                <input
-                  type="url"
-                  value={newGoodsImage}
-                  onChange={(e) => setNewGoodsImage(e.target.value)}
-                  placeholder="https://example.com/image.png"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-lime-400 focus:ring-2 focus:ring-lime-400/20 outline-none transition-all"
-                  required
-                />
+                <div className="flex items-center gap-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    id="goods-image-upload"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setNewGoodsImage(e.target.files[0]);
+                        setPreviewUrl(URL.createObjectURL(e.target.files[0]));
+                      }
+                    }}
+                    required
+                  />
+                  <label
+                    htmlFor="goods-image-upload"
+                    className="cursor-pointer px-4 py-3 rounded-xl border border-gray-200 hover:border-lime-400 bg-white text-sm font-medium text-gray-700 hover:bg-lime-50 transition-all flex items-center gap-2"
+                  >
+                    이미지 선택
+                  </label>
+                  <span className="text-sm text-gray-500 flex-1 truncate">
+                    {newGoodsImage ? newGoodsImage.name : "선택된 파일이 없습니다"}
+                  </span>
+                </div>
               </div>
 
               {/* Preview */}
-              {newGoodsImage && (
+              {previewUrl && (
                 <div className="mt-4 flex flex-col items-center">
                   <span className="text-xs text-gray-500 mb-2">미리보기</span>
                   <div className="w-32 h-32 border rounded-lg overflow-hidden flex items-center justify-center bg-gray-50">
                     <img 
-                      src={newGoodsImage} 
+                      src={previewUrl} 
                       alt="Preview" 
                       className="max-w-full max-h-full object-contain"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
                     />
                   </div>
                 </div>
@@ -281,7 +324,11 @@ export default function GoodsPage() {
               <div className="pt-4 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setNewGoodsImage(null);
+                    setPreviewUrl("");
+                  }}
                   className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
                 >
                   취소
