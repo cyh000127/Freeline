@@ -127,7 +127,7 @@ services:
     container_name: hive-metastore
     hostname: hive-metastore
     restart: always
-    entrypoint: sh -c "if [ ! -f /opt/hive/lib/postgresql.jar ]; then wget -q -O /opt/hive/lib/postgresql.jar https://jdbc.postgresql.org/download/postgresql-42.7.5.jar; fi && /entrypoint.sh"
+    entrypoint: sh -c "if [ ! -f /opt/hive/lib/postgresql.jar ]; then curl -fSL -o /opt/hive/lib/postgresql.jar https://jdbc.postgresql.org/download/postgresql-42.7.5.jar; fi && /entrypoint.sh"
     depends_on:
       hive-metastore-db:
         condition: service_healthy
