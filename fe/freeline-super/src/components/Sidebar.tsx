@@ -41,8 +41,8 @@ export function Sidebar({ userName, role, eventId }: SidebarProps) {
 
       {/* Brand Logo */}
       <div className="p-8 pb-8 flex items-center gap-3">
-        <Image src="/super/assets/logo.png" alt="Logo" width={32} height={32} className="w-8 h-8 object-contain" />
-        <span className="text-xl font-bold tracking-tight">줄서잇 매니저</span>
+        <Image src="/super/assets/logo.png" alt="Logo" width={40} height={40} className="h-6 w-auto object-contain" />
+        <span className="text-2xl font-bold tracking-tight">줄서잇 매니저</span>
       </div>
 
       {/* Navigation */}

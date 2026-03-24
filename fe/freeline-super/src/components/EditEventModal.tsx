@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import DaumPostcode from "react-daum-postcode";
 import { api } from "@/lib/api";
 import { eventApi } from "@/lib/api/event";
@@ -15,7 +15,7 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    status: "OPEN",
+    status: "DRAFT",
     startDate: "",
     endDate: "",
     openTime: "",
@@ -26,6 +26,50 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
 
   const [isLoading, setIsLoading] = useState(false);
   const [isPostcodeOpen, setIsPostcodeOpen] = useState(false);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const statusRef = useRef<HTMLDivElement>(null);
+
+  // 상태 레이블 매핑
+  const STATUS_LABELS: Record<string, string> = {
+    DRAFT: "임시저장",
+    READY: "행사 준비 중",
+    OPEN: "행사 진행 중",
+    CLOSED: "행사 종료",
+    CANCELED: "행사 취소",
+  };
+
+  // 상태 색상 매핑
+  const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+    DRAFT: { bg: "bg-gray-100", text: "text-gray-600", dot: "bg-gray-400" },
+    READY: { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" },
+    OPEN: { bg: "bg-green-50", text: "text-green-700", dot: "bg-green-500" },
+    CLOSED: { bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500" },
+    CANCELED: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" },
+  };
+
+  // 현재 상태에서 전환 가능한 상태 목록
+  const getAllowedStatuses = (current: string): string[] => {
+    switch (current) {
+      case "DRAFT":    return ["DRAFT", "READY"];
+      case "READY":    return ["READY", "OPEN", "DRAFT"];
+      case "OPEN":     return ["OPEN", "CLOSED"];
+      case "CLOSED":   return ["CLOSED", "CANCELED"];
+      case "CANCELED": return ["CANCELED"];
+      default:         return ["DRAFT"];
+    }
+  };
+
+  // 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (statusRef.current && !statusRef.current.contains(e.target as Node)) {
+        setIsStatusOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Load event data when modal opens
   useEffect(() => {
@@ -54,7 +98,7 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
           setFormData({
             name: d.name || "",
             description: d.description || "",
-            status: d.status || "OPEN",
+            status: d.status || "DRAFT",
             startDate: d.startDate || "",
             endDate: d.endDate || "",
             openTime: d.openTime || "",
@@ -69,7 +113,7 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
         setFormData({
           name: event.name || "",
           description: event.description || "",
-          status: event.status || "OPEN",
+          status: event.status || "DRAFT",
           startDate: event.startDate || "",
           endDate: event.endDate || "",
           openTime: event.openTime || "",
@@ -108,10 +152,11 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleThumbnailChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setThumbnailFile(file);
     const reader = new FileReader();
     reader.onloadend = () => {
       setFormData((prev) => ({ ...prev, thumbnailImageUrl: reader.result as string }));
@@ -145,11 +190,20 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
         openTime: formData.openTime.length === 5 ? `${formData.openTime}:00` : formData.openTime,
         closeTime: formData.closeTime.length === 5 ? `${formData.closeTime}:00` : formData.closeTime,
         locationAddress: formData.locationAddress,
-        thumbnailImageUrl: formData.thumbnailImageUrl || null,
+        // thumbnailImageUrl은 별도 /thumbnail API로 업로드하므로 여기서 제외
       };
 
       const eventId = event.eventId || event.id || 1;
       await api.patch(`/v1/events/${eventId}`, payload);
+
+      // 썸네일 파일이 새로 선택된 경우 업로드
+      if (thumbnailFile) {
+        try {
+          await eventApi.uploadThumbnail(eventId, thumbnailFile);
+        } catch (thumbErr) {
+          console.warn("썸네일 업로드 실패 (나머지 정보는 저장됨):", thumbErr);
+        }
+      }
 
       alert("행사 정보가 성공적으로 수정되었습니다.");
       onClose();
@@ -208,19 +262,71 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
             </div>
 
             {/* 행사 상태 */}
-            <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-2.5" ref={statusRef}>
               <label className="text-[15px] font-bold text-gray-900">행사 상태</label>
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                className="w-full bg-[#F3F4F6] border-none rounded-2xl p-4 text-[15px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:bg-white transition-all outline-none appearance-none"
-              >
-                <option value="UPCOMING">행사 준비 중</option>
-                <option value="OPEN">행사 진행 중</option>
-                <option value="CLOSED">행사 종료</option>
-                <option value="DRAFT">임시 저장(DRAFT)</option>
-              </select>
+              <div className="relative">
+                {/* 선택된 상태 표시 버튼 */}
+                <button
+                  type="button"
+                  onClick={() => setIsStatusOpen((prev) => !prev)}
+                  className="w-full bg-[#F3F4F6] rounded-2xl p-4 text-[15px] text-left flex items-center justify-between gap-3 hover:bg-gray-200 transition-all outline-none focus:ring-2 focus:ring-[#2D2A4A]"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${STATUS_COLORS[formData.status]?.dot ?? "bg-gray-400"}`} />
+                    <span className="font-semibold text-gray-900">{STATUS_LABELS[formData.status] ?? formData.status}</span>
+                  </div>
+                  <svg
+                    className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isStatusOpen ? "rotate-180" : ""}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* 드롭다운 목록 */}
+                {isStatusOpen && (
+                  <div className="absolute top-full mt-2 left-0 w-full bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-20">
+                    {Object.entries(STATUS_LABELS).map(([value, label]) => {
+                      const allowed = getAllowedStatuses(formData.status);
+                      const isAllowed = allowed.includes(value);
+                      const isCurrent = formData.status === value;
+                      const colors = STATUS_COLORS[value];
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          disabled={!isAllowed}
+                          onClick={() => {
+                            if (isAllowed) {
+                              setFormData((prev) => ({ ...prev, status: value }));
+                              setIsStatusOpen(false);
+                            }
+                          }}
+                          className={`w-full flex items-center gap-3 px-5 py-3.5 text-[14px] font-semibold transition-all
+                            ${
+                              !isAllowed
+                                ? "opacity-30 cursor-not-allowed text-gray-400"
+                                : isCurrent
+                                ? `${colors.bg} ${colors.text}`
+                                : "hover:bg-gray-50 text-gray-700"
+                            }`}
+                        >
+                          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${colors.dot} ${!isAllowed ? "opacity-40" : ""}`} />
+                          {label}
+                          {isCurrent && (
+                            <svg className="ml-auto w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                          {!isAllowed && (
+                            <span className="ml-auto text-[11px] font-normal text-gray-400">전환 불가</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* 행사 설명 */}
@@ -309,13 +415,21 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
               <div className="flex items-center gap-6">
                 <div className="w-32 h-32 rounded-2xl bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden shrink-0">
                   {formData.thumbnailImageUrl ? (
-                    <img src={formData.thumbnailImageUrl} alt="Poster preview" className="w-full h-full object-cover" />
+                    <img
+                      src={formData.thumbnailImageUrl}
+                      alt="Poster preview"
+                      className="w-full h-full object-cover"
+                      onError={() => {
+                        // 이미지 로드 실패 시 URL 초기화 → React가 No Photo 플레이스홀더로 re-render
+                        setFormData((prev) => ({ ...prev, thumbnailImageUrl: "" }));
+                      }}
+                    />
                   ) : (
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="flex flex-col items-center justify-center gap-2 select-none">
+                      <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                      <span className="text-[12px] text-gray-400 font-medium">사진 없음</span>
+                      <span className="text-[11px] font-bold text-gray-400 tracking-wide">No Photo</span>
                     </div>
                   )}
                 </div>
