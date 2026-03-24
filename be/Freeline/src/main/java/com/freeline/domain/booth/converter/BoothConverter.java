@@ -5,11 +5,13 @@ import java.util.List;
 import lombok.experimental.UtilityClass;
 
 import com.freeline.domain.booth.dto.request.BoothCreateReqDto;
+import com.freeline.domain.booth.dto.request.BoothPolicyUpdateReqDto;
 import com.freeline.domain.booth.dto.response.BoothCalledUserResDto;
 import com.freeline.domain.booth.dto.response.BoothCreateResDto;
 import com.freeline.domain.booth.dto.response.BoothGoodsResDto;
 import com.freeline.domain.booth.dto.response.BoothImageUploadResDto;
 import com.freeline.domain.booth.dto.response.BoothListResDto;
+import com.freeline.domain.booth.dto.response.BoothPolicyResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueEntryResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueResDto;
 import com.freeline.domain.booth.dto.response.BoothResDto;
@@ -17,7 +19,9 @@ import com.freeline.domain.booth.dto.response.BoothStatusResDto;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothGoods;
 import com.freeline.domain.booth.entity.BoothImage;
+import com.freeline.domain.booth.entity.BoothPolicy;
 import com.freeline.domain.booth.entity.BoothWaiting;
+import com.freeline.domain.event.entity.EventPolicy;
 
 @UtilityClass
 public class BoothConverter {
@@ -96,6 +100,39 @@ public class BoothConverter {
         return BoothStatusResDto.builder()
                 .boothId(booth.getId())
                 .isEmergencyClosed(booth.isEmergencyClosed())
+                .build();
+    }
+
+    public BoothPolicy toBoothPolicyEntity(final Long boothId, final BoothPolicyUpdateReqDto dto) {
+        return BoothPolicy.builder()
+                .boothId(boothId)
+                .stayTime(dto.staySeconds())
+                .maxWaitingCount(dto.maxWaitingCount())
+                .callCount(dto.callCount())
+                .callValidTime(dto.callValidSeconds())
+                .deferLimit(dto.deferLimit())
+                .build();
+    }
+
+    public BoothPolicyResDto toBoothPolicyResDto(final Long boothId, final BoothPolicy boothPolicy) {
+        return BoothPolicyResDto.builder()
+                .boothId(boothId)
+                .staySeconds(boothPolicy.getStayTime())
+                .maxWaitingCount(boothPolicy.getMaxWaitingCount())
+                .callCount(boothPolicy.getCallCount())
+                .callValidSeconds(boothPolicy.getCallValidTime())
+                .deferLimit(boothPolicy.getDeferLimit())
+                .build();
+    }
+
+    public BoothPolicyResDto toBoothPolicyResDto(final Long boothId, final EventPolicy eventPolicy) {
+        return BoothPolicyResDto.builder()
+                .boothId(boothId)
+                .staySeconds(eventPolicy.getDefaultStaySec())
+                .maxWaitingCount(eventPolicy.getDefaultMaxWaiting())
+                .callCount(eventPolicy.getDefaultCallCount())
+                .callValidSeconds(eventPolicy.getDefaultCallTtl())
+                .deferLimit(eventPolicy.getDefaultDeferLimit())
                 .build();
     }
 
