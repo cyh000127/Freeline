@@ -2,11 +2,13 @@ package com.freeline.domain.pushnotification.service;
 
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.freeline.common.error.ErrorCode;
+import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.pushnotification.dto.message.WaitingFcmTaskMessage;
 import com.freeline.domain.pushnotification.dto.request.PushNotificationSendReqDto;
 import com.freeline.domain.pushnotification.exception.PushNotificationException;
@@ -28,6 +30,28 @@ public class WaitingFcmDelayedConsumer {
                     "[PushNotification] delayed task skipped due to missing payload {eventId: {}, waitingId: {}, notificationType: {}}",
                     message.eventId(),
                     message.waitingId(),
+                    message.notificationType()
+            );
+            return;
+        }
+
+        if (!pushNotificationService.isConfigured()) {
+            log.info(
+                    "[PushNotification] delayed task skipped because push sender is not configured {eventId: {}, waitingId: {}, notificationType: {}}",
+                    message.eventId(),
+                    message.waitingId(),
+                    message.notificationType()
+            );
+            return;
+        }
+
+        final WaitingStatus expectedStatus = resolveExpectedStatus(message);
+        if (expectedStatus != null && !pushNotificationService.isWaitingStatus(message.waitingId(), expectedStatus)) {
+            log.warn(
+                    "[PushNotification] delayed task skipped due to stale waiting status {eventId: {}, waitingId: {}, expectedStatus: {}, notificationType: {}}",
+                    message.eventId(),
+                    message.waitingId(),
+                    expectedStatus,
                     message.notificationType()
             );
             return;
@@ -59,8 +83,27 @@ public class WaitingFcmDelayedConsumer {
 
     private boolean shouldSkip(final ErrorCode errorCode) {
         return errorCode == ErrorCode.NOT_FOUND
+                || errorCode == ErrorCode.PUSH_NOTIFICATION_NOT_CONFIGURED
                 || errorCode == ErrorCode.PUSH_NOTIFICATION_TOKEN_NOT_FOUND
                 || errorCode == ErrorCode.PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH
                 || errorCode == ErrorCode.INVALID_INPUT;
+    }
+
+    private WaitingStatus resolveExpectedStatus(final WaitingFcmTaskMessage message) {
+        if (!StringUtils.hasText(message.expectedStatus())) {
+            return null;
+        }
+
+        try {
+            return WaitingStatus.valueOf(message.expectedStatus());
+        } catch (final IllegalArgumentException ex) {
+            log.warn(
+                    "[PushNotification] delayed task skipped due to invalid expected status {eventId: {}, waitingId: {}, expectedStatus: {}}",
+                    message.eventId(),
+                    message.waitingId(),
+                    message.expectedStatus()
+            );
+            return null;
+        }
     }
 }

@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.freeline.common.event.waiting.model.WaitingEventMessage;
 import com.freeline.common.event.waiting.model.WaitingEventType;
 import com.freeline.common.util.TimeUtils;
+import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothPolicy;
 import com.freeline.domain.booth.entity.BoothWaiting;
 import com.freeline.domain.booth.entity.WaitingStatus;
@@ -81,6 +82,7 @@ class WaitingFcmEventConsumerTest {
     @Test
     void consume_calledEvent_sendsImmediateNotificationAndSchedulesReminder() {
         final WaitingFcmEventConsumer consumer = createConsumer();
+        final UUID eventId = UUID.randomUUID();
         final BoothWaiting waiting = BoothWaiting.builder()
                 .id(301L)
                 .boothId(12L)
@@ -91,7 +93,7 @@ class WaitingFcmEventConsumerTest {
                 .build();
         final WaitingEventMessage message = WaitingEventMessage.builder()
                 .schemaVersion(1)
-                .eventId(UUID.randomUUID())
+                .eventId(eventId)
                 .eventType(WaitingEventType.WAITING_CALLED)
                 .waitingId(301L)
                 .boothId(12L)
@@ -102,6 +104,7 @@ class WaitingFcmEventConsumerTest {
                 .snapshot(null)
                 .build();
 
+        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
         Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
 
         consumer.consume(message);
@@ -112,7 +115,8 @@ class WaitingFcmEventConsumerTest {
         );
         Mockito.verify(waitingFcmDelayPublisher).publish(
                 Mockito.argThat(task -> task.notificationType() == PushNotificationType.QR_CHECK_REMINDER
-                        && "CALLED".equals(task.expectedStatus())),
+                        && "CALLED".equals(task.expectedStatus())
+                        && eventId.equals(task.eventId())),
                 Mockito.eq(Duration.ofSeconds(90))
         );
     }
@@ -120,6 +124,7 @@ class WaitingFcmEventConsumerTest {
     @Test
     void consume_enteredEvent_schedulesExitReminder() {
         final WaitingFcmEventConsumer consumer = createConsumer();
+        final UUID eventId = UUID.randomUUID();
         final BoothWaiting waiting = BoothWaiting.builder()
                 .id(302L)
                 .boothId(12L)
@@ -129,7 +134,7 @@ class WaitingFcmEventConsumerTest {
                 .build();
         final WaitingEventMessage message = WaitingEventMessage.builder()
                 .schemaVersion(1)
-                .eventId(UUID.randomUUID())
+                .eventId(eventId)
                 .eventType(WaitingEventType.WAITING_ENTERED)
                 .waitingId(302L)
                 .boothId(12L)
@@ -140,6 +145,7 @@ class WaitingFcmEventConsumerTest {
                 .snapshot(null)
                 .build();
 
+        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
         Mockito.when(boothWaitingRepository.findById(302L)).thenReturn(Optional.of(waiting));
         Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
                 BoothPolicy.builder()
@@ -151,10 +157,12 @@ class WaitingFcmEventConsumerTest {
 
         consumer.consume(message);
 
-        Mockito.verifyNoInteractions(pushNotificationService);
+        Mockito.verify(pushNotificationService).isConfigured();
+        Mockito.verify(pushNotificationService, Mockito.never()).sendNotification(Mockito.anyLong(), Mockito.any());
         Mockito.verify(waitingFcmDelayPublisher).publish(
                 Mockito.argThat(task -> task.notificationType() == PushNotificationType.EXIT_ACTION_REQUIRED
-                        && "ENTERED".equals(task.expectedStatus())),
+                        && "ENTERED".equals(task.expectedStatus())
+                        && eventId.equals(task.eventId())),
                 Mockito.eq(Duration.ofSeconds(600))
         );
     }
@@ -190,6 +198,7 @@ class WaitingFcmEventConsumerTest {
     @Test
     void consume_enteredEvent_usesEventPolicyFallbackForExitReminder() {
         final WaitingFcmEventConsumer consumer = createConsumer();
+        final UUID eventId = UUID.randomUUID();
         final BoothWaiting waiting = BoothWaiting.builder()
                 .id(302L)
                 .boothId(12L)
@@ -199,7 +208,7 @@ class WaitingFcmEventConsumerTest {
                 .build();
         final WaitingEventMessage message = WaitingEventMessage.builder()
                 .schemaVersion(1)
-                .eventId(UUID.randomUUID())
+                .eventId(eventId)
                 .eventType(WaitingEventType.WAITING_ENTERED)
                 .waitingId(302L)
                 .boothId(12L)
@@ -210,10 +219,11 @@ class WaitingFcmEventConsumerTest {
                 .snapshot(null)
                 .build();
 
+        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
         Mockito.when(boothWaitingRepository.findById(302L)).thenReturn(Optional.of(waiting));
         Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.empty());
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(
-                com.freeline.domain.booth.entity.Booth.builder()
+                Booth.builder()
                         .id(12L)
                         .eventId(3L)
                         .name("Goods Booth")
@@ -235,8 +245,66 @@ class WaitingFcmEventConsumerTest {
 
         Mockito.verify(waitingFcmDelayPublisher).publish(
                 Mockito.argThat(task -> task.notificationType() == PushNotificationType.EXIT_ACTION_REQUIRED
-                        && "ENTERED".equals(task.expectedStatus())),
+                        && "ENTERED".equals(task.expectedStatus())
+                        && eventId.equals(task.eventId())),
                 Mockito.eq(Duration.ofSeconds(300))
         );
+    }
+
+    @Test
+    void consume_skipsWhenPushSenderIsNotConfigured() {
+        final WaitingFcmEventConsumer consumer = createConsumer();
+        final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
+                .eventId(UUID.randomUUID())
+                .eventType(WaitingEventType.WAITING_CALLED)
+                .waitingId(301L)
+                .boothId(12L)
+                .visitorId(21L)
+                .previousStatus("WAITING")
+                .currentStatus("CALLED")
+                .occurredAt(FIXED_NOW)
+                .snapshot(null)
+                .build();
+
+        Mockito.when(pushNotificationService.isConfigured()).thenReturn(false);
+
+        consumer.consume(message);
+
+        Mockito.verify(pushNotificationService).isConfigured();
+        Mockito.verify(pushNotificationService, Mockito.never()).sendNotification(Mockito.anyLong(), Mockito.any());
+        Mockito.verifyNoInteractions(
+                waitingFcmDelayPublisher,
+                boothWaitingRepository,
+                boothPolicyRepository,
+                boothRepository,
+                eventPolicyRepository
+        );
+    }
+
+    @Test
+    void consume_calledEvent_skipsWhenWaitingWasDeleted() {
+        final WaitingFcmEventConsumer consumer = createConsumer();
+        final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
+                .eventId(UUID.randomUUID())
+                .eventType(WaitingEventType.WAITING_CALLED)
+                .waitingId(301L)
+                .boothId(12L)
+                .visitorId(21L)
+                .previousStatus("WAITING")
+                .currentStatus("CALLED")
+                .occurredAt(FIXED_NOW)
+                .snapshot(null)
+                .build();
+
+        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.empty());
+
+        consumer.consume(message);
+
+        Mockito.verify(pushNotificationService).isConfigured();
+        Mockito.verify(pushNotificationService, Mockito.never()).sendNotification(Mockito.anyLong(), Mockito.any());
+        Mockito.verifyNoInteractions(waitingFcmDelayPublisher);
     }
 }
