@@ -48,7 +48,7 @@ RUNNING_BEFORE=$(docker compose ps -q 2>/dev/null || true)
 
 # ── Deploy ──
 echo "🚀 [$COMPONENT] Starting deployment..."
-if ! docker compose up -d --remove-orphans; then
+if ! docker compose up -d --build --remove-orphans; then
     echo "❌ [$COMPONENT] docker compose up failed"
     exit 1
 fi
