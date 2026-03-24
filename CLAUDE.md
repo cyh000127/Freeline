@@ -62,7 +62,7 @@ cd infra/nginx/ && docker-compose up -d
 - `infra/` — Docker Compose configs, Nginx, Jenkins pipelines, monitoring
 
 ### Backend Architecture
-Domain-driven layered design with 9 domains: `auth`, `booth`, `boothmanager`, `boothmap`, `event`, `goods`, `pushnotification`, `qr`, `waiting`.
+Domain-driven layered design with 10 domains: `actionlog`, `auth`, `booth`, `boothmanager`, `boothmap`, `event`, `goods`, `pushnotification`, `qr`, `waiting`.
 
 Each domain follows: `controller/ → service/ → repository/ → entity/` with `dto/{request,response}/`, `converter/`, and `exception/` subdirectories.
 
@@ -104,8 +104,8 @@ Key cross-cutting concerns in `common/`:
 
 ### Infrastructure
 Two-server deployment:
-- **Server A** (172.26.3.239): Nginx, backend, frontend apps, PostgreSQL, Redis, RabbitMQ
-- **Server B** (172.26.15.39): Jenkins, Infisical (secrets), Prometheus + Grafana monitoring
+- **Server A** (172.26.3.239): Nginx, backend, frontend apps, PostgreSQL, Redis, RabbitMQ, Flume Agent
+- **Server B** (172.26.15.39): Jenkins, Infisical (secrets), Prometheus + Grafana monitoring, Hadoop (HDFS + YARN) + Hive
 
 Nginx routes: `/` → user app, `/booth` → booth app, `/super` → admin app, `/api/` → backend (with SSE: no buffering, 3600s timeout)
 
@@ -119,7 +119,7 @@ Three Jenkins pipelines (`be/Jenkinsfile`, `fe/Jenkinsfile`, `infra/Jenkinsfile`
 - Docker build + deploy on `main` branch only; tests run on all branches
 - Health checks post-deploy (HTTP endpoints + `docker compose ps` state)
 - `infra/hosts.conf` maps components to target servers
-- Infra pipeline enforces deploy order: `networks,infisical,jenkins,...,nginx`
+- Infra pipeline enforces deploy order: `networks,infisical,jenkins,jenkins-agent,monitoring,monitoring-agent,hadoop,flume-agent,loadtest,nginx`
 
 ### Configuration
 - Backend profiles: `local` (defaults in `application-local.yml`) and `live` (env vars via Infisical)
@@ -128,3 +128,23 @@ Three Jenkins pipelines (`be/Jenkinsfile`, `fe/Jenkinsfile`, `infra/Jenkinsfile`
 - Prometheus metrics at `/actuator/prometheus`
 - Timezone: `Asia/Seoul` globally (Jackson + Hibernate + Docker TZ)
 - File upload limits: 100MB per file, 500MB per request
+
+### Hadoop Analytics Pipeline
+Event-level post-analysis report system using Hadoop batch processing.
+
+**Data flow:**
+```
+[Mobile App] → trackEvent() → buffer (20건/30초) → POST /api/v1/logs/actions
+    → [Spring Boot] Logback hourly rolling file (logs/action/)
+    → [Flume Agent] spooldir source → HDFS sink
+    → [HDFS] /data/logs/action/{date}/{hour}/
+    → [Hive] batch analysis → PostgreSQL report tables → Admin dashboard
+```
+
+**Components:**
+- `actionlog` domain (BE): `POST /api/v1/logs/actions` — bulk log collection, file-only (no DB)
+- `features/tracking/` (Mobile): TrackingProvider context + useTracking hook, buffer + batch send
+- `infra/hadoop/`: HDFS (NameNode + DataNode), YARN (ResourceManager + NodeManager), Hive (Metastore + HiveServer2)
+- `infra/flume-agent/`: Flume 1.11.0 spooldir→HDFS, spool-mover sidecar for rolling file handoff
+- Action log format: TSV (timestamp, eventId, visitorId, action, targetType, targetId, metadata, clientTimestamp, sessionId)
+- HDFS replication: 1 (single DataNode), Hive metastore: dedicated PostgreSQL
