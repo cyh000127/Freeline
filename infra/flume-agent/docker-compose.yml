@@ -26,7 +26,7 @@ services:
     restart: always
     environment:
       TZ: Asia/Seoul
-    entrypoint: [ "sh", "-c", "chmod +x /scripts/spool-logs.sh && /scripts/spool-logs.sh" ]
+    entrypoint: [ "sh", "/scripts/spool-logs.sh" ]
     volumes:
       - ./scripts/spool-logs.sh:/scripts/spool-logs.sh:ro
       - freeline-action-logs:/var/log/action/source:ro
