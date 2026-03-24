@@ -4,7 +4,7 @@ services:
     container_name: hadoop-namenode
     hostname: namenode
     restart: always
-    command: bash -c "if [ ! -f /hadoop/dfs/name/current/VERSION ]; then rm -rf /hadoop/dfs/name/* && hdfs namenode -format -force -nonInteractive; fi && hdfs namenode"
+    command: bash -c "sudo chown hadoop:hadoop /hadoop/dfs/name && if [ ! -f /hadoop/dfs/name/current/VERSION ]; then hdfs namenode -format -force -nonInteractive; fi && exec hdfs namenode"
     ports:
       - "9870:9870"
     environment:
@@ -29,7 +29,7 @@ services:
     container_name: hadoop-datanode
     hostname: datanode
     restart: always
-    command: hdfs datanode
+    command: bash -c "sudo chown hadoop:hadoop /hadoop/dfs/data && exec hdfs datanode"
     depends_on:
       namenode:
         condition: service_healthy
