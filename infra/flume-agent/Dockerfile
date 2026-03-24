@@ -14,9 +14,6 @@ RUN apk add --no-cache bash curl \
 COPY --from=apache/hadoop:3.4.1 /opt/hadoop/share/hadoop/common/ ${FLUME_HOME}/lib/
 COPY --from=apache/hadoop:3.4.1 /opt/hadoop/share/hadoop/hdfs/ ${FLUME_HOME}/lib/
 
-# Remove conflicting guava version
-RUN rm -f ${FLUME_HOME}/lib/guava-*.jar
-
 WORKDIR ${FLUME_HOME}
 
 ENTRYPOINT ["bin/flume-ng", "agent", \
