@@ -35,13 +35,6 @@ public class EventAdmin extends BaseEntity {
     private String name;
     private String organization;
 
-    @Builder.Default
-    private boolean verified = false;
-
-    public void verifyEmail() {
-        this.verified = true;
-    }
-
     public void updateInfo(String name, String organization) {
         this.name = name;
         this.organization = organization;

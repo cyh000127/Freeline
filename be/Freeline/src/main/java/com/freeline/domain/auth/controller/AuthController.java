@@ -33,6 +33,7 @@ import com.freeline.domain.auth.dto.request.UpdateMyInfoReqDto;
 import com.freeline.domain.auth.dto.request.VisitorEnterReqDto;
 import com.freeline.domain.auth.dto.response.BoothAdminCreateResDto;
 import com.freeline.domain.auth.dto.response.BoothAdminResDto;
+import com.freeline.domain.auth.dto.response.CheckIdResDto;
 import com.freeline.domain.auth.dto.response.LoginResDto;
 import com.freeline.domain.auth.dto.response.MyInfoResDto;
 import com.freeline.domain.auth.dto.response.SignupResDto;
@@ -50,6 +51,19 @@ public class AuthController {
     private final AuthService authService;
 
     /**
+     * 아이디 중복 확인
+     */
+    @Operation(summary = "아이디 중복 확인", description = "이미 가입된 이메일인지 확인합니다.")
+    @GetMapping("/check-id")
+    public ResponseEntity<BaseResponse<CheckIdResDto>> checkId(
+            @RequestParam final String email
+    ) {
+        CheckIdResDto response = authService.checkId(email);
+        String message = response.isAvailable() ? "사용 가능한 아이디입니다." : "이미 사용 중인 아이디입니다.";
+        return ResponseUtils.ok(response, message);
+    }
+
+    /**
      * 로그인 (행사주최자 및 부스관리자 공용)
      */
     @Operation(summary = "로그인", description = "이메일 또는 아이디를 사용하여 로그인합니다.")
@@ -59,6 +73,18 @@ public class AuthController {
     ) {
         LoginResDto response = authService.login(req);
         return ResponseUtils.ok(response);
+    }
+
+    /**
+     * 방문자 입장 (Entry Code 기반 인증)
+     */
+    @Operation(summary = "방문자 입장 인증", description = "6자리 Entry Code를 사용하여 인증합니다.")
+    @PostMapping("/visitors/entry-code/authenticate")
+    public ResponseEntity<BaseResponse<LoginResDto>> authenticate(
+            @Valid @RequestBody final VisitorEnterReqDto request
+    ) {
+        LoginResDto response = authService.visitorEnter(request);
+        return ResponseUtils.ok(response, "방문자 인증에 성공했습니다.");
     }
 
     /**
@@ -209,17 +235,5 @@ public class AuthController {
         Long userId = Long.parseLong(authentication.getName());
         authService.deleteUser(userId);
         return ResponseUtils.ok(null);
-    }
-
-    /**
-     * 방문자 입장 (Entry Code 기반)
-     */
-    @Operation(summary = "방문자 입장")
-    @PostMapping("/visitor-login")
-    public ResponseEntity<BaseResponse<LoginResDto>> visitorLogin(
-            @RequestBody final VisitorEnterReqDto request
-    ) {
-        LoginResDto response = authService.visitorEnter(request);
-        return ResponseUtils.ok(response);
     }
 }
