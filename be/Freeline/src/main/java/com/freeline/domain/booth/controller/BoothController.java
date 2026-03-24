@@ -47,8 +47,6 @@ public class BoothController {
 
     private final BoothService boothService;
 
-    // TODO: 부스 정책 설정 API (`PATCH /api/v1/booths/{boothId}/policy`)를 추가한다.
-
     @Operation(summary = "부스 이미지 업로드", description = "부스 이미지를 업로드하고 boothId와 매핑하여 저장합니다.")
     @PostMapping(value = "/booths/{boothId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BaseResponse<BoothImageUploadResDto>> uploadBoothImage(
