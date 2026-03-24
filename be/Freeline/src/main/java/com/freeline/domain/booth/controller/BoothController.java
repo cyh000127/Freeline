@@ -26,6 +26,7 @@ import com.freeline.domain.booth.dto.request.BoothCreateReqDto;
 import com.freeline.domain.booth.dto.request.BoothStatusUpdateReqDto;
 import com.freeline.domain.booth.dto.request.BoothUpdateReqDto;
 import com.freeline.domain.booth.dto.response.BoothCreateResDto;
+import com.freeline.domain.booth.dto.response.BoothCsvUploadResDto;
 import com.freeline.domain.booth.dto.response.BoothImageUploadResDto;
 import com.freeline.domain.booth.dto.response.BoothListResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueResDto;
@@ -38,7 +39,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 @Tag(name = "Booth", description = "부스 관리 API")
 @RestController
-@RequestMapping("/api/v1/booths")
+@RequestMapping("/api/v1")
 @RequiredArgsConstructor
 public class BoothController {
 
@@ -47,8 +48,8 @@ public class BoothController {
     // TODO: 부스 정책 조회 API (`GET /api/v1/booths/{boothId}/policy`)를 추가한다.
     // TODO: 부스 정책 설정 API (`PATCH /api/v1/booths/{boothId}/policy`)를 추가한다.
 
-    @Operation(summary = "부스 이미지 업로드", description = "부스 이미지를 업로드하고 boothId에 매핑하여 저장합니다.")
-    @PostMapping(value = "/{boothId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "부스 이미지 업로드", description = "부스 이미지를 업로드하고 boothId와 매핑하여 저장합니다.")
+    @PostMapping(value = "/booths/{boothId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BaseResponse<BoothImageUploadResDto>> uploadBoothImage(
             @PathVariable final Long boothId,
             @RequestPart("file") final MultipartFile file
@@ -57,8 +58,8 @@ public class BoothController {
         return ResponseUtils.ok(response);
     }
 
-    @Operation(summary = "부스 대표 이미지 업로드", description = "부스 대표 이미지를 업로드하고 boothId에 매핑하여 저장합니다.")
-    @PostMapping(value = "/{boothId}/image/representative", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "부스 대표 이미지 업로드", description = "부스 대표 이미지를 업로드하고 boothId와 매핑하여 저장합니다.")
+    @PostMapping(value = "/booths/{boothId}/image/representative", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BaseResponse<BoothImageUploadResDto>> uploadRepresentativeBoothImage(
             @PathVariable final Long boothId,
             @RequestPart("file") final MultipartFile file,
@@ -68,8 +69,18 @@ public class BoothController {
         return ResponseUtils.ok(response);
     }
 
+    @Operation(summary = "부스 CSV 일괄 등록", description = "행사에 속한 부스 목록을 CSV 파일로 업로드하여 일괄 등록합니다.")
+    @PostMapping(value = "/events/{eventId}/booths/csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<BaseResponse<BoothCsvUploadResDto>> uploadBoothsByCsv(
+            @PathVariable("eventId") final Long eventId,
+            @RequestPart("file") final MultipartFile file
+    ) {
+        final BoothCsvUploadResDto response = boothService.uploadBoothsByCsv(eventId, file);
+        return ResponseUtils.created(response);
+    }
+
     @Operation(summary = "부스 등록", description = "특정 행사에 새로운 부스를 등록합니다.")
-    @PostMapping("/events/{eventId}")
+    @PostMapping("/booths/events/{eventId}")
     public ResponseEntity<BaseResponse<BoothCreateResDto>> createBooth(
             @PathVariable final Long eventId,
             @Valid @RequestBody final BoothCreateReqDto request
@@ -79,7 +90,7 @@ public class BoothController {
     }
 
     @Operation(summary = "전체 부스 조회", description = "특정 행사에 속한 모든 부스를 조회합니다.")
-    @GetMapping("/events/{eventId}")
+    @GetMapping("/booths/events/{eventId}")
     public ResponseEntity<BaseResponse<List<BoothListResDto>>> getBooths(
             @PathVariable final Long eventId
     ) {
@@ -88,7 +99,7 @@ public class BoothController {
     }
 
     @Operation(summary = "부스 상세 조회", description = "특정 부스의 상세 정보와 굿즈 정보를 조회합니다.")
-    @GetMapping("/{boothId}")
+    @GetMapping("/booths/{boothId}")
     public ResponseEntity<BaseResponse<BoothResDto>> getBooth(
             @PathVariable final Long boothId
     ) {
@@ -97,7 +108,7 @@ public class BoothController {
     }
 
     @Operation(summary = "부스 대기열 현황 조회", description = "특정 부스의 현재 대기열 상태를 조회합니다.")
-    @GetMapping("/{boothId}/queue")
+    @GetMapping("/booths/{boothId}/queue")
     public ResponseEntity<BaseResponse<BoothQueueResDto>> getBoothQueue(
             @PathVariable final Long boothId
     ) {
@@ -106,7 +117,7 @@ public class BoothController {
     }
 
     @Operation(summary = "부스 운영 상태 변경", description = "특정 부스의 긴급 마감 여부를 변경합니다.")
-    @PatchMapping("/{boothId}/status")
+    @PatchMapping("/booths/{boothId}/status")
     public ResponseEntity<BaseResponse<BoothStatusResDto>> updateBoothStatus(
             @PathVariable final Long boothId,
             @Valid @RequestBody final BoothStatusUpdateReqDto request
@@ -116,7 +127,7 @@ public class BoothController {
     }
 
     @Operation(summary = "부스 정보 수정", description = "특정 부스의 이름, 위치, 운영 시간을 수정합니다.")
-    @PatchMapping("/{boothId}")
+    @PatchMapping("/booths/{boothId}")
     public ResponseEntity<BaseResponse<BoothCreateResDto>> updateBooth(
             @PathVariable final Long boothId,
             @Valid @RequestBody final BoothUpdateReqDto request
@@ -126,7 +137,7 @@ public class BoothController {
     }
 
     @Operation(summary = "부스 삭제", description = "특정 부스를 삭제합니다.")
-    @DeleteMapping("/{boothId}")
+    @DeleteMapping("/booths/{boothId}")
     public ResponseEntity<BaseResponse<Void>> deleteBooth(
             @PathVariable final Long boothId
     ) {

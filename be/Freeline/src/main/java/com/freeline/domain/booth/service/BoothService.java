@@ -1,6 +1,13 @@
 package com.freeline.domain.booth.service;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -12,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.freeline.common.error.ErrorCode;
+import com.freeline.common.error.exception.BusinessException;
 import com.freeline.common.file.dto.FileInfo;
 import com.freeline.common.file.service.FileService;
 import com.freeline.domain.booth.converter.BoothConverter;
@@ -20,6 +28,7 @@ import com.freeline.domain.booth.dto.request.BoothStatusUpdateReqDto;
 import com.freeline.domain.booth.dto.request.BoothUpdateReqDto;
 import com.freeline.domain.booth.dto.response.BoothCalledUserResDto;
 import com.freeline.domain.booth.dto.response.BoothCreateResDto;
+import com.freeline.domain.booth.dto.response.BoothCsvUploadResDto;
 import com.freeline.domain.booth.dto.response.BoothGoodsResDto;
 import com.freeline.domain.booth.dto.response.BoothImageUploadResDto;
 import com.freeline.domain.booth.dto.response.BoothListResDto;
@@ -47,6 +56,7 @@ import com.freeline.domain.event.repository.EventRepository;
 public class BoothService {
 
     private static final String BOOTH_DIRECTORY = "booth";
+    private static final DateTimeFormatter CSV_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private static final List<WaitingStatus> FRONT_QUEUE_STATUSES = List.of(
             WaitingStatus.CALLED,
@@ -79,6 +89,25 @@ public class BoothService {
         log.info("[Booth] 생성 완료 {id: {}, eventId: {}}", saved.getId(), saved.getEventId());
 
         return BoothConverter.toBoothCreateResDto(saved);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public BoothCsvUploadResDto uploadBoothsByCsv(final Long eventId, final MultipartFile file) {
+        validateEventExists(eventId);
+
+        if (file.isEmpty()) {
+            throw new BusinessException(ErrorCode.FILE_EMPTY);
+        }
+
+        final List<Booth> booths = parseBoothsFromCsv(eventId, file);
+        boothRepository.saveAll(booths);
+
+        log.info("[Booth] CSV bulk upload completed {eventId: {}, count: {}}", eventId, booths.size());
+
+        return BoothCsvUploadResDto.builder()
+                .eventId(eventId)
+                .importedCount(booths.size())
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -210,6 +239,84 @@ public class BoothService {
     private void validateOperatingHours(final LocalTime openTime, final LocalTime closeTime) {
         if (!closeTime.isAfter(openTime)) {
             throw new BoothException(ErrorCode.INVALID_BOOTH_OPERATING_HOURS);
+        }
+    }
+
+    private List<Booth> parseBoothsFromCsv(final Long eventId, final MultipartFile file) {
+        final List<Booth> booths = new ArrayList<>();
+
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+            String line = reader.readLine();
+            int lineNumber = 1;
+
+            if (line == null) {
+                throw new IllegalArgumentException("CSV 파일이 비어 있습니다.");
+            }
+
+            while ((line = reader.readLine()) != null) {
+                lineNumber++;
+
+                if (line.isBlank()) {
+                    continue;
+                }
+
+                booths.add(parseBoothRow(eventId, line, lineNumber));
+            }
+        } catch (IOException ex) {
+            throw new IllegalArgumentException("CSV 파일을 읽는 중 오류가 발생했습니다.", ex);
+        }
+
+        return booths;
+    }
+
+    private Booth parseBoothRow(final Long eventId, final String line, final int lineNumber) {
+        final String[] columns = line.split(",", -1);
+        final String name = getColumn(columns, 0);
+
+        if (name == null) {
+            throw new IllegalArgumentException("CSV 파싱 오류: " + lineNumber + "번째 줄의 name 값이 비어 있습니다.");
+        }
+
+        final String locationCode = getColumn(columns, 1);
+        final LocalTime openTime = parseCsvTime(getColumn(columns, 2), "openTime", lineNumber);
+        final LocalTime closeTime = parseCsvTime(getColumn(columns, 3), "closeTime", lineNumber);
+
+        if (openTime != null && closeTime != null && !closeTime.isAfter(openTime)) {
+            throw new IllegalArgumentException("CSV 파싱 오류: " + lineNumber + "번째 줄의 운영 시간이 잘못되었습니다.");
+        }
+
+        return Booth.builder()
+                .eventId(eventId)
+                .name(name)
+                .locationCode(locationCode)
+                .openTime(openTime)
+                .closeTime(closeTime)
+                .emergencyClosed(false)
+                .build();
+    }
+
+    private String getColumn(final String[] columns, final int index) {
+        if (index >= columns.length) {
+            return null;
+        }
+
+        final String value = columns[index].trim();
+        return value.isEmpty() ? null : value;
+    }
+
+    private LocalTime parseCsvTime(final String value, final String fieldName, final int lineNumber) {
+        if (value == null) {
+            return null;
+        }
+
+        try {
+            return LocalTime.parse(value, CSV_TIME_FORMATTER);
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException(
+                    "CSV 파싱 오류: " + lineNumber + "번째 줄의 " + fieldName + " 형식이 잘못되었습니다.",
+                    ex
+            );
         }
     }
 }
