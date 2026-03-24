@@ -3,6 +3,7 @@ package com.freeline.common.security;
 import java.io.IOException;
 import java.util.List;
 
+import jakarta.annotation.Nonnull;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,8 +28,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/v1/auth/signup",
             "/api/v1/auth/email/**",
             "/api/v1/auth/refresh",
-            "/api/v1/auth/check-id",
+            "/api/v1/auth/check-id/**",
             "/api/v1/auth/visitors/entry-code/authenticate",
+            "/api/v1/auth/check-id",
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/v3/api-docs/**",
@@ -45,9 +47,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
+            @Nonnull HttpServletRequest request,
+            @Nonnull HttpServletResponse response,
+            @Nonnull FilterChain filterChain
     ) throws ServletException, IOException {
 
         final String path = request.getRequestURI();
