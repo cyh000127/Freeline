@@ -4,24 +4,19 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
-import org.springframework.stereotype.Component;
+import lombok.experimental.UtilityClass;
 
-@Component
+@UtilityClass
 public class TimeUtils {
-
-    public static LocalDateTime now() {
+    public LocalDateTime nowDateTime() {
         return LocalDateTime.now();
     }
 
-    public static LocalDateTime nowDateTime() {
-        return LocalDateTime.now();
-    }
-
-    public static LocalDate today() {
+    public LocalDate today() {
         return LocalDate.now();
     }
 
-    public static LocalTime nowTime() {
+    public LocalTime nowTime() {
         return LocalTime.now();
     }
 }

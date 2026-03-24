@@ -35,6 +35,25 @@ services:
       timeout: 3s
       retries: 5
 
+  freeline-rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: freeline-rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VIRTUAL_HOST}
+      TZ: Asia/Seoul
+    volumes:
+      - freeline-rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - infra-public
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   freeline-backend:
     image: freeline-backend:latest
     container_name: freeline-backend
@@ -43,6 +62,8 @@ services:
       freeline-db:
         condition: service_healthy
       freeline-redis:
+        condition: service_healthy
+      freeline-rabbitmq:
         condition: service_healthy
     ports:
       - "8080:8080"
@@ -59,6 +80,12 @@ services:
       REDIS_HOST: freeline-redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      RABBITMQ_HOST: freeline-rabbitmq
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VIRTUAL_HOST}
 
       JWT_SECRET: ${JWT_SECRET}
       JWT_ACCESS_TOKEN_EXPIRATION: ${JWT_ACCESS_TOKEN_EXPIRATION}
@@ -83,6 +110,7 @@ services:
 volumes:
   freeline-db-data:
   freeline-redis-data:
+  freeline-rabbitmq-data:
 
 
 networks:

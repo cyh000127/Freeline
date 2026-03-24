@@ -36,4 +36,9 @@ public class EventMap extends BaseEntity {
 
     @Column(name = "is_visible", nullable = false)
     private boolean visible;
+
+    public void update(final String imagePath, final boolean visible) {
+        this.imagePath = imagePath;
+        this.visible = visible;
+    }
 }
