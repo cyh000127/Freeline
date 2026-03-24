@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -14,7 +15,10 @@ import lombok.RequiredArgsConstructor;
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.util.ResponseUtils;
 import com.freeline.domain.report.dto.response.ReportResponseDto;
+import com.freeline.domain.report.dto.response.ReportStatusResponseDto;
+import com.freeline.domain.report.service.ReportGenerationService;
 import com.freeline.domain.report.service.ReportQueryService;
+import com.freeline.domain.report.service.ReportStatus;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,6 +30,34 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class ReportController {
 
     private final ReportQueryService reportQueryService;
+    private final ReportGenerationService reportGenerationService;
+
+    @Operation(summary = "리포트 생성 트리거",
+            description = "종료된 행사의 리포트 생성을 비동기로 시작합니다. DB 덤프 → Hive 분석 → PostgreSQL 적재 순서로 진행됩니다.")
+    @PostMapping("/events/{eventId}/generate")
+    public ResponseEntity<BaseResponse<ReportStatusResponseDto>> generateReport(
+            final Authentication authentication,
+            @PathVariable final Long eventId
+    ) {
+        final Long eventAdminId = Long.valueOf(authentication.getName());
+        reportGenerationService.requestGeneration(eventAdminId, eventId);
+        final ReportStatusResponseDto response =
+                ReportStatusResponseDto.of(eventId, ReportStatus.PENDING.name());
+        return ResponseUtils.accepted(response);
+    }
+
+    @Operation(summary = "리포트 생성 상태 조회",
+            description = "리포트 생성 진행 상태를 조회합니다. (PENDING, DUMPING, ANALYZING, IMPORTING, COMPLETED, FAILED)")
+    @GetMapping("/events/{eventId}/status")
+    public ResponseEntity<BaseResponse<ReportStatusResponseDto>> getReportStatus(
+            final Authentication authentication,
+            @PathVariable final Long eventId
+    ) {
+        final ReportStatus status = reportGenerationService.getStatus(eventId);
+        final String statusName = status != null ? status.name() : "NOT_STARTED";
+        final ReportStatusResponseDto response = ReportStatusResponseDto.of(eventId, statusName);
+        return ResponseUtils.ok(response);
+    }
 
     @Operation(summary = "행사 리포트 전체 조회",
             description = "종료된 행사의 요약, 부스 성과, 유입량, 동선, 문제지점 종합 데이터를 제공합니다.")
