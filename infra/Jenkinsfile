@@ -21,7 +21,7 @@ pipeline {
     environment {
         INFRA_DIR    = 'infra'
         HOSTS_FILE   = 'infra/hosts.conf'
-        DEPLOY_ORDER = 'networks,infisical,jenkins,jenkins-agent,monitoring,monitoring-agent,nginx'
+        DEPLOY_ORDER = 'networks,infisical,jenkins,jenkins-agent,monitoring,monitoring-agent,loadtest,nginx'
     }
 
     stages {
@@ -29,6 +29,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+                updateGitlabCommitStatus name: 'freeline-infra', state: 'pending'
                 script {
                     if (env.gitlabSourceBranch) {
                         sh "git checkout origin/${env.gitlabSourceBranch}"

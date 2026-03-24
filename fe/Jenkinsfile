@@ -25,12 +25,18 @@ pipeline {
         SUPER_IMAGE = 'freeline-super'
 
         DOCKER_TAG = "${env.BUILD_ID}"
+
+        INFISICAL_URL = 'https://j14a207.p.ssafy.io:8443'
+        INFISICAL_PROJECT_ID = credentials('infisical-project-id')
+        INFISICAL_CLIENT_ID = credentials('infisical-client-id')
+        INFISICAL_CLIENT_SECRET = credentials('infisical-client-secret')
     }
 
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
+                updateGitlabCommitStatus name: 'freeline-fe', state: 'pending'
                 script {
                     if (env.gitlabSourceBranch) {
                         sh "git checkout origin/${env.gitlabSourceBranch}"
@@ -83,24 +89,20 @@ pipeline {
                 stage('Build freeline_user') {
                     when { expression { env.BUILD_USER == 'true' } }
                     steps {
-                        withInfisical(
-                            configuration: [
-                                infisicalCredentialId: 'infisical-universal-auth',
-                                infisicalEnvironmentSlug: 'prod',
-                                infisicalProjectSlug: 'freeline',
-                                infisicalUrl: 'https://j14a207.p.ssafy.io:8443'
-                            ],
-                            infisicalSecrets: [
-                                infisicalSecret(
-                                    includeImports: true,
-                                    path: '/fe',
-                                    secretValues: []
-                                )
-                            ]
-                        ) {
-                            dir('fe/freeline_user') {
-                                sh "docker build -t ${USER_IMAGE}:${DOCKER_TAG} -t ${USER_IMAGE}:latest ."
-                            }
+                        dir('fe/freeline_user') {
+                            sh '''set +x
+                                export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
+                                    --client-id=$INFISICAL_CLIENT_ID \
+                                    --client-secret=$INFISICAL_CLIENT_SECRET \
+                                    --domain=$INFISICAL_URL/api \
+                                    --silent --plain)
+                                set -x
+                                infisical run \
+                                    --domain=$INFISICAL_URL/api \
+                                    --projectId=$INFISICAL_PROJECT_ID \
+                                    --env=prod --path=/fe \
+                                    -- docker build -t $USER_IMAGE:$DOCKER_TAG -t $USER_IMAGE:latest .
+                            '''
                         }
                     }
                 }
@@ -108,24 +110,20 @@ pipeline {
                 stage('Build freeline-booth') {
                     when { expression { env.BUILD_BOOTH == 'true' } }
                     steps {
-                        withInfisical(
-                            configuration: [
-                                infisicalCredentialId: 'infisical-universal-auth',
-                                infisicalEnvironmentSlug: 'prod',
-                                infisicalProjectSlug: 'freeline',
-                                infisicalUrl: 'https://j14a207.p.ssafy.io:8443'
-                            ],
-                            infisicalSecrets: [
-                                infisicalSecret(
-                                    includeImports: true,
-                                    path: '/fe',
-                                    secretValues: []
-                                )
-                            ]
-                        ) {
-                            dir('fe/freeline-booth') {
-                                sh "docker build -t ${BOOTH_IMAGE}:${DOCKER_TAG} -t ${BOOTH_IMAGE}:latest ."
-                            }
+                        dir('fe/freeline-booth') {
+                            sh '''set +x
+                                export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
+                                    --client-id=$INFISICAL_CLIENT_ID \
+                                    --client-secret=$INFISICAL_CLIENT_SECRET \
+                                    --domain=$INFISICAL_URL/api \
+                                    --silent --plain)
+                                set -x
+                                infisical run \
+                                    --domain=$INFISICAL_URL/api \
+                                    --projectId=$INFISICAL_PROJECT_ID \
+                                    --env=prod --path=/fe \
+                                    -- docker build -t $BOOTH_IMAGE:$DOCKER_TAG -t $BOOTH_IMAGE:latest .
+                            '''
                         }
                     }
                 }
@@ -133,24 +131,20 @@ pipeline {
                 stage('Build freeline-super') {
                     when { expression { env.BUILD_SUPER == 'true' } }
                     steps {
-                        withInfisical(
-                            configuration: [
-                                infisicalCredentialId: 'infisical-universal-auth',
-                                infisicalEnvironmentSlug: 'prod',
-                                infisicalProjectSlug: 'freeline',
-                                infisicalUrl: 'https://j14a207.p.ssafy.io:8443'
-                            ],
-                            infisicalSecrets: [
-                                infisicalSecret(
-                                    includeImports: true,
-                                    path: '/fe',
-                                    secretValues: []
-                                )
-                            ]
-                        ) {
-                            dir('fe/freeline-super') {
-                                sh "docker build -t ${SUPER_IMAGE}:${DOCKER_TAG} -t ${SUPER_IMAGE}:latest ."
-                            }
+                        dir('fe/freeline-super') {
+                            sh '''set +x
+                                export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
+                                    --client-id=$INFISICAL_CLIENT_ID \
+                                    --client-secret=$INFISICAL_CLIENT_SECRET \
+                                    --domain=$INFISICAL_URL/api \
+                                    --silent --plain)
+                                set -x
+                                infisical run \
+                                    --domain=$INFISICAL_URL/api \
+                                    --projectId=$INFISICAL_PROJECT_ID \
+                                    --env=prod --path=/fe \
+                                    -- docker build -t $SUPER_IMAGE:$DOCKER_TAG -t $SUPER_IMAGE:latest .
+                            '''
                         }
                     }
                 }

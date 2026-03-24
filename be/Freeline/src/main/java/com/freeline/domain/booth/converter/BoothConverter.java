@@ -8,6 +8,7 @@ import com.freeline.domain.booth.dto.request.BoothCreateReqDto;
 import com.freeline.domain.booth.dto.response.BoothCalledUserResDto;
 import com.freeline.domain.booth.dto.response.BoothCreateResDto;
 import com.freeline.domain.booth.dto.response.BoothGoodsResDto;
+import com.freeline.domain.booth.dto.response.BoothImageUploadResDto;
 import com.freeline.domain.booth.dto.response.BoothListResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueEntryResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueResDto;
@@ -15,6 +16,7 @@ import com.freeline.domain.booth.dto.response.BoothResDto;
 import com.freeline.domain.booth.dto.response.BoothStatusResDto;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothGoods;
+import com.freeline.domain.booth.entity.BoothImage;
 import com.freeline.domain.booth.entity.BoothWaiting;
 
 @UtilityClass
@@ -59,6 +61,15 @@ public class BoothConverter {
                 .name(goods.getName())
                 .imageUrl(goods.getImagePath())
                 .isSoldOut(goods.isSoldOut())
+                .build();
+    }
+
+    public BoothImageUploadResDto toBoothImageUploadResDto(final BoothImage boothImage) {
+        return BoothImageUploadResDto.builder()
+                .boothImageId(boothImage.getId())
+                .boothId(boothImage.getBoothId())
+                .imageUrl(boothImage.getImagePath())
+                .isRepresentative(boothImage.isRepresentative())
                 .build();
     }
 

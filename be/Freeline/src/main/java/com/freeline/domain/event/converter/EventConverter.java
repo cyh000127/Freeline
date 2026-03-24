@@ -90,6 +90,7 @@ public class EventConverter {
 
     public EventDetailResDto toEventDetailResDto(
             final Event event,
+            final String mapImageUrl,
             final List<EventDetailResDto.BoothSummaryDto> booths
     ) {
         return EventDetailResDto.builder()
@@ -104,7 +105,7 @@ public class EventConverter {
                 .closeTime(event.getCloseTime())
                 .locationAddress(event.getLocationAddress())
                 .thumbnailImageUrl(event.getThumbnailImageUrl())
-                .mapImageUrl(null)
+                .mapImageUrl(mapImageUrl)
                 .status(event.getStatus().name())
                 .createdAt(event.getCreatedAt())
                 .updatedAt(event.getUpdatedAt())

@@ -5,15 +5,20 @@ import java.util.List;
 import java.util.Optional;
 
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.freeline.common.error.ErrorCode;
+import com.freeline.common.event.waiting.dispatcher.WaitingEventDispatcher;
+import com.freeline.common.util.TimeUtils;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothPolicy;
 import com.freeline.domain.booth.entity.BoothWaiting;
@@ -35,6 +40,8 @@ import com.freeline.domain.waiting.exception.WaitingException;
 
 @ExtendWith(MockitoExtension.class)
 class WaitingServiceTest {
+
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 3, 19, 18, 0);
 
     private static final List<WaitingStatus> ACTIVE_WAITING_STATUSES = List.of(
             WaitingStatus.WAITING,
@@ -64,8 +71,26 @@ class WaitingServiceTest {
     @Mock
     private BoothPolicyRepository boothPolicyRepository;
 
+    @Mock
+    private WaitingEventDispatcher waitingEventDispatcher;
+
     @InjectMocks
     private WaitingService waitingService;
+
+    private MockedStatic<TimeUtils> timeUtilsMock;
+
+    @BeforeEach
+    void setUp() {
+        timeUtilsMock = Mockito.mockStatic(TimeUtils.class);
+        timeUtilsMock.when(TimeUtils::nowDateTime).thenReturn(FIXED_NOW);
+        timeUtilsMock.when(TimeUtils::today).thenReturn(FIXED_NOW.toLocalDate());
+        timeUtilsMock.when(TimeUtils::nowTime).thenReturn(FIXED_NOW.toLocalTime());
+    }
+
+    @AfterEach
+    void tearDown() {
+        timeUtilsMock.close();
+    }
 
     @Test
     void createWaiting_success() {
@@ -421,9 +446,9 @@ class WaitingServiceTest {
 
         Assertions.assertThat(result.visitorQueueStatus()).isEqualTo("FRONT_QUEUE_OCCUPIED");
         Assertions.assertThat(result.waitings()).hasSize(2);
-        Assertions.assertThat(result.waitings().get(0).boothName()).isEqualTo("Goods Booth");
-        Assertions.assertThat(result.waitings().get(0).myRank()).isEqualTo(5);
-        Assertions.assertThat(result.waitings().get(0).postponeAvailable()).isTrue();
+        Assertions.assertThat(result.waitings().getFirst().boothName()).isEqualTo("Goods Booth");
+        Assertions.assertThat(result.waitings().getFirst().myRank()).isEqualTo(5);
+        Assertions.assertThat(result.waitings().getFirst().postponeAvailable()).isTrue();
         Assertions.assertThat(result.waitings().get(1).myRank()).isEqualTo(2);
         Assertions.assertThat(result.waitings().get(1).postponeAvailable()).isFalse();
     }

@@ -12,6 +12,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,7 +52,10 @@ import com.freeline.domain.event.repository.EventRepository;
 @RequiredArgsConstructor
 public class EventService {
 
+
     private static final String EVENT_THUMBNAIL_DIRECTORY = "events";
+    private static final String EVENT_DIRECTORY = "event";
+
 
     private final EventRepository eventRepository;
     private final EventMapRepository eventMapRepository;
@@ -85,6 +89,35 @@ public class EventService {
         }
     }
 
+    public EventUpdateResDto uploadThumbnail(
+            final Long eventAdminId,
+            final Long eventId,
+            final MultipartFile file
+    ) {
+        final Event event = getAuthorizedEvent(eventAdminId, eventId);
+        final String previousThumbnailUrl = event.getThumbnailImageUrl();
+        final FileInfo uploadedFile = fileService.uploadFile(file, EVENT_DIRECTORY);
+
+        event.update(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                uploadedFile.fileUrl(),
+                null
+        );
+
+        if (previousThumbnailUrl != null && !previousThumbnailUrl.isBlank()) {
+            cloudflareStorageUtil.deleteFile(previousThumbnailUrl);
+        }
+
+        log.info("[Event] thumbnail upload completed {id: {}, adminId: {}}", event.getId(), eventAdminId);
+
+        return EventConverter.toEventUpdateResDto(event);
+    }
+
     @Transactional(readOnly = true)
     public Page<EventListResDto> getEvents(
             final String status,
@@ -111,9 +144,14 @@ public class EventService {
             final Boolean includeBooths
     ) {
         final Event event = getAuthorizedEvent(eventAdminId, eventId);
+        final String mapImageUrl = eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(eventId)
+                .or(() -> eventMapRepository.findFirstByEventIdOrderByIdDesc(eventId))
+                .map(EventMap::getImagePath)
+                .orElse(null);
 
         return EventConverter.toEventDetailResDto(
                 event,
+                mapImageUrl,
                 Boolean.TRUE.equals(includeBooths) ? Collections.emptyList() : null
         );
     }
