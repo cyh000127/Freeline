@@ -83,9 +83,11 @@ ALTER TABLE IF EXISTS event_policies
 ALTER TABLE IF EXISTS event_policies
     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
-DO $$
+DO
+$$
 BEGIN
-    IF EXISTS (
+    IF
+EXISTS (
         SELECT 1
         FROM information_schema.tables
         WHERE table_schema = current_schema()
@@ -98,105 +100,121 @@ BEGIN
               AND table_name = 'event_policies'
               AND column_name = 'expected_stay_time'
         ) THEN
-            UPDATE event_policies
-            SET default_stay_sec = COALESCE(default_stay_sec, expected_stay_time, 600)
-            WHERE default_stay_sec IS NULL;
-        ELSE
-            UPDATE event_policies
-            SET default_stay_sec = COALESCE(default_stay_sec, 600)
-            WHERE default_stay_sec IS NULL;
-        END IF;
+UPDATE event_policies
+SET default_stay_sec = COALESCE(default_stay_sec, expected_stay_time, 600)
+WHERE default_stay_sec IS NULL;
+ELSE
+UPDATE event_policies
+SET default_stay_sec = COALESCE(default_stay_sec, 600)
+WHERE default_stay_sec IS NULL;
+END IF;
 
-        IF EXISTS (
+        IF
+EXISTS (
             SELECT 1
             FROM information_schema.columns
             WHERE table_schema = current_schema()
               AND table_name = 'event_policies'
               AND column_name = 'max_waiting_count'
         ) THEN
-            UPDATE event_policies
-            SET default_max_waiting = COALESCE(default_max_waiting, max_waiting_count, 100)
-            WHERE default_max_waiting IS NULL;
-        ELSE
-            UPDATE event_policies
-            SET default_max_waiting = COALESCE(default_max_waiting, 100)
-            WHERE default_max_waiting IS NULL;
-        END IF;
+UPDATE event_policies
+SET default_max_waiting = COALESCE(default_max_waiting, max_waiting_count, 100)
+WHERE default_max_waiting IS NULL;
+ELSE
+UPDATE event_policies
+SET default_max_waiting = COALESCE(default_max_waiting, 100)
+WHERE default_max_waiting IS NULL;
+END IF;
 
-        IF EXISTS (
+        IF
+EXISTS (
             SELECT 1
             FROM information_schema.columns
             WHERE table_schema = current_schema()
               AND table_name = 'event_policies'
               AND column_name = 'call_count'
         ) THEN
-            UPDATE event_policies
-            SET default_call_count = COALESCE(default_call_count, call_count, 5)
-            WHERE default_call_count IS NULL;
-        ELSE
-            UPDATE event_policies
-            SET default_call_count = COALESCE(default_call_count, 5)
-            WHERE default_call_count IS NULL;
-        END IF;
+UPDATE event_policies
+SET default_call_count = COALESCE(default_call_count, call_count, 5)
+WHERE default_call_count IS NULL;
+ELSE
+UPDATE event_policies
+SET default_call_count = COALESCE(default_call_count, 5)
+WHERE default_call_count IS NULL;
+END IF;
 
-        IF EXISTS (
+        IF
+EXISTS (
             SELECT 1
             FROM information_schema.columns
             WHERE table_schema = current_schema()
               AND table_name = 'event_policies'
               AND column_name = 'call_valid_time'
         ) THEN
-            UPDATE event_policies
-            SET default_call_ttl = COALESCE(default_call_ttl, call_valid_time, 180)
-            WHERE default_call_ttl IS NULL;
-        ELSE
-            UPDATE event_policies
-            SET default_call_ttl = COALESCE(default_call_ttl, 180)
-            WHERE default_call_ttl IS NULL;
-        END IF;
+UPDATE event_policies
+SET default_call_ttl = COALESCE(default_call_ttl, call_valid_time, 180)
+WHERE default_call_ttl IS NULL;
+ELSE
+UPDATE event_policies
+SET default_call_ttl = COALESCE(default_call_ttl, 180)
+WHERE default_call_ttl IS NULL;
+END IF;
 
-        IF EXISTS (
+        IF
+EXISTS (
             SELECT 1
             FROM information_schema.columns
             WHERE table_schema = current_schema()
               AND table_name = 'event_policies'
               AND column_name = 'defer_limit'
         ) THEN
-            UPDATE event_policies
-            SET default_defer_limit = COALESCE(default_defer_limit, defer_limit, 2)
-            WHERE default_defer_limit IS NULL;
-        ELSE
-            UPDATE event_policies
-            SET default_defer_limit = COALESCE(default_defer_limit, 2)
-            WHERE default_defer_limit IS NULL;
-        END IF;
-    END IF;
+UPDATE event_policies
+SET default_defer_limit = COALESCE(default_defer_limit, defer_limit, 2)
+WHERE default_defer_limit IS NULL;
+ELSE
+UPDATE event_policies
+SET default_defer_limit = COALESCE(default_defer_limit, 2)
+WHERE default_defer_limit IS NULL;
+END IF;
+END IF;
 END $$;
 
 ALTER TABLE IF EXISTS event_policies
-    ALTER COLUMN default_stay_sec SET DEFAULT 600;
+ALTER
+COLUMN default_stay_sec SET DEFAULT 600;
 ALTER TABLE IF EXISTS event_policies
-    ALTER COLUMN default_stay_sec SET NOT NULL;
+ALTER
+COLUMN default_stay_sec SET NOT NULL;
 ALTER TABLE IF EXISTS event_policies
-    ALTER COLUMN default_max_waiting SET DEFAULT 100;
+ALTER
+COLUMN default_max_waiting SET DEFAULT 100;
 ALTER TABLE IF EXISTS event_policies
-    ALTER COLUMN default_max_waiting SET NOT NULL;
+ALTER
+COLUMN default_max_waiting SET NOT NULL;
 ALTER TABLE IF EXISTS event_policies
-    ALTER COLUMN default_call_count SET DEFAULT 5;
+ALTER
+COLUMN default_call_count SET DEFAULT 5;
 ALTER TABLE IF EXISTS event_policies
-    ALTER COLUMN default_call_count SET NOT NULL;
+ALTER
+COLUMN default_call_count SET NOT NULL;
 ALTER TABLE IF EXISTS event_policies
-    ALTER COLUMN default_call_ttl SET DEFAULT 180;
+ALTER
+COLUMN default_call_ttl SET DEFAULT 180;
 ALTER TABLE IF EXISTS event_policies
-    ALTER COLUMN default_call_ttl SET NOT NULL;
+ALTER
+COLUMN default_call_ttl SET NOT NULL;
 ALTER TABLE IF EXISTS event_policies
-    ALTER COLUMN default_defer_limit SET DEFAULT 2;
+ALTER
+COLUMN default_defer_limit SET DEFAULT 2;
 ALTER TABLE IF EXISTS event_policies
-    ALTER COLUMN default_defer_limit SET NOT NULL;
+ALTER
+COLUMN default_defer_limit SET NOT NULL;
 
-DO $$
+DO
+$$
 BEGIN
-    IF EXISTS (
+    IF
+EXISTS (
         SELECT 1
         FROM information_schema.tables
         WHERE table_schema = current_schema()
@@ -206,7 +224,7 @@ BEGIN
         FROM pg_constraint
         WHERE conname = 'uq_event_policies_event'
     ) THEN
-        ALTER TABLE event_policies
-            ADD CONSTRAINT uq_event_policies_event UNIQUE (event_id);
-    END IF;
+ALTER TABLE event_policies
+    ADD CONSTRAINT uq_event_policies_event UNIQUE (event_id);
+END IF;
 END $$;

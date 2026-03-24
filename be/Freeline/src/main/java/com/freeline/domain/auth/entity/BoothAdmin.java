@@ -66,10 +66,6 @@ public class BoothAdmin extends BaseEntity {
         this.password = password;
     }
 
-    public void updateInfo(final String name) {
-        this.name = name;
-    }
-
     public void markEmailAsSent() {
         this.emailSent = true;
     }

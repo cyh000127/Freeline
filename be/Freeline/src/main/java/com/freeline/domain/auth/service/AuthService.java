@@ -22,7 +22,6 @@ import com.freeline.common.security.JwtProvider;
 import com.freeline.domain.auth.converter.AuthConverter;
 import com.freeline.domain.auth.dto.request.BoothAdminBulkCreateReqDto;
 import com.freeline.domain.auth.dto.request.BoothAdminEmailSendReqDto;
-import com.freeline.domain.auth.dto.request.BoothLoginReqDto;
 import com.freeline.domain.auth.dto.request.ChangePasswordReqDto;
 import com.freeline.domain.auth.dto.request.EmailVerifyReqDto;
 import com.freeline.domain.auth.dto.request.LoginReqDto;
@@ -31,6 +30,7 @@ import com.freeline.domain.auth.dto.request.UpdateMyInfoReqDto;
 import com.freeline.domain.auth.dto.request.VisitorEnterReqDto;
 import com.freeline.domain.auth.dto.response.BoothAdminCreateResDto;
 import com.freeline.domain.auth.dto.response.BoothAdminResDto;
+import com.freeline.domain.auth.dto.response.CheckIdResDto;
 import com.freeline.domain.auth.dto.response.LoginResDto;
 import com.freeline.domain.auth.dto.response.MyInfoResDto;
 import com.freeline.domain.auth.dto.response.SignupResDto;
@@ -75,30 +75,36 @@ public class AuthService {
     private long refreshTokenExpiration;
 
     /**
+     * 아이디(이메일) 중복 확인
+     */
+    @Transactional(readOnly = true)
+    public CheckIdResDto checkId(final String email) {
+        if (email == null || email.isBlank()) {
+            return new CheckIdResDto(false);
+        }
+        boolean exists = eventAdminRepository.existsByEmail(email.trim().toLowerCase());
+        return new CheckIdResDto(!exists);
+    }
+
+    /**
      * 이메일 인증 코드 발송
      */
     public void sendVerificationCode(final String email) {
-
         if (eventAdminRepository.existsByEmail(email)) {
             throw new AuthException(ErrorCode.EMAIL_DUPLICATE);
         }
-
         String code = createVerificationCode();
         String key = "email:verify:" + email;
-
         if (Boolean.TRUE.equals(redisTemplate.hasKey(key))) {
             redisTemplate.delete(key);
         }
-
         redisTemplate.opsForValue()
                 .set(key, code, authProperties.getEmailCodeExpireMinutes(), TimeUnit.MINUTES);
-
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(email);
             message.setSubject("[Freeline] 이메일 인증 코드");
             message.setText("인증 코드: " + code);
-
             mailSender.send(message);
             log.info("[Auth] Verification code sent to: {}", email);
         } catch (Exception e) {
@@ -112,20 +118,15 @@ public class AuthService {
      * 이메일 인증 확인
      */
     public void verifyCode(final EmailVerifyReqDto req) {
-
         String key = "email:verify:" + req.email();
         String savedCode = redisTemplate.opsForValue().get(key);
-
         if (savedCode == null) {
             throw new AuthException(ErrorCode.EMAIL_CODE_EXPIRED);
         }
-
         if (!savedCode.equals(req.code())) {
             throw new AuthException(ErrorCode.EMAIL_CODE_MISMATCH);
         }
-
         redisTemplate.delete(key);
-
         redisTemplate.opsForValue()
                 .set(REDIS_KEY_PREFIX_EMAIL_VERIFIED + req.email(), "true", authProperties.getEmailVerifyTtlMinutes(), TimeUnit.MINUTES);
         log.info("[Auth] Email verified: {}", req.email());
@@ -139,23 +140,16 @@ public class AuthService {
         if (eventAdminRepository.existsByEmail(req.email())) {
             throw new AuthException(ErrorCode.EMAIL_DUPLICATE);
         }
-
         String verified = redisTemplate.opsForValue()
                 .get(REDIS_KEY_PREFIX_EMAIL_VERIFIED + req.email());
-
         if (verified == null || !verified.equals("true")) {
             throw new AuthException(ErrorCode.EMAIL_VERIFICATION_REQUIRED);
         }
-
         String encodedPassword = passwordEncoder.encode(req.password());
-
         EventAdmin eventAdmin = authConverter.toEventAdmin(req, encodedPassword);
         EventAdmin saved = eventAdminRepository.save(eventAdmin);
-
         redisTemplate.delete(REDIS_KEY_PREFIX_EMAIL_VERIFIED + req.email());
-
         log.info("[Auth] New event admin signed up: {}", saved.getEmail());
-
         return authConverter.toSignupResDto(saved);
     }
 
@@ -165,8 +159,6 @@ public class AuthService {
     @Transactional
     public LoginResDto login(final LoginReqDto req) {
         String identifier = req.id();
-
-        // 1. 먼저 행사 주최자(Event Admin)인지 확인 (이메일로 로그인)
         if (identifier.contains("@")) {
             var eventAdminOpt = eventAdminRepository.findByEmail(identifier);
             if (eventAdminOpt.isPresent()) {
@@ -175,20 +167,15 @@ public class AuthService {
                 return generateLoginResponse(eventAdmin.getId(), Role.EVENT_ADMIN, eventAdmin.getEmail());
             }
         }
-
-        // 2. 아니면 부스 관리자(Booth Admin)인지 확인 (부여받은 아이디로 로그인)
         var boothAdminOpt = boothAdminRepository.findByLoginId(identifier);
         if (boothAdminOpt.isPresent()) {
             BoothAdmin boothAdmin = boothAdminOpt.get();
             validatePassword(req.password(), boothAdmin.getPassword());
-
             if (!boothAdmin.isActive()) {
                 boothAdmin.activateAccount();
             }
-
             return generateLoginResponse(boothAdmin.getId(), Role.BOOTH_ADMIN, boothAdmin.getLoginId());
         }
-
         throw new AuthException(ErrorCode.USER_NOT_FOUND);
     }
 
@@ -196,21 +183,15 @@ public class AuthService {
      * AccessToken 재발급
      */
     public LoginResDto refresh(final String refreshToken) {
-
         Claims claims = jwtProvider.getClaims(refreshToken);
         Long userId = Long.parseLong(claims.getSubject());
-
         String saved = redisTemplate.opsForValue()
                 .get(REDIS_KEY_PREFIX_REFRESH + userId);
-
         if (saved == null || !saved.equals(refreshToken)) {
             throw new AuthException(ErrorCode.INVALID_TOKEN);
         }
-
         Role role = eventAdminRepository.existsById(userId) ? Role.EVENT_ADMIN : Role.BOOTH_ADMIN;
-
         String newAccessToken = jwtProvider.createToken(userId, role.name());
-
         return authConverter.toLoginResDto(newAccessToken, refreshToken, role);
     }
 
@@ -219,10 +200,8 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public MyInfoResDto getMyInfo(final Long userId) {
-
         EventAdmin eventAdmin = eventAdminRepository.findById(userId)
                 .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
-
         return authConverter.toMyInfoResDto(eventAdmin);
     }
 
@@ -231,12 +210,9 @@ public class AuthService {
      */
     @Transactional
     public MyInfoResDto updateMyInfo(final Long userId, final UpdateMyInfoReqDto req) {
-
         EventAdmin eventAdmin = eventAdminRepository.findById(userId)
                 .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
-
         eventAdmin.updateInfo(req.name(), req.organization());
-
         return authConverter.toMyInfoResDto(eventAdmin);
     }
 
@@ -245,18 +221,12 @@ public class AuthService {
      */
     @Transactional
     public void changePassword(final Long userId, final ChangePasswordReqDto req) {
-
         EventAdmin eventAdmin = eventAdminRepository.findById(userId)
                 .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
-
         if (!passwordEncoder.matches(req.currentPassword(), eventAdmin.getPassword())) {
             throw new AuthException(ErrorCode.PASSWORD_MISMATCH);
         }
-
-        eventAdmin.changePassword(
-                passwordEncoder.encode(req.newPassword())
-        );
-
+        eventAdmin.changePassword(passwordEncoder.encode(req.newPassword()));
         log.info("[Auth] Password changed for event admin: {}", eventAdmin.getEmail());
     }
 
@@ -264,20 +234,12 @@ public class AuthService {
      * 행사 주최자 로그아웃
      */
     public void logout(final String token) {
-
         Claims claims = jwtProvider.getClaims(token);
         Long userId = Long.parseLong(claims.getSubject());
         Date expiration = claims.getExpiration();
-
         long remainTime = expiration.getTime() - System.currentTimeMillis();
-
         if (remainTime > 0) {
-            redisTemplate.opsForValue().set(
-                    "blacklist:" + token,
-                    "logout",
-                    remainTime,
-                    TimeUnit.MILLISECONDS
-            );
+            redisTemplate.opsForValue().set("blacklist:" + token, "logout", remainTime, TimeUnit.MILLISECONDS);
         }
         redisTemplate.delete(REDIS_KEY_PREFIX_REFRESH + userId);
         log.info("[Auth] User logged out, userId: {}", userId);
@@ -288,7 +250,6 @@ public class AuthService {
      */
     @Transactional
     public void deleteUser(final Long userId) {
-
         EventAdmin eventAdmin = eventAdminRepository.findById(userId)
                 .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
         redisTemplate.delete(REDIS_KEY_PREFIX_REFRESH + userId);
@@ -301,11 +262,9 @@ public class AuthService {
      */
     @Transactional
     public List<BoothAdminCreateResDto> createBoothAdminsBulk(final Long userId, final BoothAdminBulkCreateReqDto req) {
-
         if (!eventAdminRepository.existsById(userId)) {
             throw new AuthException(ErrorCode.USER_NOT_FOUND);
         }
-
         return req.admins().stream()
                 .map(item -> createSingleBoothAdminAuto(req.eventId(), item))
                 .toList();
@@ -316,24 +275,17 @@ public class AuthService {
      */
     @Transactional
     public void sendBoothAdminLoginsBulk(final Long userId, final BoothAdminEmailSendReqDto req) {
-
         if (!eventAdminRepository.existsById(userId)) {
             throw new AuthException(ErrorCode.USER_NOT_FOUND);
         }
-
         List<BoothAdmin> admins = boothAdminRepository.findAllById(req.boothAdminIds());
-
         if (admins.isEmpty()) {
             throw new AuthException(ErrorCode.USER_NOT_FOUND);
         }
-
         for (BoothAdmin admin : admins) {
             String rawPassword = createRandomPassword();
-            String encodedPassword = passwordEncoder.encode(rawPassword);
-
-            admin.changePassword(encodedPassword);
+            admin.changePassword(passwordEncoder.encode(rawPassword));
             admin.markEmailAsSent();
-
             sendLoginInfoEmail(admin.getEmail(), admin.getLoginId(), rawPassword);
         }
     }
@@ -343,19 +295,13 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public List<BoothAdminResDto> getBoothAdminsByEvent(final Long userId, final Long eventId) {
-
         if (!eventAdminRepository.existsById(userId)) {
             throw new AuthException(ErrorCode.USER_NOT_FOUND);
         }
-
         List<Long> boothIds = boothRepository.findAllByEventIdOrderByIdAsc(eventId)
-                .stream()
-                .map(Booth::getId)
-                .toList();
-
+                .stream().map(Booth::getId).toList();
         return boothAdminRepository.findAllByBoothIdInOrderByBoothIdAsc(boothIds)
-                .stream()
-                .map(admin -> BoothAdminResDto.builder()
+                .stream().map(admin -> BoothAdminResDto.builder()
                         .id(admin.getId())
                         .boothId(admin.getBoothId())
                         .boothName(admin.getBooth() != null ? admin.getBooth().getName() : null)
@@ -371,63 +317,25 @@ public class AuthService {
     }
 
     /**
-     * 부스 관리자 로그인
-     */
-    @Transactional
-    public LoginResDto boothLogin(final BoothLoginReqDto req) {
-
-        BoothAdmin boothAdmin = boothAdminRepository
-                .findByLoginId(req.loginId())
-                .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
-
-        if (!passwordEncoder.matches(req.password(), boothAdmin.getPassword())) {
-            throw new AuthException(ErrorCode.PASSWORD_MISMATCH);
-        }
-
-        // 최초 로그인 시 계정 활성화 (isActive = true)
-        if (!boothAdmin.isActive()) {
-            boothAdmin.activateAccount();
-        }
-
-        String token = jwtProvider.createToken(
-                boothAdmin.getId(),
-                Role.BOOTH_ADMIN.name()
-        );
-
-        log.info("[Auth] Booth admin logged in: {}", boothAdmin.getLoginId());
-        return authConverter.toLoginResDto(token, null, Role.BOOTH_ADMIN);
-    }
-
-    /**
      * 방문자 입장
      */
     @Transactional(readOnly = true)
     public LoginResDto visitorEnter(final VisitorEnterReqDto req) {
-
-        Visitor visitor = visitorRepository
-                .findByEntryCode(req.entryCode())
+        Visitor visitor = visitorRepository.findByEntryCode(req.entryCode())
                 .orElseThrow(() -> new AuthException(ErrorCode.VISITOR_NOT_FOUND));
-
-        String token = jwtProvider.createToken(
-                visitor.getId(),
-                Role.VISITOR.name()
-        );
-
+        String token = jwtProvider.createToken(visitor.getId(), Role.VISITOR.name());
         log.info("[Auth] Visitor entered, visitorId: {}", visitor.getId());
         return authConverter.toLoginResDto(token, null, Role.VISITOR);
     }
 
     private String createVerificationCode() {
-        int code = random.nextInt(900000) + 100000;
-        return String.valueOf(code);
+        return String.valueOf(random.nextInt(900000) + 100000);
     }
 
     private String createRandomPassword() {
         StringBuilder sb = new StringBuilder(12);
         for (int i = 0; i < 12; i++) {
-            int rndCharAt = random.nextInt(PASSWORD_ALLOW_BASE.length());
-            char rndChar = PASSWORD_ALLOW_BASE.charAt(rndCharAt);
-            sb.append(rndChar);
+            sb.append(PASSWORD_ALLOW_BASE.charAt(random.nextInt(PASSWORD_ALLOW_BASE.length())));
         }
         return sb.toString();
     }
@@ -453,45 +361,30 @@ public class AuthService {
         return authConverter.toLoginResDto(accessToken, refreshToken, role);
     }
 
-    private BoothAdminCreateResDto createSingleBoothAdminAuto(final Long eventId, final BoothAdminBulkCreateReqDto.BoothAdminItem item) {
+    private BoothAdminCreateResDto createSingleBoothAdminAuto(
+            final Long eventId,
+            final BoothAdminBulkCreateReqDto.BoothAdminItem item
+    ) {
         final Long boothId = item.boothId();
-
         if (!boothRepository.existsById(boothId)) {
             throw new AuthException(ErrorCode.BOOTH_NOT_FOUND);
         }
-
         if (!boothAdminRepository.findAllByBoothIdIn(List.of(boothId)).isEmpty()) {
             throw new AuthException(ErrorCode.ALREADY_ASSIGNED_BOOTH_ADMIN);
         }
-
         String loginId = String.format("evt%d_bth%d", eventId, boothId);
-
         if (boothAdminRepository.findByLoginId(loginId).isPresent()) {
             loginId = String.format("evt%d_bth%d_%d", eventId, boothId, random.nextInt(1000));
         }
-
         String rawPassword = createRandomPassword();
-        String encodedPassword = passwordEncoder.encode(rawPassword);
-
         BoothAdmin boothAdmin = BoothAdmin.builder()
-                .boothId(boothId)
-                .loginId(loginId)
-                .password(encodedPassword)
-                .email(item.email())
-                .accountIssued(true)
-                .build();
-
+                .boothId(boothId).loginId(loginId).password(passwordEncoder.encode(rawPassword))
+                .email(item.email()).accountIssued(true).build();
         BoothAdmin saved = boothAdminRepository.save(boothAdmin);
-
         log.info("[Auth] Auto created booth admin, loginId: {}", loginId);
-
         return BoothAdminCreateResDto.builder()
-                .id(saved.getId())
-                .boothId(saved.getBoothId())
-                .loginId(saved.getLoginId())
-                .rawPassword(rawPassword)
-                .email(saved.getEmail())
-                .build();
+                .id(saved.getId()).boothId(saved.getBoothId()).loginId(saved.getLoginId())
+                .rawPassword(rawPassword).email(saved.getEmail()).build();
     }
 
     private void sendLoginInfoEmail(final String email, final String loginId, final String password) {

@@ -8,14 +8,9 @@ import lombok.Getter;
 @ConfigurationProperties(prefix = "auth")
 public class AuthProperties {
 
-    private long emailCodeExpireMinutes;
-    private long emailVerifyTtlMinutes;
+    // 이메일 인증 코드 만료 시간 (10분 고정)
+    private final long emailCodeExpireMinutes = 10L;
 
-    public void setEmailCodeExpireMinutes(long emailCodeExpireMinutes) {
-        this.emailCodeExpireMinutes = emailCodeExpireMinutes;
-    }
-
-    public void setEmailVerifyTtlMinutes(long emailVerifyTtlMinutes) {
-        this.emailVerifyTtlMinutes = emailVerifyTtlMinutes;
-    }
+    // 이메일 인증 성공 후 유효 시간 (10분 고정)
+    private final long emailVerifyTtlMinutes = 10L;
 }
