@@ -24,6 +24,14 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
     thumbnailImageUrl: "",
   });
 
+  const [policyData, setPolicyData] = useState({
+    default_stay_sec: 600,
+    default_max_waiting: 30,
+    default_call_count: 5,
+    default_call_ttl: 300,
+    default_defer_limit: 2,
+  });
+
   const [isLoading, setIsLoading] = useState(false);
   const [isPostcodeOpen, setIsPostcodeOpen] = useState(false);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -106,6 +114,23 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
             locationAddress: d.locationAddress || "",
             thumbnailImageUrl: d.thumbnailImageUrl || "",
           });
+        }
+
+        // 행사 정책 조회
+        try {
+          const policyRes = await eventApi.getPolicy(eventId);
+          const p = policyRes.data?.data || policyRes.data;
+          if (p) {
+            setPolicyData({
+              default_stay_sec: p.default_stay_sec ?? 600,
+              default_max_waiting: p.default_max_waiting ?? 30,
+              default_call_count: p.default_call_count ?? 5,
+              default_call_ttl: p.default_call_ttl ?? 300,
+              default_defer_limit: p.default_defer_limit ?? 2,
+            });
+          }
+        } catch (pErr) {
+          console.warn("정책 조회 실패 (기본값 사용):", pErr);
         }
       } catch (error) {
         console.error("Failed to fetch event detail:", error);
@@ -203,6 +228,13 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
         } catch (thumbErr) {
           console.warn("썸네일 업로드 실패 (나머지 정보는 저장됨):", thumbErr);
         }
+      }
+
+      // 행사 정책 수정
+      try {
+        await eventApi.updatePolicy(eventId, policyData);
+      } catch (pErr) {
+        console.warn("정책 수정 실패 (행사 정보는 저장됨):", pErr);
       }
 
       alert("행사 정보가 성공적으로 수정되었습니다.");
@@ -407,6 +439,90 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
                 </button>
               </div>
             </div>
+
+            {/* 구분선 */}
+            <div className="h-px bg-gray-100" />
+
+            {/* 행사 정책 */}
+            <div className="flex flex-col gap-3">
+              <h3 className="text-[15px] font-bold text-gray-900">행사 정책 설정</h3>
+              <p className="text-[13px] text-gray-500 -mt-1">웨이팅, 호출 등에 대한 기본 정책을 설정합니다.</p>
+
+              <div className="grid grid-cols-2 gap-3 bg-[#F8F9FA] p-5 rounded-2xl border border-gray-100">
+                {/* 기본 체류 시간 */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] font-bold text-gray-700">기본 체류 시간 (초)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={policyData.default_stay_sec}
+                      onChange={(e) => setPolicyData((prev) => ({ ...prev, default_stay_sec: parseInt(e.target.value) || 0 }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 pr-10 text-[14px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-gray-400 pointer-events-none">sec</span>
+                  </div>
+                </div>
+
+                {/* 최대 대기 인원 */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] font-bold text-gray-700">최대 대기 인원</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={policyData.default_max_waiting}
+                      onChange={(e) => setPolicyData((prev) => ({ ...prev, default_max_waiting: parseInt(e.target.value) || 0 }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 pr-10 text-[14px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-gray-400 pointer-events-none">명</span>
+                  </div>
+                </div>
+
+                {/* 호출 횟수 */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] font-bold text-gray-700">기본 호출 횟수</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={policyData.default_call_count}
+                      onChange={(e) => setPolicyData((prev) => ({ ...prev, default_call_count: parseInt(e.target.value) || 0 }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 pr-10 text-[14px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-gray-400 pointer-events-none">회</span>
+                  </div>
+                </div>
+
+                {/* 호출 수명 */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] font-bold text-gray-700">기본 호출 수명 (초)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={policyData.default_call_ttl}
+                      onChange={(e) => setPolicyData((prev) => ({ ...prev, default_call_ttl: parseInt(e.target.value) || 0 }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 pr-10 text-[14px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-gray-400 pointer-events-none">sec</span>
+                  </div>
+                </div>
+
+                {/* 미루기 제한 */}
+                <div className="flex flex-col gap-1.5 col-span-2">
+                  <label className="text-[13px] font-bold text-gray-700">기본 미루기 제한</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={policyData.default_defer_limit}
+                      onChange={(e) => setPolicyData((prev) => ({ ...prev, default_defer_limit: parseInt(e.target.value) || 0 }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 pr-10 text-[14px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-gray-400 pointer-events-none">회</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 구분선 */}
+            <div className="h-px bg-gray-100" />
 
             {/* 포스터 업로드 */}
             <div className="flex flex-col gap-4 pb-4">

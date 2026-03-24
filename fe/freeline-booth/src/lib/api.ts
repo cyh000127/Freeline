@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create a custom axios instance
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://j14a207.p.ssafy.io/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -31,12 +31,12 @@ api.interceptors.response.use(
   },
   (error) => {
     // Handle global API errors here (e.g., 401 Unauthorized)
-    // if (error.response?.status === 401) {
-    //   // Handle logout or redirect to login page
-    //   if (typeof window !== 'undefined') {
-    //     window.location.href = '/login';
-    //   }
-    // }
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken');
+        window.location.href = '/login';
+      }
+    }
     return Promise.reject(error);
   }
 );

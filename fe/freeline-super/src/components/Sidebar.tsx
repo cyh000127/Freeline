@@ -22,16 +22,16 @@ export function Sidebar({ userName, role, eventId }: SidebarProps) {
   const pathname = usePathname();
 
   const navItems = [
-    { name: "대시보드", icon: LayoutDashboard, href: `/events/${eventId || ''}/dashboard` },
-    { name: "부스 관리", icon: Store, href: `/events/${eventId || ''}/booths` },
-    { name: "사용자 통계", icon: Users, href: `/events/${eventId || ''}/stats` },
-    { name: "환경 설정", icon: Settings, href: `/events/${eventId || ''}/settings` },
+    { name: "대시보드", icon: LayoutDashboard, href: `/events/${eventId || ''}`, exact: true },
+    { name: "부스 계정 관리", icon: Store, href: `/events/${eventId || ''}/booths`, exact: false },
+    { name: "사용자 통계", icon: Users, href: `/events/${eventId || ''}/stats`, exact: false },
+    { name: "환경 설정", icon: Settings, href: `/events/${eventId || ''}/settings`, exact: false },
   ];
 
   return (
     <aside className="w-64 bg-[#2D2A4A] h-screen flex flex-col text-white shrink-0 relative overflow-hidden">
       {/* Back to Home Button at the very top */}
-      <Link 
+      <Link
         href="/"
         className="flex items-center gap-2 px-6 py-4 text-gray-400 hover:text-white transition-all bg-black/10 hover:bg-black/20 group border-b border-white/5"
       >
@@ -49,7 +49,9 @@ export function Sidebar({ userName, role, eventId }: SidebarProps) {
       <nav className="flex-1 px-4 space-y-1">
 
         {navItems.map((item) => {
-          const isActive = pathname.includes(item.href);
+          const isActive = item.exact
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(item.href + '/');
           return (
             <Link
               key={item.href}
