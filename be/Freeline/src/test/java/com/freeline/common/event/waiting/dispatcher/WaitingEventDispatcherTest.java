@@ -37,6 +37,7 @@ class WaitingEventDispatcherTest {
                 "CALLED"
         );
         final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
                 .eventId(UUID.randomUUID())
                 .eventType(WaitingEventType.WAITING_CALLED)
                 .waitingId(1L)
@@ -45,6 +46,7 @@ class WaitingEventDispatcherTest {
                 .previousStatus("WAITING")
                 .currentStatus("CALLED")
                 .occurredAt(LocalDateTime.now())
+                .snapshot(null)
                 .build();
 
         Mockito.when(waitingStatusChangeDetector.detect(command))

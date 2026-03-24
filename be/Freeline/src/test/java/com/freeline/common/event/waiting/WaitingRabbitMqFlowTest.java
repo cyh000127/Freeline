@@ -198,6 +198,9 @@ class WaitingRabbitMqFlowTest {
         final ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
         Mockito.verify(applicationEventPublisher).publishEvent(captor.capture());
         Assertions.assertThat(captor.getValue()).isInstanceOf(WaitingEventMessage.class);
-        return (WaitingEventMessage) captor.getValue();
+        final WaitingEventMessage message = (WaitingEventMessage) captor.getValue();
+        Assertions.assertThat(message.schemaVersion()).isEqualTo(1);
+        Assertions.assertThat(message.snapshot()).isNull();
+        return message;
     }
 }

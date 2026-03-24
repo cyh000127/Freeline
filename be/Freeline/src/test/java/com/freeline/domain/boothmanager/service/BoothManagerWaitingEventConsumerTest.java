@@ -23,6 +23,7 @@ class BoothManagerWaitingEventConsumerTest {
     void consume_success_whenSseTargetStatusEvent() {
         final BoothManagerWaitingEventConsumer consumer = new BoothManagerWaitingEventConsumer(boothManagerSseService);
         final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
                 .eventId(UUID.randomUUID())
                 .eventType(WaitingEventType.WAITING_REGISTERED)
                 .waitingId(301L)
@@ -31,6 +32,7 @@ class BoothManagerWaitingEventConsumerTest {
                 .previousStatus("CALLED")
                 .currentStatus("REGISTERED")
                 .occurredAt(LocalDateTime.of(2026, 3, 23, 12, 0))
+                .snapshot(null)
                 .build();
 
         consumer.consume(message);
@@ -42,6 +44,7 @@ class BoothManagerWaitingEventConsumerTest {
     void consume_skip_whenEventIsNotSseTarget() {
         final BoothManagerWaitingEventConsumer consumer = new BoothManagerWaitingEventConsumer(boothManagerSseService);
         final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
                 .eventId(UUID.randomUUID())
                 .eventType(WaitingEventType.WAITING_EXPIRED)
                 .waitingId(301L)
@@ -50,6 +53,7 @@ class BoothManagerWaitingEventConsumerTest {
                 .previousStatus("CALLED")
                 .currentStatus("EXPIRED")
                 .occurredAt(LocalDateTime.of(2026, 3, 23, 12, 0))
+                .snapshot(null)
                 .build();
 
         consumer.consume(message);
@@ -61,6 +65,7 @@ class BoothManagerWaitingEventConsumerTest {
     void consume_skip_whenCurrentStatusIsInvalid() {
         final BoothManagerWaitingEventConsumer consumer = new BoothManagerWaitingEventConsumer(boothManagerSseService);
         final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
                 .eventId(UUID.randomUUID())
                 .eventType(WaitingEventType.WAITING_CALLED)
                 .waitingId(301L)
@@ -69,6 +74,7 @@ class BoothManagerWaitingEventConsumerTest {
                 .previousStatus("WAITING")
                 .currentStatus("INVALID")
                 .occurredAt(LocalDateTime.of(2026, 3, 23, 12, 0))
+                .snapshot(null)
                 .build();
 
         consumer.consume(message);
@@ -80,6 +86,7 @@ class BoothManagerWaitingEventConsumerTest {
     void consume_skip_whenRequiredPayloadIsMissing() {
         final BoothManagerWaitingEventConsumer consumer = new BoothManagerWaitingEventConsumer(boothManagerSseService);
         final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
                 .eventId(UUID.randomUUID())
                 .eventType(WaitingEventType.WAITING_ENTERED)
                 .waitingId(null)
@@ -88,6 +95,7 @@ class BoothManagerWaitingEventConsumerTest {
                 .previousStatus("REGISTERED")
                 .currentStatus("ENTERED")
                 .occurredAt(LocalDateTime.of(2026, 3, 23, 12, 0))
+                .snapshot(null)
                 .build();
 
         consumer.consume(message);

@@ -71,6 +71,7 @@ class WaitingFcmEventConsumerTest {
                 .callExpiresAt(FIXED_NOW.plusSeconds(180))
                 .build();
         final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
                 .eventId(UUID.randomUUID())
                 .eventType(WaitingEventType.WAITING_CALLED)
                 .waitingId(301L)
@@ -79,6 +80,7 @@ class WaitingFcmEventConsumerTest {
                 .previousStatus("WAITING")
                 .currentStatus("CALLED")
                 .occurredAt(FIXED_NOW)
+                .snapshot(null)
                 .build();
 
         Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
@@ -112,6 +114,7 @@ class WaitingFcmEventConsumerTest {
                 .enteredAt(FIXED_NOW)
                 .build();
         final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
                 .eventId(UUID.randomUUID())
                 .eventType(WaitingEventType.WAITING_ENTERED)
                 .waitingId(302L)
@@ -120,6 +123,7 @@ class WaitingFcmEventConsumerTest {
                 .previousStatus("REGISTERED")
                 .currentStatus("ENTERED")
                 .occurredAt(FIXED_NOW)
+                .snapshot(null)
                 .build();
 
         Mockito.when(boothWaitingRepository.findById(302L)).thenReturn(Optional.of(waiting));
@@ -150,6 +154,7 @@ class WaitingFcmEventConsumerTest {
                 boothPolicyRepository
         );
         final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
                 .eventId(UUID.randomUUID())
                 .eventType(WaitingEventType.WAITING_CREATED)
                 .waitingId(301L)
@@ -158,6 +163,7 @@ class WaitingFcmEventConsumerTest {
                 .previousStatus("NONE")
                 .currentStatus("WAITING")
                 .occurredAt(FIXED_NOW)
+                .snapshot(null)
                 .build();
 
         consumer.consume(message);

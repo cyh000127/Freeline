@@ -52,6 +52,7 @@ class WaitingEventPublishListenerTest {
 
     private WaitingEventMessage createMessage(final WaitingEventType eventType) {
         return WaitingEventMessage.builder()
+                .schemaVersion(1)
                 .eventId(UUID.randomUUID())
                 .eventType(eventType)
                 .waitingId(1L)
@@ -60,6 +61,7 @@ class WaitingEventPublishListenerTest {
                 .previousStatus("WAITING")
                 .currentStatus("CALLED")
                 .occurredAt(LocalDateTime.now())
+                .snapshot(null)
                 .build();
     }
 }
