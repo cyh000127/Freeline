@@ -15,6 +15,7 @@ services:
       - hadoop-namenode-data:/hadoop/dfs/name
       - ./config/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
       - ./config/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml
+      - ./scripts/init-hdfs.sh:/scripts/init-hdfs.sh:ro
     networks:
       - infra-public
     healthcheck:
@@ -171,6 +172,7 @@ services:
     volumes:
       - ./config/core-site.xml:/opt/hive/conf/core-site.xml
       - ./config/hdfs-site.xml:/opt/hive/conf/hdfs-site.xml
+      - ./scripts/init-hive.sql:/scripts/init-hive.sql:ro
     networks:
       - infra-public
     healthcheck:
