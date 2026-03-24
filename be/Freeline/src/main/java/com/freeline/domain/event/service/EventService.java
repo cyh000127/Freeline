@@ -52,7 +52,10 @@ import com.freeline.domain.event.repository.EventRepository;
 @RequiredArgsConstructor
 public class EventService {
 
+
+    private static final String EVENT_THUMBNAIL_DIRECTORY = "events";
     private static final String EVENT_DIRECTORY = "event";
+
 
     private final EventRepository eventRepository;
     private final EventMapRepository eventMapRepository;
@@ -60,18 +63,30 @@ public class EventService {
     private final FileService fileService;
     private final CloudflareStorageUtil cloudflareStorageUtil;
 
+    @Transactional(rollbackFor = Exception.class)
     public EventResDto createEvent(final Long eventAdminId, final EventCreateReqDto request) {
         validateEventPeriod(request.startDate(), request.endDate());
 
-        final Event event = EventConverter.toEntity(eventAdminId, request, EventStatus.DRAFT);
-        final Event saved = eventRepository.save(event);
+        String uploadedThumbnailUrl = null;
 
-        log.info("[Event] create completed {id: {}, adminId: {}, status: {}}",
-                saved.getId(),
-                saved.getEventAdminId(),
-                saved.getStatus());
+        try {
+            final String thumbnailImageUrl = resolveThumbnailImageUrl(request);
+            uploadedThumbnailUrl = thumbnailImageUrl;
 
-        return EventConverter.toEventResDto(saved);
+            final Event event = EventConverter.toEntity(eventAdminId, request, thumbnailImageUrl, EventStatus.DRAFT);
+            final Event saved = eventRepository.saveAndFlush(event);
+
+            log.info("[Event] create completed {id: {}, adminId: {}, status: {}, hasThumbnail: {}}",
+                    saved.getId(),
+                    saved.getEventAdminId(),
+                    saved.getStatus(),
+                    StringUtils.hasText(saved.getThumbnailImageUrl()));
+
+            return EventConverter.toEventResDto(saved);
+        } catch (final RuntimeException ex) {
+            cleanupUploadedThumbnail(uploadedThumbnailUrl, request);
+            throw ex;
+        }
     }
 
     public EventUpdateResDto uploadThumbnail(
@@ -105,7 +120,6 @@ public class EventService {
 
     @Transactional(readOnly = true)
     public Page<EventListResDto> getEvents(
-            final Long eventAdminId,
             final String status,
             final int page,
             final int size
@@ -150,7 +164,7 @@ public class EventService {
             throw new EventException(ErrorCode.EVENT_NOT_OPEN_FOR_DASHBOARD);
         }
 
-        // TODO: Replace with actual DB queries after Booth and Waiting domains are implemented.
+        // 현재 대시보드는 Booth/Waiting 도메인 집계 연동 전까지 임시 집계값을 반환한다.
         final DashboardSummaryDto summary = DashboardSummaryDto.builder()
                 .totalWaitingTeams(156)
                 .totalCompletedTeams(430)
@@ -297,6 +311,35 @@ public class EventService {
     private void validateEventOwnership(final Long eventAdminId, final Event event) {
         if (!event.getEventAdminId().equals(eventAdminId)) {
             throw new EventException(ErrorCode.ACCESS_DENIED);
+        }
+    }
+
+    private String resolveThumbnailImageUrl(final EventCreateReqDto request) {
+        if (request.thumbnailImageFile() != null && !request.thumbnailImageFile().isEmpty()) {
+            final FileInfo uploadedFile = fileService.uploadFile(request.thumbnailImageFile(), EVENT_THUMBNAIL_DIRECTORY);
+            return uploadedFile.fileUrl();
+        }
+
+        if (!StringUtils.hasText(request.thumbnailImageUrl())) {
+            return null;
+        }
+
+        return request.thumbnailImageUrl().trim();
+    }
+
+    private void cleanupUploadedThumbnail(final String uploadedThumbnailUrl, final EventCreateReqDto request) {
+        if (!StringUtils.hasText(uploadedThumbnailUrl)) {
+            return;
+        }
+
+        if (request.thumbnailImageFile() == null || request.thumbnailImageFile().isEmpty()) {
+            return;
+        }
+
+        try {
+            cloudflareStorageUtil.deleteFile(uploadedThumbnailUrl);
+        } catch (final RuntimeException cleanupEx) {
+            log.warn("[Event] thumbnail cleanup failed after create rollback {url: {}}", uploadedThumbnailUrl, cleanupEx);
         }
     }
 

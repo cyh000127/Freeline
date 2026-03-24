@@ -6,6 +6,8 @@ import java.time.LocalTime;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+import org.springframework.web.multipart.MultipartFile;
+
 import lombok.Builder;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -42,6 +44,9 @@ public record EventCreateReqDto(
         String locationAddress,
 
         @Schema(description = "썸네일 이미지 URL", example = "https://example.com/images/event-thumbnail.png")
-        String thumbnailImageUrl
+        String thumbnailImageUrl,
+
+        @Schema(description = "썸네일 이미지 파일", type = "string", format = "binary", nullable = true)
+        MultipartFile thumbnailImageFile
 ) {
 }

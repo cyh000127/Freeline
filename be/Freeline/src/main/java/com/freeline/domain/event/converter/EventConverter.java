@@ -24,6 +24,7 @@ public class EventConverter {
     public Event toEntity(
             final Long eventAdminId,
             final EventCreateReqDto dto,
+            final String thumbnailImageUrl,
             final EventStatus status
     ) {
         return Event.builder()
@@ -35,7 +36,7 @@ public class EventConverter {
                 .openTime(dto.openTime())
                 .closeTime(dto.closeTime())
                 .locationAddress(dto.locationAddress())
-                .thumbnailImageUrl(dto.thumbnailImageUrl())
+                .thumbnailImageUrl(thumbnailImageUrl)
                 .status(status)
                 .build();
     }
