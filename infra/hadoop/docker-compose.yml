@@ -104,16 +104,16 @@ services:
     container_name: hive-metastore-db
     restart: always
     environment:
-      POSTGRES_DB: hive_metastore
-      POSTGRES_USER: hive
-      POSTGRES_PASSWORD: hive
+      POSTGRES_DB: ${HIVE_METASTORE_DB_NAME:-hive_metastore}
+      POSTGRES_USER: ${HIVE_METASTORE_DB_USER:-hive}
+      POSTGRES_PASSWORD: ${HIVE_METASTORE_DB_PASSWORD:-hive}
       TZ: Asia/Seoul
     volumes:
       - hive-metastore-db-data:/var/lib/postgresql/data
     networks:
       - infra-public
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U hive -d hive_metastore" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${HIVE_METASTORE_DB_USER:-hive} -d ${HIVE_METASTORE_DB_NAME:-hive_metastore}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -136,9 +136,9 @@ services:
       DB_DRIVER: postgres
       SERVICE_OPTS: >-
         -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver
-        -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://hive-metastore-db:5432/hive_metastore
-        -Djavax.jdo.option.ConnectionUserName=hive
-        -Djavax.jdo.option.ConnectionPassword=hive
+        -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://hive-metastore-db:5432/${HIVE_METASTORE_DB_NAME:-hive_metastore}
+        -Djavax.jdo.option.ConnectionUserName=${HIVE_METASTORE_DB_USER:-hive}
+        -Djavax.jdo.option.ConnectionPassword=${HIVE_METASTORE_DB_PASSWORD:-hive}
     volumes:
       - ./config/core-site.xml:/opt/hive/conf/core-site.xml
       - ./config/hdfs-site.xml:/opt/hive/conf/hdfs-site.xml

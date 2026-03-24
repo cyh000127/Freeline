@@ -6,9 +6,21 @@ import { sendActionLogs } from './tracking.api';
 const FLUSH_INTERVAL_MS = 30_000;
 const FLUSH_THRESHOLD = 20;
 const MAX_BUFFER_SIZE = 200;
+const API_BULK_LIMIT = 100;
 
 function generateSessionId(): string {
   return `sess_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+}
+
+function formatLocalTimestamp(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const mo = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const h = String(now.getHours()).padStart(2, '0');
+  const mi = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
 }
 
 interface TrackingContextValue {
@@ -40,7 +52,11 @@ export function TrackingProvider({ accessToken, children }: TrackingProviderProp
     bufferRef.current = [];
 
     try {
-      await sendActionLogs(accessToken, { logs: logsToSend });
+      // 백엔드 벌크 제한(100건)에 맞춰 분할 전송
+      for (let i = 0; i < logsToSend.length; i += API_BULK_LIMIT) {
+        const chunk = logsToSend.slice(i, i + API_BULK_LIMIT);
+        await sendActionLogs(accessToken, { logs: chunk });
+      }
     } catch {
       // 전송 실패 시 버퍼에 다시 추가 (최대 크기 초과 시 오래된 것 버림)
       const merged = [...logsToSend, ...bufferRef.current];
@@ -80,7 +96,7 @@ export function TrackingProvider({ accessToken, children }: TrackingProviderProp
         targetType: params.targetType,
         targetId: params.targetId,
         metadata: params.metadata,
-        clientTimestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        clientTimestamp: formatLocalTimestamp(),
         sessionId: sessionIdRef.current,
       };
 

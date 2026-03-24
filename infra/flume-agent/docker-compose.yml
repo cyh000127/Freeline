@@ -1,0 +1,45 @@
+services:
+  flume-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flume-agent
+    restart: always
+    environment:
+      TZ: Asia/Seoul
+    volumes:
+      - ./config/flume.conf:/opt/flume/conf/flume.conf:ro
+      - ./scripts/spool-logs.sh:/opt/flume/scripts/spool-logs.sh:ro
+      - freeline-action-logs:/var/log/action/source:ro
+      - flume-spool:/var/log/action/spool
+    networks:
+      - infra-public
+    healthcheck:
+      test: [ "CMD-SHELL", "ps aux | grep flume | grep -v grep || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  flume-spool-mover:
+    image: alpine:3.21
+    container_name: flume-spool-mover
+    restart: always
+    environment:
+      TZ: Asia/Seoul
+    entrypoint: [ "sh", "-c", "chmod +x /scripts/spool-logs.sh && /scripts/spool-logs.sh" ]
+    volumes:
+      - ./scripts/spool-logs.sh:/scripts/spool-logs.sh:ro
+      - freeline-action-logs:/var/log/action/source:ro
+      - flume-spool:/var/log/action/spool
+    networks:
+      - infra-public
+
+volumes:
+  freeline-action-logs:
+    external: true
+    name: backend_freeline-action-logs
+  flume-spool:
+
+networks:
+  infra-public:
+    external: true

@@ -21,7 +21,7 @@ pipeline {
     environment {
         INFRA_DIR    = 'infra'
         HOSTS_FILE   = 'infra/hosts.conf'
-        DEPLOY_ORDER = 'networks,infisical,jenkins,jenkins-agent,monitoring,monitoring-agent,hadoop,loadtest,nginx'
+        DEPLOY_ORDER = 'networks,infisical,jenkins,jenkins-agent,monitoring,monitoring-agent,hadoop,flume-agent,loadtest,nginx'
     }
 
     stages {
