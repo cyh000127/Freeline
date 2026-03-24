@@ -17,7 +17,7 @@ export default function SuperAdminDashboard() {
   const [isChecking, setIsChecking] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [userName, setUserName] = useState("익명");
-  const [timeLeft, setTimeLeft] = useState(1800); // 30분 (초 단위)
+  const [timeLeft, setTimeLeft] = useState(3600); // 1시간 (초 단위)
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
 
@@ -108,11 +108,11 @@ export default function SuperAdminDashboard() {
     setOpenMenuId(null);
   };
 
-  const handleLogout = () => {
-    if (confirm("로그아웃 하시겠습니까?")) {
-      localStorage.removeItem("accessToken");
-      router.replace("/login");
-    }
+  const handleLogout = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    router.replace("/login");
   };
   
   // Close menu when clicking outside
@@ -159,7 +159,7 @@ export default function SuperAdminDashboard() {
         if (newData.refreshToken) {
           localStorage.setItem("refreshToken", newData.refreshToken);
         }
-        setTimeLeft(1800); // Reset timer to 30 minutes
+        setTimeLeft(3600); // Reset timer to 1 hour
         alert("로그인 시간이 연장되었습니다.");
       } else {
         throw new Error("Invalid refresh response");
@@ -230,7 +230,7 @@ export default function SuperAdminDashboard() {
             </Link>
             <button 
               title="로그아웃" 
-              onClick={handleLogout}
+              onClick={(e) => handleLogout(e)}
               className="hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10"
             >
               <LogOut className="w-5 h-5" />

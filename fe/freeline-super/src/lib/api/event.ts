@@ -49,4 +49,17 @@ export const eventApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+
+  // 행사 정책 조회
+  getPolicy: (eventId: number | string) =>
+    api.get<ApiResponse<any>>(`/v1/events/${eventId}/policies`),
+
+  // 행사 정책 수정
+  updatePolicy: (eventId: number | string, payload: {
+    default_stay_sec: number;
+    default_max_waiting: number;
+    default_call_count: number;
+    default_call_ttl: number;
+    default_defer_limit: number;
+  }) => api.put<ApiResponse<any>>(`/v1/events/${eventId}/policies`, payload),
 };
