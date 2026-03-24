@@ -103,6 +103,8 @@ services:
 
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
+    volumes:
+      - freeline-action-logs:/app/logs/action
     networks:
       - infra-public
 
@@ -110,6 +112,7 @@ volumes:
   freeline-db-data:
   freeline-redis-data:
   freeline-rabbitmq-data:
+  freeline-action-logs:
 
 
 networks:
