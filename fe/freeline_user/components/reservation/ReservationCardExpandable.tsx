@@ -4,44 +4,67 @@ import { Ionicons } from '@expo/vector-icons';
 import ReservationCard from './ReservationCard';
 
 type ReservationStatus =
-  | 'waiting'
-  | 'called'
-  | 'registered'
-  | 'entered'
-  | 'completed'
-  | 'canceled'
-  | 'autocanceled';
+  | 'WAITING'
+  | 'CALLED'
+  | 'REGISTERED'
+  | 'ENTERED'
+  | 'EXITED'
+  | 'CANCELED'
+  | 'AUTO_CANCELED';
 
 type ExpandableReservationItem = {
   waitingId: string;
   boothName: string;
   myRank?: number;
-  estimatedWaitMinutes?: number;
+  estimatedWaitText?: string;
   boothLocation?: string;
   reservedAt?: string;
   notice?: string;
+  canPostpone?: boolean;
   status: ReservationStatus;
 };
 
 type Props = {
   item: ExpandableReservationItem;
   onQrPress?: () => void;
-  onDeferPress?: () => void;
+  onPostponePress?: () => void;
   onCancelPress?: () => void;
+  onExitPress?: () => void;
 };
 
 function getStatusUI(status: ReservationStatus) {
   switch (status) {
-    case 'called':
+    case 'CALLED':
       return {
         label: '호출됨' as const,
         tone: 'yellow' as const,
       };
-    case 'registered':
+    case 'REGISTERED':
       return {
         label: '도착 인증 완료' as const,
         tone: 'green' as const,
       };
+    case 'ENTERED':
+      return {
+        label: '입장 완료' as const,
+        tone: 'green' as const,
+      };
+    case 'EXITED':
+      return {
+        label: '이용 종료' as const,
+        tone: 'gray' as const,
+      };
+    case 'CANCELED':
+      return {
+        label: '예약 취소' as const,
+        tone: 'gray' as const,
+      };
+    case 'AUTO_CANCELED':
+      return {
+        label: '자동 취소' as const,
+        tone: 'red' as const,
+      };
+    case 'WAITING':
     default:
       return {
         label: '정상 대기 중' as const,
@@ -53,24 +76,23 @@ function getStatusUI(status: ReservationStatus) {
 export default function ReservationCardExpandable({
   item,
   onQrPress,
-  onDeferPress,
+  onPostponePress,
   onCancelPress,
+  onExitPress,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
 
   const statusUI = getStatusUI(item.status);
-  const isCalled = item.status === 'called';
-  const isRegistered = item.status === 'registered';
+  const isWaiting = item.status === 'WAITING';
+  const isCalled = item.status === 'CALLED';
+  const isRegistered = item.status === 'REGISTERED';
+  const isEntered = item.status === 'ENTERED';
 
   return (
     <ReservationCard
       boothName={item.boothName}
       myOrderText={typeof item.myRank === 'number' ? `${item.myRank}번째` : undefined}
-      estimatedWaitText={
-        typeof item.estimatedWaitMinutes === 'number'
-          ? `약 ${item.estimatedWaitMinutes}분`
-          : undefined
-      }
+      estimatedWaitText={item.estimatedWaitText}
       statusLabel={statusUI.label}
       statusTone={statusUI.tone}
       onCardPress={() => setExpanded((prev) => !prev)}
@@ -79,7 +101,7 @@ export default function ReservationCardExpandable({
         <Ionicons
           name={expanded ? 'chevron-up' : 'chevron-down'}
           size={18}
-          color="#FFFFFF"
+          color="rgba(255,255,255,0.85)"
         />
       }
     >
@@ -110,11 +132,18 @@ export default function ReservationCardExpandable({
               <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
               <Text style={styles.fullGreenButtonText}>도착 인증 완료</Text>
             </Pressable>
+          ) : isEntered ? (
+            <Pressable style={styles.fullGreenButton} onPress={onExitPress}>
+              <Ionicons name="exit-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.fullGreenButtonText}>이용 종료</Text>
+            </Pressable>
           ) : (
             <View style={styles.buttonRow}>
-              <Pressable style={styles.grayButton} onPress={onDeferPress}>
-                <Text style={styles.grayButtonText}>순서 미루기</Text>
-              </Pressable>
+              {isWaiting && item.canPostpone ? (
+                <Pressable style={styles.grayButton} onPress={onPostponePress}>
+                  <Text style={styles.grayButtonText}>순서 미루기</Text>
+                </Pressable>
+              ) : null}
 
               {isCalled ? (
                 <Pressable style={styles.greenButton} onPress={onQrPress}>
@@ -122,9 +151,11 @@ export default function ReservationCardExpandable({
                 </Pressable>
               ) : null}
 
-              <Pressable style={styles.redButton} onPress={onCancelPress}>
-                <Text style={styles.redButtonText}>취소</Text>
-              </Pressable>
+              {isWaiting || isCalled ? (
+                <Pressable style={styles.redButton} onPress={onCancelPress}>
+                  <Text style={styles.redButtonText}>취소</Text>
+                </Pressable>
+              ) : null}
             </View>
           )}
         </>
@@ -146,86 +177,101 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
+
   infoText: {
     color: '#F3F4FA',
     fontSize: 14,
     fontWeight: '500',
+    lineHeight: 20,
   },
+
   noticeBlock: {
-    marginTop: 4,
+    marginTop: 10,
   },
+
   noticeTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginBottom: 6,
   },
+
   noticeTitle: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
   },
+
   noticeText: {
     color: '#F3F4FA',
     fontSize: 13,
-    lineHeight: 19,
+    lineHeight: 20,
   },
+
   buttonRow: {
     flexDirection: 'row',
-    gap: 30,
-    marginTop: 8,
+    gap: 12,
+    marginTop: 12,
   },
+
   grayButton: {
     flex: 1,
-    height: 40,
-    borderRadius: 8,
+    height: 44,
+    borderRadius: 10,
     backgroundColor: '#A9A7B8',
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   grayButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
+
   greenButton: {
     flex: 1,
-    height: 40,
-    borderRadius: 8,
+    height: 44,
+    borderRadius: 10,
     backgroundColor: '#20C189',
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   greenButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
   },
+
   redButton: {
     flex: 1,
-    height: 40,
-    borderRadius: 8,
+    height: 44,
+    borderRadius: 10,
     backgroundColor: '#FF5454',
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   redButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
   },
+
   fullGreenButton: {
-    marginTop: 8,
-    height: 40,
-    borderRadius: 8,
+    marginTop: 12,
+    height: 44,
+    borderRadius: 10,
     backgroundColor: '#20C189',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
   },
+
   fullGreenButtonText: {
     color: '#FFFFFF',
     fontSize: 15,

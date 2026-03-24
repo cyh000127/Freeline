@@ -15,14 +15,7 @@ type ReservationCardProps = {
   statusTone?: Tone;
   onCardPress?: () => void;
   expandIndicator?: React.ReactNode;
-
   children?: React.ReactNode;
-
-  /**
-   * Shows the divider under the summary section.
-   * Useful for expandable cards that should still show
-   * the bottom line even when collapsed.
-   */
   showDivider?: boolean;
 };
 
@@ -53,19 +46,27 @@ export default function ReservationCard({
 
       <View style={styles.metaGroup}>
         {myOrderText ? (
-          <ReservationMetaRow label="내 대기번호:" value={myOrderText} />
+          <ReservationMetaRow icon="queue" label="내 대기번호:" value={myOrderText} />
         ) : null}
 
         {estimatedWaitText ? (
-          <ReservationMetaRow label="예상 대기시간:" value={estimatedWaitText} />
+          <ReservationMetaRow
+            icon="time"
+            label="예상 대기시간:"
+            value={estimatedWaitText}
+          />
         ) : null}
 
         {visitTimeText ? (
-          <ReservationMetaRow label="관람 시간:" value={visitTimeText} />
+          <ReservationMetaRow icon="time" label="관람 시간:" value={visitTimeText} />
         ) : null}
 
         {boothLocationText ? (
-          <ReservationMetaRow label="관람 위치:" value={boothLocationText} />
+          <ReservationMetaRow
+            icon="location"
+            label="관람 위치:"
+            value={boothLocationText}
+          />
         ) : null}
       </View>
 
@@ -106,8 +107,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   divider: {
-    marginTop: 5,
-    marginBottom: 5,
+    marginTop: 14,
+    marginBottom: 14,
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.35)',
   },

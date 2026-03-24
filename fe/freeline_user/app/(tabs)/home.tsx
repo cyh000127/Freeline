@@ -4,9 +4,10 @@ import BottomTabBar, { TabKey } from '@/components/navigation/BottomTabBar';
 import HomeBanner from '@/components/home/HomeBanner';
 // import PopularBoothCard from '@/components/home/PopularBoothCard';
 // import { useQRMock } from '@/app/contexts/QRMockContext';
-// import ReservationCard from '@/components/reservation/ReservationCard';
 import { useExperienceMock } from '@/mocks/useExperienceMock';
 import ExperienceCard from '@/components/home/ExperienceCard';
+import { useMemo, useState } from 'react';
+import ReservationCard from '@/components/reservation/ReservationCard';
 
 const TAB_ROUTES: Record<TabKey, '/home' | '/reservation' | '/map' | '/my' | '/search'> =
   {
@@ -17,10 +18,63 @@ const TAB_ROUTES: Record<TabKey, '/home' | '/reservation' | '/map' | '/my' | '/s
     search: '/search',
   };
 
+type HomeReservationItem = {
+  // 임시 테스트용 예약현황 값
+  id: string;
+  boothName: string;
+  statusLabel: '정상 대기 중' | '호출됨' | '도착 인증 완료';
+  statusTone: 'blue' | 'yellow' | 'green';
+  myOrderText: string;
+  estimatedWaitText: string;
+};
+
+const HOME_RESERVATION_SEED: HomeReservationItem[] = [
+  {
+    id: '1',
+    boothName: '현대 글로비스',
+    statusLabel: '정상 대기 중',
+    statusTone: 'blue',
+    myOrderText: '13번째',
+    estimatedWaitText: '약 25분',
+  },
+  {
+    id: '2',
+    boothName: '두산',
+    statusLabel: '호출됨',
+    statusTone: 'yellow',
+    myOrderText: '5번째',
+    estimatedWaitText: '약 10분',
+  },
+  {
+    id: '3',
+    boothName: 'LS 일렉트릭',
+    statusLabel: '도착 인증 완료',
+    statusTone: 'green',
+    myOrderText: '2번째',
+    estimatedWaitText: '입장 대기 중',
+  },
+];
+
 export default function HomeScreen() {
   const router = useRouter();
-  // const { waitings } = useQRMock();
 
+  const [homeReservations, setHomeReservations] = useState<HomeReservationItem[]>([]);
+
+  const canAddReservation = homeReservations.length < 3;
+
+  const handleAddReservation = () => {
+    if (!canAddReservation) return;
+
+    const nextItem = HOME_RESERVATION_SEED[homeReservations.length];
+    if (!nextItem) return;
+
+    setHomeReservations((prev) => [...prev, nextItem]);
+  };
+
+  const visibleReservations = useMemo(
+    () => homeReservations.slice(0, 3),
+    [homeReservations],
+  );
   const handleTabPress = (tab: TabKey) => {
     router.replace(TAB_ROUTES[tab]);
   };
@@ -61,52 +115,36 @@ export default function HomeScreen() {
             <View style={styles.sectionAccent} />
             <Text style={styles.sectionTitle}>현재 예약 현황</Text>
           </View>
-          {/* {waitings.length === 0 ? ( */}
-          <View style={styles.emptyBox}>
-            <Text style={styles.contentText}>
-              아직 예약한 부스가 없네요.{'\n'}지도를 보고 관심 있는 부스를 예약해보세요!
-            </Text>
-            <Pressable style={styles.purpleButton} onPress={() => router.push('/map')}>
-              <Text style={styles.btnText}>예약하러 가기</Text>
-            </Pressable>
-          </View>
-          {/* { ) : (
-            <View style={styles.homeCardList}>
-              {waitings.map((item) => {
-                const isDone = item.verificationState === 'done';
-                const isAvailable = item.verificationState === 'on';
 
-                return (
-                  <View key={item.waitingId} style={styles.reservationCardWrap}>
+          <View style={styles.reservationSectionBox}>
+            {visibleReservations.length === 0 ? (
+              <Text style={styles.contentText}>
+                아직 예약한 부스가 없네요.{'\n'}지도를 보고 관심 있는 부스를 예약해보세요!
+              </Text>
+            ) : (
+              <View style={styles.homeCardList}>
+                {visibleReservations.map((item) => (
+                  <View key={item.id} style={styles.reservationCardWrap}>
                     <ReservationCard
                       boothName={item.boothName}
-                      myOrderText={isDone ? undefined : `${item.myRank}번째`}
-                      estimatedWaitText={
-                        isDone ? undefined : isAvailable ? '지금 입장 가능' : '대기 중'
-                      }
-                      actionLabel={
-                        isDone ? '도착 인증 완료' : isAvailable ? '도착 인증' : undefined
-                      }
-                      actionTone={isDone ? 'green' : isAvailable ? 'yellow' : 'blue'}
-                      onActionPress={
-                        isAvailable && !isDone
-                          ? () =>
-                              router.push({
-                                pathname: '/qr/scan',
-                                params: {
-                                  waitingId: item.waitingId,
-                                  boothName: item.boothName,
-                                  from: 'home',
-                                },
-                              })
-                          : undefined
-                      }
+                      myOrderText={item.myOrderText}
+                      estimatedWaitText={item.estimatedWaitText}
+                      statusLabel={item.statusLabel}
+                      statusTone={item.statusTone}
                     />
                   </View>
-                ); 
-              })}
-            </View>
-          )} */}
+                ))}
+              </View>
+            )}
+
+            {canAddReservation ? (
+              <Pressable style={styles.purpleButton} onPress={handleAddReservation}>
+                <Text style={styles.btnText}>
+                  {visibleReservations.length === 0 ? '예약하러 가기' : '예약 1개 추가'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
         {/* <View style={styles.section}> */}
         {/* <View style={styles.sectionHeader}>
@@ -164,26 +202,70 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-
   screen: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+
+  graySection: {
+    backgroundColor: '#F0F2F5',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+
+  reservationSectionBox: {
+    borderRadius: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+
+  homeCardList: {
+    marginTop: 4,
+    marginBottom: 12,
+  },
+
+  reservationCardWrap: {
+    marginBottom: 12,
+  },
+
+  emptyBox: {
+    backgroundColor: '#F0F2F5',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+
+  contentText: {
+    paddingVertical: 20,
+    fontFamily: 'Pretendard-Bold',
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+    color: '#A09EAB',
+  },
+
+  purpleButton: {
+    alignSelf: 'center',
+    backgroundColor: '#7C3AED',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 186,
+  },
+
+  btnText: {
+    fontSize: 15,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 
   scrollContent: {
     // paddingHorizontal: 20,
     // paddingTop: 14,
     paddingBottom: 130,
-  },
-  reservationCardWrap: {
-    marginBottom: 12,
-  },
-  purpleButton: {
-    backgroundColor: '#7C3AED',
-    flex: 1,
-    paddingVertical: 5,
-    paddingHorizontal: 30,
-    borderRadius: 8,
-    alignItems: 'center',
   },
 
   header: {
@@ -206,11 +288,6 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingHorizontal: 20,
     minHeight: 200,
-  },
-
-  graySection: {
-    backgroundColor: '#F0F2F5',
-    paddingHorizontal: 20,
   },
 
   sectionTitle: {
@@ -265,15 +342,6 @@ const styles = StyleSheet.create({
     color: '#111111',
   },
 
-  contentText: {
-    paddingVertical: 20,
-    fontFamily: 'Pretendard-Bold',
-    fontSize: 15,
-    fontWeight: '700',
-    textAlign: 'center',
-    color: '#A09EAB',
-  },
-
   bellButton: {
     width: 40,
     height: 40,
@@ -295,20 +363,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  emptyBox: {
-    backgroundColor: '#F0F2F5',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-
   emptyText: {
     color: '#888888',
-  },
-
-  homeCardList: {
-    marginTop: 4,
   },
 
   infoRow: {
@@ -327,11 +383,6 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 12,
     color: '#5C5A72',
-    fontWeight: '500',
-  },
-  btnText: {
-    fontSize: 15,
-    color: 'white',
     fontWeight: '500',
   },
 

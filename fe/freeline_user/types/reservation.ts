@@ -13,7 +13,7 @@ export interface ReservationItem {
   boothLocation?: string;
   status: ReservationStatus;
   waitingOrder?: number;
-  estimatedWaitMinutes?: number;
+  estimatedWaitText?: number;
   reservedAt?: string;
   notice?: string;
 }
