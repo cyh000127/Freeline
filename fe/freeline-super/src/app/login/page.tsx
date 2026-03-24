@@ -27,8 +27,13 @@ export default function LoginPage() {
     try {
       const response = await authApi.login({ id: email, password });
       const token = response.data?.data?.accessToken || response.data?.accessToken || response.data?.token;
+      const refreshToken = response.data?.data?.refreshToken || response.data?.refreshToken;
+      
       if (token) {
         localStorage.setItem("accessToken", token);
+      }
+      if (refreshToken) {
+        localStorage.setItem("refreshToken", refreshToken);
       }
       
       // Redirect to dashboard or main page

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import DaumPostcode from "react-daum-postcode";
 import { api } from "@/lib/api";
+import { eventApi } from "@/lib/api/event";
 
 interface AddEventModalProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isPostcodeOpen, setIsPostcodeOpen] = useState(false);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
 
   const handleComplete = (data: any) => {
     let fullAddress = data.address;
@@ -56,12 +58,11 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
     setFormData((prev) => ({ ...prev, [name]: parseInt(value) || 0 }));
   };
 
-  const handleThumbnailChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // TODO: 이미지 업로드 API가 있으면 호출하여 URL을 받아옵니다.
-    // 현재는 로컬 미리보기를 위해 dataURL을 사용하거나 임시 경로를 지정합니다.
+    setThumbnailFile(file);
     const reader = new FileReader();
     reader.onloadend = () => {
       setFormData((prev) => ({ ...prev, thumbnailImageUrl: reader.result as string }));
@@ -98,7 +99,7 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
         openTime: formData.openTime.length === 5 ? `${formData.openTime}:00` : formData.openTime,
         closeTime: formData.closeTime.length === 5 ? `${formData.closeTime}:00` : formData.closeTime,
         locationAddress: formData.locationAddress,
-        thumbnailImageUrl: formData.thumbnailImageUrl || null // 빈 문자열 대신 null 전송 시도
+        // thumbnailImageUrl은 별도 /thumbnail API로 업로드하므로 여기서 제외
       };
 
       const eventResponse = await api.post("/v1/events", eventPayload);
@@ -107,8 +108,8 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
       const resData = eventResponse.data;
       const eventId = resData?.data?.eventId || resData?.data?.id || resData?.eventId || resData?.id;
 
-      // 2. 행사 정책 설정 API 호출
       if (eventId) {
+        // 2. 행사 정책 설정 API 호출
         const policyPayload = {
           default_stay_sec: formData.default_stay_sec,
           default_max_waiting: formData.default_max_waiting,
@@ -116,8 +117,16 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
           default_call_ttl: formData.default_call_ttl,
           default_defer_limit: formData.default_defer_limit
         };
-
         await api.put(`/v1/events/${eventId}/policies`, policyPayload);
+
+        // 3. 썸네일 업로드 (파일이 있을 경우에만)
+        if (thumbnailFile) {
+          try {
+            await eventApi.uploadThumbnail(eventId, thumbnailFile);
+          } catch (thumbErr) {
+            console.warn("썸네일 업로드 실패 (행사는 생성됨):", thumbErr);
+          }
+        }
       }
 
       alert("행사가 성공적으로 추가되었습니다.");

@@ -15,7 +15,7 @@ export interface Event {
   openTime: string;
   closeTime: string;
   locationAddress: string;
-  status: 'OPEN' | 'CLOSED' | 'PREPARING' | 'ENDED' | 'DRAFT' | 'UPCOMING';
+  status: 'DRAFT' | 'READY' | 'OPEN' | 'CLOSED' | 'CANCELED';
   thumbnailImageUrl?: string;
   createdAt?: string;
 }
@@ -40,4 +40,13 @@ export const eventApi = {
   
   // 행사 삭제
   deleteEvent: (id: number | string) => api.delete<ApiResponse<any>>(`/v1/events/${id}`),
+
+  // 행사 썸네일 업로드
+  uploadThumbnail: (eventId: number | string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<ApiResponse<any>>(`/v1/events/${eventId}/thumbnail`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };

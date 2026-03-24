@@ -15,7 +15,9 @@ import { eventApi, Event } from "@/lib/api/event";
 export default function SuperAdminDashboard() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
-  const [userName, setUserName] = useState("관리자");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [userName, setUserName] = useState("익명");
+  const [timeLeft, setTimeLeft] = useState(1800); // 30분 (초 단위)
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
 
@@ -80,6 +82,12 @@ export default function SuperAdminDashboard() {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   const handleEditClick = (eventData: Event) => {
+    setSelectedEvent(eventData);
+    setIsEditEventOpen(true);
+    setOpenMenuId(null);
+  };
+
+  const handleCardClick = (eventData: Event) => {
     const id = eventData.eventId || (eventData as any).id;
     if (id) {
       router.push(`/events/${id}`);
@@ -116,69 +124,135 @@ export default function SuperAdminDashboard() {
     return () => window.removeEventListener("click", handleClickOutside);
   }, [openMenuId]);
 
+  // Timer Effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const handleRefresh = async () => {
+    try {
+      const rToken = localStorage.getItem("refreshToken");
+      
+      if (!rToken) {
+        alert("리프레시 토큰이 없습니다. 다시 로그인해주세요.");
+        router.replace("/login");
+        return;
+      }
+
+      // API Response follows the provided documentation
+      const response = await authApi.refresh({ 
+        refreshToken: rToken
+      }); 
+      
+      const newData = response.data?.data;
+      if (newData?.accessToken) {
+        localStorage.setItem("accessToken", newData.accessToken);
+        if (newData.refreshToken) {
+          localStorage.setItem("refreshToken", newData.refreshToken);
+        }
+        setTimeLeft(1800); // Reset timer to 30 minutes
+        alert("로그인 시간이 연장되었습니다.");
+      } else {
+        throw new Error("Invalid refresh response");
+      }
+    } catch (error) {
+      console.error("Failed to refresh session:", error);
+      alert("로그인 연장에 실패했습니다. 다시 로그인해주시기 바랍니다.");
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      router.replace("/login");
+    }
+  };
+
   if (isChecking) {
     return <div className="min-h-screen bg-[#F1F3F5]" />;
   }
 
   const getStatusDisplay = (status: string) => {
     switch (status) {
-      case "OPEN":
-        return { text: "진행 중", color: "text-[#10B981]", bgColor: "from-emerald-200" };
-      case "CLOSED":
-      case "ENDED":
-        return { text: "종료", color: "text-gray-400", bgColor: "from-gray-300" };
-      case "PREPARING":
-      case "UPCOMING":
       case "DRAFT":
-        return { text: "준비 중", color: "text-blue-400", bgColor: "from-blue-200" };
+        return { text: "임시저장", color: "text-gray-500", bgColor: "from-gray-200" };
+      case "READY":
+        return { text: "준비 중", color: "text-blue-500", bgColor: "from-blue-200" };
+      case "OPEN":
+        return { text: "진행 중", color: "text-green-600", bgColor: "from-green-200" };
+      case "CLOSED":
+        return { text: "종료", color: "text-orange-500", bgColor: "from-orange-200" };
+      case "CANCELED":
+        return { text: "취소", color: "text-red-500", bgColor: "from-red-200" };
       default:
-        return { text: status, color: "text-gray-400", bgColor: "from-gray-300" };
+        return { text: status, color: "text-gray-400", bgColor: "from-gray-200" };
     }
   };
 
   return (
     <div className="min-h-screen bg-[#F1F3F5] flex flex-col">
-      {/* Top Navbar */}
-      <header className="h-24 bg-[#2D2A4A] flex items-center justify-between px-8 text-white shrink-0">
-        <div className="w-[100px]" /> {/* Spacer for centering */}
+      {/* Top Navbar (Thick Centered Style) */}
+      <header className="h-24 bg-[#2D2A4A] flex items-center justify-between px-10 text-white shrink-0 shadow-lg relative z-50">
+        <div className="w-[200px]" /> {/* Spacer for centering */}
         
-        <div className="flex flex-col items-center justify-center mt-2">
-          <div className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+        <div className="flex flex-col items-center justify-center">
+          <div className="flex items-center justify-center gap-2 text-2xl font-bold tracking-tight">
             <Image src="/super/assets/logo.png" alt="줄서잇 매니저 로고" width={100} height={24} className="h-6 w-auto object-contain" priority />
             줄서잇 매니저
           </div>
-          <p className="mt-2 text-sm text-gray-300 font-medium">
+          <p className="mt-1 text-xs text-gray-300 font-medium opacity-80">
             부스 운영을 스마트하고 간편하게
           </p>
         </div>
 
-        <div className="w-[100px] flex justify-end items-center gap-2 text-gray-300">
-          <Link href="/settings" title="설정" className="hover:text-white transition-colors p-2 rounded-full hover:bg-white/10">
-            <Settings className="w-5 h-5" />
-          </Link>
-          <button 
-            title="로그아웃" 
-            onClick={handleLogout}
-            className="hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
+        <div className="flex items-center gap-6 w-[220px] justify-end">
+          {/* Minified Timer in Header (Horizontal Layout) */}
+          <div className="flex items-center gap-3 bg-white/5 pl-4 pr-1.5 py-1.5 rounded-2xl border border-white/10 shadow-inner">
+            <span className={`text-[15px] font-black tabular-nums transition-colors ${timeLeft < 300 ? 'text-red-400 animate-pulse' : 'text-[#C4FF00]'}`}>
+              {formatTime(timeLeft)}
+            </span>
+            <button 
+              onClick={(e) => { e.stopPropagation(); handleRefresh(); }}
+              className="px-3 py-1 bg-[#C4FF00] text-[#2D2A4A] rounded-xl text-[11px] font-extrabold hover:bg-[#bcfd00] transition-all whitespace-nowrap"
+            >
+              연장
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1 text-gray-400 border-l border-white/10 pl-5">
+            <Link href="/settings" title="설정" className="hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10">
+              <Settings className="w-5 h-5" />
+            </Link>
+            <button 
+              title="로그아웃" 
+              onClick={handleLogout}
+              className="hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-5xl mx-auto px-6 pt-10 pb-24 flex flex-col gap-6 relative">
-        {/* Actions Bar */}
+      <main className="flex-1 w-full max-w-5xl mx-auto px-6 pt-12 pb-24 flex flex-col gap-6 relative">
+        {/* Actions bar with aligned Welcome message */}
         <div className="flex items-center justify-between mb-2">
           <Button 
             variant="outline" 
-            className="h-12 px-6 rounded-xl border-2 border-[#2D2A4A] text-[#2D2A4A] font-bold shadow-sm hover:bg-[#2D2A4A] hover:text-white transition-colors"
+            className="h-11 px-6 rounded-xl border-2 border-[#2D2A4A] text-[#2D2A4A] font-bold shadow-sm hover:bg-[#2D2A4A] hover:text-white transition-colors"
             onClick={() => setIsAddEventOpen(true)}
           >
             + 행사 추가하기
           </Button>
-          <div className="text-lg font-bold text-[#111111]">
-            {userName}님, 환영합니다.
+          
+          <div className="text-right">
+            <span className="text-lg font-bold text-gray-900 leading-none">{userName}님, 환영합니다.</span>
           </div>
         </div>
 
@@ -200,19 +274,25 @@ export default function SuperAdminDashboard() {
               return (
                 <div 
                   key={event.eventId}
-                  onClick={() => handleEditClick(event)}
+                  onClick={() => handleCardClick(event)}
                   className={`relative w-full h-32 bg-gradient-to-r ${statusDisplay.bgColor} via-white to-white rounded-xl shadow-md flex items-center border border-gray-100 transition-transform hover:scale-[1.01] cursor-pointer ${openMenuId === event.eventId ? 'z-40' : 'z-0'}`}
                 >
-                  <div className="flex-1 px-14 flex items-center justify-between z-10">
-                    <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{event.name}</h3>
-                    <div className="flex flex-col text-center">
-                      <span className="text-2xl font-bold text-gray-900 leading-tight">{event.startDate.replace(/-/g, '.')}~</span>
-                      <span className="text-2xl font-bold text-gray-900 leading-tight">{event.endDate.replace(/-/g, '.')}</span>
+                  <div className="flex-1 px-14 flex items-center z-10">
+                    <div className="w-1/3 min-w-[300px]">
+                      <h3 className="text-3xl font-bold text-gray-900 tracking-tight truncate">{event.name}</h3>
                     </div>
-                    <div className="flex items-center gap-12">
-                      <div className={`w-32 text-right text-2xl font-bold ${statusDisplay.color} whitespace-nowrap`}>
-                        {statusDisplay.text}
+                    
+                    <div className="flex-1 flex justify-center">
+                      <div className="text-2xl font-bold text-gray-500 flex flex-col items-center">
+                        <span className="leading-tight">{event.startDate.replace(/-/g, '.')}~</span>
+                        <span className="leading-tight">{event.endDate.replace(/-/g, '.')}</span>
                       </div>
+                    </div>
+                    
+                    <div className="w-1/4 flex items-center justify-end gap-12">
+                      <span className={`text-2xl font-bold ${statusDisplay.color}`}>
+                        {statusDisplay.text}
+                      </span>
                       
                       {/* 3-Dots Menu */}
                       <div className="relative" onClick={(e) => e.stopPropagation()}>

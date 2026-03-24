@@ -95,16 +95,16 @@ export default function EventDetailPage() {
   }
 
   return (
-    <div className="flex bg-[#F1F3F5] min-h-screen">
+    <div className="flex bg-[#F1F3F5] h-screen overflow-hidden">
       <Sidebar userName={userName} role="총괄 팀장" eventId={eventId} />
 
       <main className="flex-1 flex flex-col p-8 overflow-y-auto">
         {/* Header Section */}
         <div className="flex flex-col items-center justify-center mb-8 text-center pt-4">
-          <h1 className="text-[48px] font-black text-[#2D2A4A] leading-tight tracking-tight uppercase">
+          <h1 className="text-[56px] font-black text-[#2D2A4A] leading-tight tracking-tight uppercase">
             {event.name}
           </h1>
-          <div className="mt-3 flex flex-col items-center gap-1.5">
+          <div className="mt-4 flex flex-col items-center gap-2">
             <div className="flex items-center gap-2.5 text-[22px] font-bold text-gray-400">
               <Calendar className="w-6 h-6" />
               <span>{event.startDate.replace(/-/g, '.')} ~ {event.endDate.replace(/-/g, '.')}</span>
@@ -117,20 +117,10 @@ export default function EventDetailPage() {
         </div>
 
         {/* Content Area */}
-        <div className="w-full max-w-6xl mx-auto bg-white rounded-[32px] shadow-sm border border-gray-100 p-8 flex flex-col relative overflow-hidden min-h-[500px]">
-          {/* Action Buttons */}
-          <div className="absolute top-10 right-10 flex gap-4">
-            <button 
-              onClick={() => setIsEditModalOpen(true)}
-              className="flex items-center gap-2 px-5 py-3 bg-[#E9FCE5] text-[#1D4A16] rounded-xl font-bold text-[15px] hover:bg-[#dbfbd5] transition-colors shadow-sm"
-            >
-              <Edit3 className="w-5 h-5" />
-              편집하기
-            </button>
-          </div>
+        <div className="w-full max-w-7xl mx-auto bg-white rounded-[40px] shadow-sm border border-gray-100 p-10 flex flex-col relative overflow-hidden min-h-[550px]">
 
-          {/* Status Indicators (Dummy) */}
-          <div className="flex gap-6 mb-8">
+          {/* Status Indicators with Edit Button */}
+          <div className="flex items-center gap-6 mb-8">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-[#10B981]" />
               <span className="text-[13px] font-bold text-gray-600">원활 (1m²당 5명 이하)</span>
@@ -142,6 +132,15 @@ export default function EventDetailPage() {
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-[#EF4444]" />
               <span className="text-[13px] font-bold text-gray-600">혼잡 (1m²당 8명 이상)</span>
+            </div>
+            <div className="ml-auto">
+              <button 
+                onClick={() => setIsEditModalOpen(true)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#DBFC53] text-[#2D2A4A] rounded-xl font-black text-[15px] hover:scale-105 transition-all shadow-md shadow-[#DBFC53]/30 active:scale-95"
+              >
+                <Edit3 className="w-5 h-5" />
+                편집하기
+              </button>
             </div>
           </div>
 
