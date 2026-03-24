@@ -16,6 +16,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,8 @@ import com.freeline.common.util.LoggingUtils;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final HttpStatus REQUEST_ENTITY_TOO_LARGE = HttpStatus.valueOf(413);
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<BaseResponse<ErrorResponse>> handleException(
@@ -141,6 +144,17 @@ public class GlobalExceptionHandler {
         LoggingUtils.logException("DataIntegrityViolationException 발생", ex, request);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.DATA_INTEGRITY_VIOLATION, request);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(BaseResponse.fail(response, HttpStatus.CONFLICT));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<BaseResponse<ErrorResponse>> handleMaxUploadSizeExceeded(
+            final MaxUploadSizeExceededException ex,
+            final HttpServletRequest request
+    ) {
+        LoggingUtils.logException("MaxUploadSizeExceededException 발생", ex, request);
+        final ErrorResponse response = ErrorResponse.of(ErrorCode.FILE_SIZE_EXCEEDED, request);
+        return ResponseEntity.status(REQUEST_ENTITY_TOO_LARGE)
+                .body(BaseResponse.fail(response, REQUEST_ENTITY_TOO_LARGE));
     }
 
     @ExceptionHandler(DataAccessException.class)

@@ -81,9 +81,10 @@ public enum ErrorCode {
     FILE_EMPTY(HttpStatus.BAD_REQUEST, "F-001", "빈 파일은 업로드할 수 없습니다."),
     FILE_TYPE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "F-002", "허용되지 않는 파일 형식입니다."),
     FILE_NAME_INVALID(HttpStatus.BAD_REQUEST, "F-003", "유효하지 않은 파일명입니다."),
-    FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F-004", "파일 업로드에 실패했습니다."),
-    FILE_DOWNLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F-005", "파일 조회에 실패했습니다."),
-    FILE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F-006", "파일 삭제에 실패했습니다."),
+    FILE_SIZE_EXCEEDED(HttpStatus.valueOf(413), "F-004", "업로드 가능한 파일 용량을 초과했습니다."),
+    FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F-005", "파일 업로드에 실패했습니다."),
+    FILE_DOWNLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F-006", "파일 조회에 실패했습니다."),
+    FILE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F-007", "파일 삭제에 실패했습니다."),
 
     /**
      * Goods Error (G-xxx)

@@ -3,10 +3,12 @@ package com.freeline.domain.event.controller;
 import jakarta.validation.Valid;
 
 import org.springframework.data.domain.Page;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -45,10 +47,21 @@ public class EventController {
     private final EventService eventService;
 
     @Operation(summary = "행사 생성", description = "주최자가 신규 행사를 생성합니다.")
-    @PostMapping
-    public ResponseEntity<BaseResponse<EventResDto>> createEvent(
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<BaseResponse<EventResDto>> createEventJson(
             final Authentication authentication,
             @Valid @RequestBody final EventCreateReqDto request
+    ) {
+        final Long eventAdminId = extractId(authentication);
+        final EventResDto response = eventService.createEvent(eventAdminId, request);
+        return ResponseUtils.created(response);
+    }
+
+    @Operation(summary = "행사 생성", description = "주최자가 신규 행사를 생성합니다. multipart/form-data 요청 시 썸네일 파일 업로드를 함께 처리합니다.")
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<BaseResponse<EventResDto>> createEventMultipart(
+            final Authentication authentication,
+            @Valid @ModelAttribute final EventCreateReqDto request
     ) {
         final Long eventAdminId = extractId(authentication);
         final EventResDto response = eventService.createEvent(eventAdminId, request);
@@ -63,8 +76,7 @@ public class EventController {
             @RequestParam(defaultValue = "0") final int page,
             @RequestParam(defaultValue = "10") final int size
     ) {
-        final Long eventAdminId = extractId(authentication);
-        final Page<EventListResDto> response = eventService.getEvents(eventAdminId, status, page, size);
+        final Page<EventListResDto> response = eventService.getEvents(status, page, size);
         return ResponseUtils.page(response);
     }
 
