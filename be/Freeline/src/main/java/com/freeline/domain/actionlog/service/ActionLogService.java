@@ -20,25 +20,28 @@ public class ActionLogService {
 
 	public ActionLogBulkResDto collectLogs(final Long visitorId, final ActionLogBulkReqDto request) {
 		final List<ActionLogReqDto> logs = request.logs();
-		int receivedCount = 0;
+		int droppedCount = 0;
 
 		for (final ActionLogReqDto log : logs) {
-			actionLogger.info("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-					log.eventId(),
-					visitorId,
-					log.action(),
-					log.targetType(),
-					log.targetId(),
-					log.metadata(),
-					log.clientTimestamp(),
-					log.sessionId()
-			);
-			receivedCount++;
+			try {
+				actionLogger.info("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+						log.eventId(),
+						visitorId,
+						log.action(),
+						log.targetType(),
+						log.targetId(),
+						log.metadata(),
+						log.clientTimestamp(),
+						log.sessionId()
+				);
+			} catch (Exception e) {
+				droppedCount++;
+			}
 		}
 
 		return ActionLogBulkResDto.builder()
-				.receivedCount(receivedCount)
-				.droppedCount(logs.size() - receivedCount)
+				.receivedCount(logs.size() - droppedCount)
+				.droppedCount(droppedCount)
 				.build();
 	}
 }
