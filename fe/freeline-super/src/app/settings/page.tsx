@@ -56,9 +56,9 @@ export default function SettingsPage() {
     try {
       setIsLoading(true);
 
-      const payload: any = {};
+      const payload: { name?: string; company?: string } = {};
       if (name.trim()) payload.name = name;
-      if (organization.trim()) payload.organization = organization;
+      if (organization.trim()) payload.company = organization;
 
       if (Object.keys(payload).length === 0) {
         alert("수정할 항목을 하나 이상 입력해주세요.");

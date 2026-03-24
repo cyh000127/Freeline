@@ -20,7 +20,7 @@ export interface EmailAuthCodeVerifyRequest {
 
 export interface UpdateProfileRequest {
   name?: string;
-  organization?: string;
+  company?: string;
 }
 
 export interface ChangePasswordRequest {
