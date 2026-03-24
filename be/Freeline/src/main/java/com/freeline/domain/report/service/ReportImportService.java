@@ -16,10 +16,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.freeline.domain.report.entity.BoothPerformanceResult;
+import com.freeline.domain.report.entity.EventSummaryResult;
 import com.freeline.domain.report.entity.HourlyTrafficResult;
 import com.freeline.domain.report.entity.ProblemSpotResult;
 import com.freeline.domain.report.entity.VisitorPathResult;
 import com.freeline.domain.report.repository.BoothPerformanceResultRepository;
+import com.freeline.domain.report.repository.EventSummaryResultRepository;
 import com.freeline.domain.report.repository.HourlyTrafficResultRepository;
 import com.freeline.domain.report.repository.ProblemSpotResultRepository;
 import com.freeline.domain.report.repository.VisitorPathResultRepository;
@@ -29,6 +31,7 @@ import com.freeline.domain.report.repository.VisitorPathResultRepository;
 @RequiredArgsConstructor
 public class ReportImportService {
 
+    private final EventSummaryResultRepository eventSummaryResultRepository;
     private final BoothPerformanceResultRepository boothPerformanceResultRepository;
     private final HourlyTrafficResultRepository hourlyTrafficResultRepository;
     private final VisitorPathResultRepository visitorPathResultRepository;
@@ -60,6 +63,7 @@ public class ReportImportService {
         }
 
         try (Connection conn = DriverManager.getConnection(hiveUrl, hiveUser, hivePassword)) {
+            importEventSummary(conn, eventId);
             importBoothPerformance(conn, eventId);
             importHourlyTraffic(conn, eventId);
             importVisitorPath(conn, eventId);
@@ -72,10 +76,36 @@ public class ReportImportService {
     }
 
     private void clearExistingReport(Long eventId) {
+        eventSummaryResultRepository.deleteByEventId(eventId);
         boothPerformanceResultRepository.deleteByEventId(eventId);
         hourlyTrafficResultRepository.deleteByEventId(eventId);
         visitorPathResultRepository.deleteByEventId(eventId);
         problemSpotResultRepository.deleteByEventId(eventId);
+    }
+
+    private void importEventSummary(Connection conn, Long eventId) throws SQLException {
+        String sql = "SELECT event_id, total_visitors, total_registrations, "
+                + "avg_waiting_seconds, overall_dropout_rate, peak_hour, analyzed_at "
+                + "FROM freeline.event_summary_result WHERE event_id = ?";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setLong(1, eventId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    EventSummaryResult entity = EventSummaryResult.builder()
+                            .eventId(rs.getLong("event_id"))
+                            .totalVisitors(rs.getLong("total_visitors"))
+                            .totalRegistrations(rs.getLong("total_registrations"))
+                            .avgWaitingSeconds(rs.getDouble("avg_waiting_seconds"))
+                            .overallDropoutRate(rs.getDouble("overall_dropout_rate"))
+                            .peakHour(rs.getString("peak_hour"))
+                            .analyzedAt(rs.getString("analyzed_at"))
+                            .build();
+                    eventSummaryResultRepository.save(entity);
+                    log.info("Imported EventSummaryResult for event_id: {}", eventId);
+                }
+            }
+        }
     }
 
     private void importBoothPerformance(Connection conn, Long eventId) throws SQLException {
