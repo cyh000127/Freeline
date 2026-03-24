@@ -20,6 +20,10 @@ public class ResponseUtils {
         return ResponseEntity.status(HttpStatus.CREATED).body(BaseResponse.created(data));
     }
 
+    public <T> ResponseEntity<BaseResponse<T>> accepted(T data) {
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(BaseResponse.ok(data));
+    }
+
     public <T> ResponseEntity<BaseResponse<T>> noContent() {
         return ResponseEntity.status(HttpStatus.NO_CONTENT).body(BaseResponse.noContent());
     }
