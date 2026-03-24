@@ -120,6 +120,7 @@ public class EventService {
 
     @Transactional(readOnly = true)
     public Page<EventListResDto> getEvents(
+            final Long eventAdminId,
             final String status,
             final int page,
             final int size
@@ -128,10 +129,10 @@ public class EventService {
         final Page<Event> eventPage;
 
         if ("ALL".equalsIgnoreCase(status)) {
-            eventPage = eventRepository.findAll(pageable);
+            eventPage = eventRepository.findAllByEventAdminId(eventAdminId, pageable);
         } else {
             final EventStatus eventStatus = parseEventStatus(status);
-            eventPage = eventRepository.findAllByStatus(eventStatus, pageable);
+            eventPage = eventRepository.findAllByEventAdminIdAndStatus(eventAdminId, eventStatus, pageable);
         }
 
         return eventPage.map(EventConverter::toEventListResDto);
