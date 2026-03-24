@@ -15,6 +15,7 @@ import com.freeline.common.event.waiting.model.WaitingEventType;
 import com.freeline.domain.booth.entity.BoothWaiting;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
 
 @Slf4j
 @Service
@@ -23,6 +24,7 @@ public class WaitingStatusPersistenceService {
 
     private final BoothWaitingRepository boothWaitingRepository;
     private final WaitingEventDispatcher waitingEventDispatcher;
+    private final WaitingEventSnapshotAssembler waitingEventSnapshotAssembler;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean expireWaiting(final Long waitingId, final LocalDateTime expiresAt) {
@@ -56,7 +58,8 @@ public class WaitingStatusPersistenceService {
                         waiting.getBoothId(),
                         waiting.getVisitorId(),
                         previousStatus,
-                        waiting.getStatus().name()
+                        waiting.getStatus().name(),
+                        waitingEventSnapshotAssembler.toSnapshot(waiting)
                 )
         );
         return true;

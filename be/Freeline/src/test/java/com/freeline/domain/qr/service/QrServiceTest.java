@@ -24,6 +24,7 @@ import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
 import com.freeline.domain.qr.dto.request.QrScanReqDto;
 import com.freeline.domain.qr.dto.response.BoothQrResDto;
 import com.freeline.domain.qr.entity.BoothQr;
@@ -81,7 +82,8 @@ class QrServiceTest {
                 stringRedisTemplate,
                 qrProperties,
                 waitingEventDispatcher,
-                waitingStatusPersistenceService
+                waitingStatusPersistenceService,
+                new WaitingEventSnapshotAssembler()
         );
     }
 

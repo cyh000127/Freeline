@@ -33,6 +33,7 @@ import com.freeline.domain.qr.entity.BoothQrStatus;
 import com.freeline.domain.qr.entity.QrPurpose;
 import com.freeline.domain.qr.exception.QrException;
 import com.freeline.domain.qr.repository.BoothQrRepository;
+import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
 import com.freeline.domain.waiting.service.WaitingStatusPersistenceService;
 
 @Slf4j
@@ -53,6 +54,7 @@ public class QrService {
     private final QrProperties qrProperties;
     private final WaitingEventDispatcher waitingEventDispatcher;
     private final WaitingStatusPersistenceService waitingStatusPersistenceService;
+    private final WaitingEventSnapshotAssembler waitingEventSnapshotAssembler;
 
     // TODO: visitor 인증이 붙으면 scanQr()에서 visitorId를 request body로 받지 않고 인증 정보에서 추출하도록 변경한다.
     // TODO: booth_qr 이력 정리 및 만료 QR 배치 정리 정책이 필요하면 별도 스케줄러로 분리한다.
@@ -293,7 +295,8 @@ public class QrService {
                         waiting.getBoothId(),
                         waiting.getVisitorId(),
                         previousStatus,
-                        waiting.getStatus().name()
+                        waiting.getStatus().name(),
+                        waitingEventSnapshotAssembler.toSnapshot(waiting)
                 )
         );
     }

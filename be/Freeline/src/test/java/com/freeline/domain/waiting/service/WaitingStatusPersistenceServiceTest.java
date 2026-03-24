@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.freeline.common.event.waiting.detector.WaitingStatusChangeCommand;
@@ -16,6 +17,7 @@ import com.freeline.common.event.waiting.dispatcher.WaitingEventDispatcher;
 import com.freeline.domain.booth.entity.BoothWaiting;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
 
 @ExtendWith(MockitoExtension.class)
 class WaitingStatusPersistenceServiceTest {
@@ -25,6 +27,9 @@ class WaitingStatusPersistenceServiceTest {
 
     @Mock
     private WaitingEventDispatcher waitingEventDispatcher;
+
+    @Spy
+    private WaitingEventSnapshotAssembler waitingEventSnapshotAssembler;
 
     @InjectMocks
     private WaitingStatusPersistenceService waitingStatusPersistenceService;
@@ -56,6 +61,9 @@ class WaitingStatusPersistenceServiceTest {
         Assertions.assertThat(captor.getValue().eventType().name()).isEqualTo("WAITING_EXPIRED");
         Assertions.assertThat(captor.getValue().previousStatus()).isEqualTo("CALLED");
         Assertions.assertThat(captor.getValue().currentStatus()).isEqualTo("EXPIRED");
+        Assertions.assertThat(captor.getValue().snapshot()).isNotNull();
+        Assertions.assertThat(captor.getValue().snapshot().waitingNumber()).isEqualTo(7);
+        Assertions.assertThat(captor.getValue().snapshot().status()).isEqualTo("EXPIRED");
     }
 
     @Test

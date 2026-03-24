@@ -22,6 +22,7 @@ import com.freeline.domain.booth.exception.BoothException;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
 import com.freeline.domain.waiting.converter.WaitingConverter;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingResDto;
@@ -87,6 +88,7 @@ public class WaitingService {
     private final BoothWaitingRepository boothWaitingRepository;
     private final BoothPolicyRepository boothPolicyRepository;
     private final WaitingEventDispatcher waitingEventDispatcher;
+    private final WaitingEventSnapshotAssembler waitingEventSnapshotAssembler;
 
     public WaitingCreateResDto createWaiting(final Long boothId, final Long visitorId) {
         getBoothEntity(boothId);
@@ -446,7 +448,8 @@ public class WaitingService {
                         waiting.getBoothId(),
                         waiting.getVisitorId(),
                         previousStatus,
-                        waiting.getStatus().name()
+                        waiting.getStatus().name(),
+                        waitingEventSnapshotAssembler.toSnapshot(waiting)
                 )
         );
     }

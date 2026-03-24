@@ -14,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.freeline.common.error.ErrorCode;
@@ -28,6 +29,7 @@ import com.freeline.domain.booth.exception.BoothException;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
@@ -73,6 +75,9 @@ class WaitingServiceTest {
 
     @Mock
     private WaitingEventDispatcher waitingEventDispatcher;
+
+    @Spy
+    private WaitingEventSnapshotAssembler waitingEventSnapshotAssembler;
 
     @InjectMocks
     private WaitingService waitingService;
