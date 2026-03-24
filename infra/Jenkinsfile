@@ -130,6 +130,10 @@ pipeline {
 
                     components.each { component ->
                         if (component == 'networks') return
+                        if (component == 'jenkins-agent') {
+                            echo "⚠️  jenkins-agent 자기 자신 배포 스킵 (수동 배포 필요)"
+                            return
+                        }
 
                         def targetHost = hostMap[component] ?: 'localhost'
                         stage("Deploy: ${component} → ${targetHost}") {

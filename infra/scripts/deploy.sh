@@ -47,8 +47,13 @@ echo "✅ [$COMPONENT] Configuration valid"
 RUNNING_BEFORE=$(docker compose ps -q 2>/dev/null || true)
 
 # ── Deploy ──
+BUILD_FLAG=""
+if ls "$COMPONENT_DIR"/*.Dockerfile "$COMPONENT_DIR"/Dockerfile 2>/dev/null | grep -q .; then
+    BUILD_FLAG="--build"
+fi
+
 echo "🚀 [$COMPONENT] Starting deployment..."
-if ! docker compose up -d --build --remove-orphans; then
+if ! docker compose up -d $BUILD_FLAG --remove-orphans; then
     echo "❌ [$COMPONENT] docker compose up failed"
     exit 1
 fi
