@@ -24,6 +24,7 @@ import com.freeline.common.file.dto.FileInfo;
 import com.freeline.common.file.service.FileService;
 import com.freeline.domain.booth.converter.BoothConverter;
 import com.freeline.domain.booth.dto.request.BoothCreateReqDto;
+import com.freeline.domain.booth.dto.request.BoothPolicyUpdateReqDto;
 import com.freeline.domain.booth.dto.request.BoothStatusUpdateReqDto;
 import com.freeline.domain.booth.dto.request.BoothUpdateReqDto;
 import com.freeline.domain.booth.dto.response.BoothCalledUserResDto;
@@ -183,6 +184,29 @@ public class BoothService {
                 .orElseGet(() -> eventPolicyRepository.findByEvent_Id(booth.getEventId())
                         .map(eventPolicy -> BoothConverter.toBoothPolicyResDto(boothId, eventPolicy))
                         .orElseThrow(() -> new BoothException(ErrorCode.NOT_FOUND)));
+    }
+
+    public BoothPolicyResDto upsertBoothPolicy(final Long boothId, final BoothPolicyUpdateReqDto request) {
+        getBoothEntity(boothId);
+
+        final BoothPolicy saved = boothPolicyRepository.findByBoothId(boothId)
+                .map(existingPolicy -> {
+                    existingPolicy.updatePolicy(
+                            request.staySeconds(),
+                            request.maxWaitingCount(),
+                            request.callCount(),
+                            request.callValidSeconds(),
+                            request.deferLimit()
+                    );
+                    return existingPolicy;
+                })
+                .orElseGet(() -> boothPolicyRepository.save(
+                        BoothConverter.toBoothPolicyEntity(boothId, request)
+                ));
+
+        log.info("[Booth] policy upsert completed {boothId: {}}", boothId);
+
+        return BoothConverter.toBoothPolicyResDto(boothId, saved);
     }
 
     public BoothStatusResDto updateBoothStatus(final Long boothId, final BoothStatusUpdateReqDto request) {

@@ -5,6 +5,7 @@ import java.util.List;
 import lombok.experimental.UtilityClass;
 
 import com.freeline.domain.booth.dto.request.BoothCreateReqDto;
+import com.freeline.domain.booth.dto.request.BoothPolicyUpdateReqDto;
 import com.freeline.domain.booth.dto.response.BoothCalledUserResDto;
 import com.freeline.domain.booth.dto.response.BoothCreateResDto;
 import com.freeline.domain.booth.dto.response.BoothGoodsResDto;
@@ -99,6 +100,17 @@ public class BoothConverter {
         return BoothStatusResDto.builder()
                 .boothId(booth.getId())
                 .isEmergencyClosed(booth.isEmergencyClosed())
+                .build();
+    }
+
+    public BoothPolicy toBoothPolicyEntity(final Long boothId, final BoothPolicyUpdateReqDto dto) {
+        return BoothPolicy.builder()
+                .boothId(boothId)
+                .stayTime(dto.staySeconds())
+                .maxWaitingCount(dto.maxWaitingCount())
+                .callCount(dto.callCount())
+                .callValidTime(dto.callValidSeconds())
+                .deferLimit(dto.deferLimit())
                 .build();
     }
 

@@ -23,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.util.ResponseUtils;
 import com.freeline.domain.booth.dto.request.BoothCreateReqDto;
+import com.freeline.domain.booth.dto.request.BoothPolicyUpdateReqDto;
 import com.freeline.domain.booth.dto.request.BoothStatusUpdateReqDto;
 import com.freeline.domain.booth.dto.request.BoothUpdateReqDto;
 import com.freeline.domain.booth.dto.response.BoothCreateResDto;
@@ -122,6 +123,16 @@ public class BoothController {
             @PathVariable final Long boothId
     ) {
         final BoothPolicyResDto response = boothService.getBoothPolicy(boothId);
+        return ResponseUtils.ok(response);
+    }
+
+    @Operation(summary = "부스 정책 설정", description = "특정 부스의 대기열 운영 정책을 설정하거나 수정합니다.")
+    @PatchMapping("/booths/{boothId}/policy")
+    public ResponseEntity<BaseResponse<BoothPolicyResDto>> upsertBoothPolicy(
+            @PathVariable final Long boothId,
+            @Valid @RequestBody final BoothPolicyUpdateReqDto request
+    ) {
+        final BoothPolicyResDto response = boothService.upsertBoothPolicy(boothId, request);
         return ResponseUtils.ok(response);
     }
 
