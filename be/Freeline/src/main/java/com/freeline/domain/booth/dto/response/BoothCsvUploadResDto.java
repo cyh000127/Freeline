@@ -11,6 +11,9 @@ public record BoothCsvUploadResDto(
         Long eventId,
 
         @Schema(description = "등록된 부스 수", example = "12")
-        int importedCount
+        int importedCount,
+
+        @Schema(description = "생성된 부스 관리자 계정 수", example = "12")
+        int adminCreatedCount
 ) {
 }

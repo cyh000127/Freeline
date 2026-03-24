@@ -1,5 +1,7 @@
 package com.freeline.domain.booth.service;
 
+import java.util.List;
+
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,14 +11,18 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.freeline.common.file.service.FileService;
+import com.freeline.domain.auth.repository.BoothAdminRepository;
 import com.freeline.domain.booth.dto.response.BoothCsvUploadResDto;
+import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.repository.BoothGoodsRepository;
 import com.freeline.domain.booth.repository.BoothImageRepository;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.event.repository.EventPolicyRepository;
 import com.freeline.domain.event.repository.EventRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,10 +44,19 @@ class BoothCsvUploadServiceTest {
     private BoothWaitingRepository boothWaitingRepository;
 
     @Mock
+    private BoothAdminRepository boothAdminRepository;
+
+    @Mock
     private EventRepository eventRepository;
 
     @Mock
+    private EventPolicyRepository eventPolicyRepository;
+
+    @Mock
     private FileService fileService;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private BoothService boothService;
@@ -52,20 +67,50 @@ class BoothCsvUploadServiceTest {
                 "file",
                 "booths.csv",
                 "text/csv",
-                ("name,locationCode,openTime,closeTime\n"
-                        + "굿즈 부스,A-01,10:00:00,18:00:00\n"
-                        + "체험 부스,,11:00:00,19:00:00\n").getBytes()
+                ("boothName,locationCode,openTime,closeTime,adminName,adminEmail,adminCompany\n"
+                        + "굿즈 부스,A-01,10:00:00,18:00:00,홍길동,admin1@example.com,Freeline\n"
+                        + "체험 부스,B-02,11:00:00,19:00:00,김부스,admin2@example.com,SSAFY\n").getBytes()
         );
 
         Mockito.when(eventRepository.existsById(5L)).thenReturn(true);
-        Mockito.when(boothRepository.saveAll(ArgumentMatchers.anyList()))
+        Mockito.when(passwordEncoder.encode(ArgumentMatchers.anyString()))
+                .thenAnswer(invocation -> "ENC:" + invocation.getArgument(0, String.class));
+        Mockito.when(boothRepository.saveAll(ArgumentMatchers.<Booth>anyList()))
+                .thenAnswer(invocation -> {
+                    final List<Booth> booths = invocation.getArgument(0);
+                    return List.of(
+                            Booth.builder()
+                                    .id(101L)
+                                    .eventId(5L)
+                                    .name(booths.get(0).getName())
+                                    .locationCode(booths.get(0).getLocationCode())
+                                    .openTime(booths.get(0).getOpenTime())
+                                    .closeTime(booths.get(0).getCloseTime())
+                                    .emergencyClosed(booths.get(0).isEmergencyClosed())
+                                    .build(),
+                            Booth.builder()
+                                    .id(102L)
+                                    .eventId(5L)
+                                    .name(booths.get(1).getName())
+                                    .locationCode(booths.get(1).getLocationCode())
+                                    .openTime(booths.get(1).getOpenTime())
+                                    .closeTime(booths.get(1).getCloseTime())
+                                    .emergencyClosed(booths.get(1).isEmergencyClosed())
+                                    .build()
+                    );
+                });
+        Mockito.when(boothAdminRepository.findByLoginId(ArgumentMatchers.anyString()))
+                .thenReturn(java.util.Optional.empty());
+        Mockito.when(boothAdminRepository.saveAll(ArgumentMatchers.anyList()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         final BoothCsvUploadResDto result = boothService.uploadBoothsByCsv(5L, file);
 
         Assertions.assertThat(result.eventId()).isEqualTo(5L);
         Assertions.assertThat(result.importedCount()).isEqualTo(2);
+        Assertions.assertThat(result.adminCreatedCount()).isEqualTo(2);
         Mockito.verify(boothRepository).saveAll(ArgumentMatchers.anyList());
+        Mockito.verify(boothAdminRepository).saveAll(ArgumentMatchers.anyList());
     }
 
     @Test
@@ -74,14 +119,35 @@ class BoothCsvUploadServiceTest {
                 "file",
                 "booths.csv",
                 "text/csv",
-                ("name,locationCode,openTime,closeTime\n"
-                        + "굿즈 부스,A-01,10:00,18:00:00\n").getBytes()
+                ("boothName,locationCode,openTime,closeTime,adminName,adminEmail,adminCompany\n"
+                        + "굿즈 부스,A-01,10:00,18:00:00,홍길동,admin1@example.com,Freeline\n").getBytes()
         );
 
         Mockito.when(eventRepository.existsById(5L)).thenReturn(true);
 
         Assertions.assertThatThrownBy(() -> boothService.uploadBoothsByCsv(5L, file))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("2번째 줄의 openTime 형식이 잘못되었습니다.");
+                .hasMessageContaining("2번째 줄의 openTime 형식이 올바르지 않습니다.");
+        Mockito.verify(boothRepository, Mockito.never()).saveAll(ArgumentMatchers.anyList());
+        Mockito.verify(boothAdminRepository, Mockito.never()).saveAll(ArgumentMatchers.anyList());
+    }
+
+    @Test
+    void uploadBoothsByCsv_failWhenAdminEmailIsMissing() {
+        final MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "booths.csv",
+                "text/csv",
+                ("boothName,locationCode,openTime,closeTime,adminName,adminEmail,adminCompany\n"
+                        + "굿즈 부스,A-01,10:00:00,18:00:00,홍길동,,Freeline\n").getBytes()
+        );
+
+        Mockito.when(eventRepository.existsById(5L)).thenReturn(true);
+
+        Assertions.assertThatThrownBy(() -> boothService.uploadBoothsByCsv(5L, file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("2번째 줄의 adminEmail 값이 비어 있습니다.");
+        Mockito.verify(boothRepository, Mockito.never()).saveAll(ArgumentMatchers.anyList());
+        Mockito.verify(boothAdminRepository, Mockito.never()).saveAll(ArgumentMatchers.anyList());
     }
 }
