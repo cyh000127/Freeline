@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.util.ResponseUtils;
+import com.freeline.domain.auth.service.BoothAccessService;
 import com.freeline.domain.qr.dto.request.QrScanReqDto;
 import com.freeline.domain.qr.dto.response.BoothQrResDto;
 import com.freeline.domain.qr.dto.response.QrScanResDto;
@@ -31,12 +32,15 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class QrController {
 
     private final QrService qrService;
+    private final BoothAccessService boothAccessService;
 
     @Operation(summary = "부스 QR 생성", description = "부스에 부착할 고정형 QR payload를 생성합니다. 활성 QR이 있으면 기존 QR을 반환합니다.")
     @PostMapping("/booths/{boothId}")
     public ResponseEntity<BaseResponse<BoothQrResDto>> createBoothQr(
+            final Authentication authentication,
             @PathVariable final Long boothId
     ) {
+        boothAccessService.validateBoothAccess(authentication, boothId);
         final BoothQrResDto response = qrService.createBoothQr(boothId);
         return ResponseUtils.created(response);
     }
@@ -44,8 +48,10 @@ public class QrController {
     @Operation(summary = "부스 QR 조회", description = "현재 활성 상태인 부스 QR payload를 조회합니다.")
     @GetMapping("/booths/{boothId}")
     public ResponseEntity<BaseResponse<BoothQrResDto>> getBoothQr(
+            final Authentication authentication,
             @PathVariable final Long boothId
     ) {
+        boothAccessService.validateBoothAccess(authentication, boothId);
         final BoothQrResDto response = qrService.getBoothQr(boothId);
         return ResponseUtils.ok(response);
     }
@@ -53,8 +59,10 @@ public class QrController {
     @Operation(summary = "부스 QR 재발급", description = "기존 QR을 재발급 처리하고 새로운 고정형 QR payload를 생성합니다.")
     @PatchMapping("/booths/{boothId}/reissue")
     public ResponseEntity<BaseResponse<BoothQrResDto>> reissueBoothQr(
+            final Authentication authentication,
             @PathVariable final Long boothId
     ) {
+        boothAccessService.validateBoothAccess(authentication, boothId);
         final BoothQrResDto response = qrService.reissueBoothQr(boothId);
         return ResponseUtils.ok(response);
     }
