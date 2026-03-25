@@ -46,8 +46,17 @@ public class RabbitMqConfig {
                 .deadLetterExchange(properties.getDeadLetterExchange())
                 .deadLetterRoutingKey(properties.getFcmDeadLetterQueue())
                 .build();
+        final Queue expireDelayQueue = QueueBuilder.durable(properties.getExpireDelayQueue())
+                .deadLetterExchange(properties.getExchange())
+                .deadLetterRoutingKey(properties.getExpireDelayedRoutingKey())
+                .build();
+        final Queue expireDelayedQueue = QueueBuilder.durable(properties.getExpireDelayedQueue())
+                .deadLetterExchange(properties.getDeadLetterExchange())
+                .deadLetterRoutingKey(properties.getExpireDeadLetterQueue())
+                .build();
         final Queue sseDeadLetterQueue = QueueBuilder.durable(properties.getSseDeadLetterQueue()).build();
         final Queue fcmDeadLetterQueue = QueueBuilder.durable(properties.getFcmDeadLetterQueue()).build();
+        final Queue expireDeadLetterQueue = QueueBuilder.durable(properties.getExpireDeadLetterQueue()).build();
 
         final Binding sseBinding = BindingBuilder.bind(sseQueue)
                 .to(waitingExchange)
@@ -58,12 +67,18 @@ public class RabbitMqConfig {
         final Binding fcmDelayedBinding = BindingBuilder.bind(fcmDelayedQueue)
                 .to(waitingExchange)
                 .with(properties.getFcmDelayedRoutingKey());
+        final Binding expireDelayedBinding = BindingBuilder.bind(expireDelayedQueue)
+                .to(waitingExchange)
+                .with(properties.getExpireDelayedRoutingKey());
         final Binding sseDeadLetterBinding = BindingBuilder.bind(sseDeadLetterQueue)
                 .to(deadLetterExchange)
                 .with(properties.getSseDeadLetterQueue());
         final Binding fcmDeadLetterBinding = BindingBuilder.bind(fcmDeadLetterQueue)
                 .to(deadLetterExchange)
                 .with(properties.getFcmDeadLetterQueue());
+        final Binding expireDeadLetterBinding = BindingBuilder.bind(expireDeadLetterQueue)
+                .to(deadLetterExchange)
+                .with(properties.getExpireDeadLetterQueue());
 
         return new Declarables(
                 waitingExchange,
@@ -72,13 +87,18 @@ public class RabbitMqConfig {
                 fcmQueue,
                 fcmDelayQueue,
                 fcmDelayedQueue,
+                expireDelayQueue,
+                expireDelayedQueue,
                 sseDeadLetterQueue,
                 fcmDeadLetterQueue,
+                expireDeadLetterQueue,
                 sseBinding,
                 fcmBinding,
                 fcmDelayedBinding,
+                expireDelayedBinding,
                 sseDeadLetterBinding,
-                fcmDeadLetterBinding
+                fcmDeadLetterBinding,
+                expireDeadLetterBinding
         );
     }
 

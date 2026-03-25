@@ -46,7 +46,7 @@ public class PushNotificationService {
 
         final FcmToken saved = fcmTokenRepository.findByDeviceId(request.deviceId())
                 .map(existing -> {
-                    existing.updateToken(request.fcmToken(), request.platform());
+                    existing.updateToken(request.visitorId(), request.fcmToken(), request.platform());
                     return existing;
                 })
                 .orElseGet(() -> fcmTokenRepository.save(PushNotificationConverter.toEntity(request)));
@@ -60,6 +60,18 @@ public class PushNotificationService {
         );
 
         return PushNotificationConverter.toFcmTokenResDto(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isConfigured() {
+        return pushNotificationSender.isActive();
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isWaitingStatus(final Long waitingId, final WaitingStatus expectedStatus) {
+        return boothWaitingRepository.findById(waitingId)
+                .map(waiting -> waiting.getStatus() == expectedStatus)
+                .orElse(false);
     }
 
     public PushNotificationSendResDto sendNotification(

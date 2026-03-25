@@ -7,6 +7,7 @@ import lombok.Builder;
 
 @Builder
 public record WaitingEventMessage(
+        Integer schemaVersion,
         UUID eventId,
         WaitingEventType eventType,
         Long waitingId,
@@ -14,6 +15,7 @@ public record WaitingEventMessage(
         Long visitorId,
         String previousStatus,
         String currentStatus,
-        LocalDateTime occurredAt
+        LocalDateTime occurredAt,
+        WaitingEventSnapshot snapshot
 ) {
 }
