@@ -33,6 +33,8 @@ services:
     depends_on:
       namenode:
         condition: service_healthy
+    ports:
+      - "9864:9864"
     environment:
       TZ: Asia/Seoul
       HADOOP_HOME: /opt/hadoop

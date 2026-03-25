@@ -36,16 +36,16 @@ set -euo pipefail
 # ─── Configuration ───────────────────────────────────────────────────────────
 
 TARGET_URL="${TARGET_URL:-https://j14a207.p.ssafy.io}"
-ADMIN_ID="${ADMIN_ID:-kangseunghun9927@gmail.com}"
-ADMIN_PW="${ADMIN_PW:-jmh8EYG3pyd9ydt*vam}"
+ADMIN_ID="${ADMIN_ID:?환경변수 ADMIN_ID를 설정하세요}"
+ADMIN_PW="${ADMIN_PW:?환경변수 ADMIN_PW를 설정하세요}"
 VU_COUNT="${VU_COUNT:-50}"
 ITERATIONS="${ITERATIONS:-10}"
 
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-freeline}"
-DB_USER="${DB_USER:-freeline_admin}"
-DB_PASSWORD="${DB_PASSWORD:-AtIDZFMV20ARA747nyOSBjtFNuIfMbIa}"
+DB_USER="${DB_USERNAME:-${DB_USER:?환경변수 DB_USERNAME을 설정하세요}}"
+DB_PASSWORD="${DB_PASSWORD:?환경변수 DB_PASSWORD를 설정하세요}"
 
 SKIP_K6="${SKIP_K6:-false}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -144,13 +144,16 @@ if ! command -v curl &>/dev/null; then
 fi
 log_ok "curl 확인"
 
-# psql: docker exec fallback
+# psql check: prefer docker exec if container is running (more reliable for DB access)
 USE_DOCKER_PSQL=false
-if ! command -v psql &>/dev/null; then
-  log_warn "psql이 없습니다 — docker exec 시도"
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^freeline-db$'; then
+  log_ok "freeline-db 컨테이너 확인"
   USE_DOCKER_PSQL=true
+elif command -v psql &>/dev/null; then
+  log_ok "로컬 psql 확인"
 else
-  log_ok "psql 확인"
+  log_fail "psql 또는 docker freeline-db를 찾을 수 없습니다"
+  exit 1
 fi
 
 # ─── Step 1: 관리자 로그인 ──────────────────────────────────────────────────
@@ -244,12 +247,15 @@ run_sql() {
   fi
 }
 
-log_info "방문자 ${VU_COUNT}명 생성 중..."
+TOTAL_VISITORS=$((VU_COUNT * ITERATIONS))
+log_info "방문자 ${TOTAL_VISITORS}명 (${VU_COUNT} VUs × ${ITERATIONS} iterations) 생성 중..."
+
+ENTRY_PREFIX="E${EVENT_ID}_"
 
 SQL="INSERT INTO visitors (event_id, entry_code, name, is_active, created_at, updated_at) VALUES "
 VALUES=""
-for i in $(seq 1 "${VU_COUNT}"); do
-  CODE=$(printf "E2E%03d" "$i")
+for i in $(seq 1 "${TOTAL_VISITORS}"); do
+  CODE=$(printf "${ENTRY_PREFIX}%03d" "$i")
   if [ -n "$VALUES" ]; then VALUES="${VALUES},"; fi
   VALUES="${VALUES}(${EVENT_ID}, '${CODE}', 'E2E Visitor ${i}', true, NOW(), NOW())"
 done
@@ -258,14 +264,14 @@ SQL="${SQL}${VALUES} ON CONFLICT (entry_code) DO NOTHING;"
 INSERT_RESULT=$(run_sql "$SQL" 2>&1) || true
 
 # 검증
-AFTER_COUNT=$(run_sql "SELECT COUNT(*) FROM visitors WHERE entry_code LIKE 'E2E%' AND event_id = ${EVENT_ID};" 2>/dev/null || echo "0")
-if [ "${AFTER_COUNT}" -ge "${VU_COUNT}" ]; then
+AFTER_COUNT=$(run_sql "SELECT COUNT(*) FROM visitors WHERE entry_code LIKE '${ENTRY_PREFIX}%' AND event_id = ${EVENT_ID};" 2>/dev/null || echo "0")
+if [ "${AFTER_COUNT}" -ge "${TOTAL_VISITORS}" ]; then
   log_ok "방문자 ${AFTER_COUNT}명 준비 완료"
   record_pass "방문자 사전 생성 (${AFTER_COUNT}명)"
 else
-  log_warn "방문자 생성 결과: ${AFTER_COUNT}/${VU_COUNT}"
+  log_warn "방문자 생성 결과: ${AFTER_COUNT}/${TOTAL_VISITORS}"
   if [ "${AFTER_COUNT}" -gt 0 ]; then
-    record_pass "방문자 사전 생성 (일부: ${AFTER_COUNT}/${VU_COUNT})"
+    record_pass "방문자 사전 생성 (일부: ${AFTER_COUNT}/${TOTAL_VISITORS})"
   else
     log_fail "방문자 생성 실패"
     log_info "SQL 결과: ${INSERT_RESULT}"
@@ -332,18 +338,24 @@ if [ "$SKIP_K6" = "true" ]; then
   log_warn "SKIP_K6=true — k6 단계를 건너뜁니다"
   record_pass "k6 (건너뜀)"
 else
-  K6_ENV_ARGS="-e TARGET_URL=${TARGET_URL} -e ADMIN_ID=${ADMIN_ID} -e ADMIN_PW=${ADMIN_PW} -e VU_COUNT=${VU_COUNT} -e ITERATIONS=${ITERATIONS} -e PRESET_EVENT_ID=${EVENT_ID} -e PRESET_BOOTH_IDS=${BOOTH_IDS_CSV}"
+  K6_ENV_ARGS="-e TARGET_URL=${TARGET_URL} -e ADMIN_ID=${ADMIN_ID} -e ADMIN_PW=${ADMIN_PW} -e VU_COUNT=${VU_COUNT} -e ITERATIONS=${ITERATIONS} -e PRESET_EVENT_ID=${EVENT_ID} -e PRESET_BOOTH_IDS=${BOOTH_IDS_CSV} -e ENTRY_PREFIX=${ENTRY_PREFIX}"
+
+  K6_SERVER="${K6_SERVER:-172.26.15.39}"
 
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^k6-manager$'; then
-    log_info "k6-manager 컨테이너에서 실행"
+    log_info "로컬 k6-manager 컨테이너에서 실행"
     K6_RESULT=$(docker exec k6-manager k6 run ${K6_ENV_ARGS} \
       /scripts/e2e-report-test.js 2>&1) || true
   elif command -v k6 &>/dev/null; then
     log_info "로컬 k6로 실행"
     K6_RESULT=$(k6 run ${K6_ENV_ARGS} \
       "${SCRIPT_DIR}/e2e-report-test.js" 2>&1) || true
+  elif ssh -o ConnectTimeout=5 "${K6_SERVER}" "docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^k6-manager$'" 2>/dev/null; then
+    log_info "Server B (${K6_SERVER}) k6-manager에서 원격 실행"
+    K6_RESULT=$(ssh "${K6_SERVER}" "docker exec k6-manager k6 run ${K6_ENV_ARGS} \
+      /scripts/e2e-report-test.js" 2>&1) || true
   else
-    log_fail "k6가 설치되어 있지 않고 k6-manager 컨테이너도 없습니다"
+    log_fail "k6 실행 환경을 찾을 수 없습니다 (로컬/Server B 모두 실패)"
     record_fail "k6 실행 환경 없음"
     exit 1
   fi
