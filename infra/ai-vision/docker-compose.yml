@@ -1,0 +1,15 @@
+services:
+  freeline-ai-vision:
+    image: freeline-ai-vision:latest
+    container_name: freeline-ai-vision
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      TZ: Asia/Seoul
+    networks:
+      - infra-public
+
+networks:
+  infra-public:
+    external: true
