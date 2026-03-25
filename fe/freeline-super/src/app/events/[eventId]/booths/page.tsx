@@ -159,7 +159,7 @@ export default function EventBoothsPage() {
           setUserName(userRes.data.data.name);
         const detail = eventRes.data?.success ? eventRes.data.data : (eventRes.data as any);
         if (detail?.eventId) setEvent(detail as Event);
-        
+
         await fetchBooths();
       } catch {
         /* ignore */
@@ -253,7 +253,7 @@ export default function EventBoothsPage() {
       alert("이메일을 발송할 관리자(등록완료 상태)를 선택해주세요.");
       return;
     }
-    if (!confirm(`선택한 ${selected.length}명의 최고 관리자에게 로그인 정보를 전송하시겠습니까?`)) return;
+    if (!confirm(`선택한 ${selected.length}명의 부스 관리자에게 로그인 정보를 전송하시겠습니까?`)) return;
 
     setIsSendingMail(true);
     try {
