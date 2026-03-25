@@ -43,6 +43,8 @@ import com.freeline.domain.pushnotification.entity.PushNotificationType;
 import com.freeline.domain.pushnotification.service.PushNotificationService;
 import com.freeline.domain.pushnotification.service.WaitingFcmDelayPublisher;
 import com.freeline.domain.pushnotification.service.WaitingFcmEventConsumer;
+import com.freeline.domain.waiting.service.WaitingExpireDelayPublisher;
+import com.freeline.domain.waiting.service.WaitingExpireTaskScheduler;
 import com.freeline.domain.waiting.service.WaitingPolicyResolver;
 
 @ExtendWith(MockitoExtension.class)
@@ -64,6 +66,9 @@ class WaitingRabbitMqFlowTest {
 
     @Mock
     private WaitingFcmDelayPublisher waitingFcmDelayPublisher;
+
+    @Mock
+    private WaitingExpireDelayPublisher waitingExpireDelayPublisher;
 
     @Mock
     private BoothWaitingRepository boothWaitingRepository;
@@ -98,6 +103,7 @@ class WaitingRabbitMqFlowTest {
         final WaitingEventPublishListener publishListener = new WaitingEventPublishListener(waitingEventPublisher);
         final BoothManagerWaitingEventConsumer sseConsumer =
                 new BoothManagerWaitingEventConsumer(boothManagerSseService);
+        final WaitingExpireTaskScheduler expireTaskScheduler = createExpireTaskScheduler();
         final WaitingFcmEventConsumer fcmConsumer = new WaitingFcmEventConsumer(
                 pushNotificationService,
                 waitingFcmDelayPublisher,
@@ -144,6 +150,7 @@ class WaitingRabbitMqFlowTest {
         Mockito.verify(waitingEventPublisher).publish(WaitingEventChannel.SSE, message);
         Mockito.verify(waitingEventPublisher).publish(WaitingEventChannel.FCM, message);
 
+        expireTaskScheduler.handle(message);
         sseConsumer.consume(message);
         fcmConsumer.consume(message);
 
@@ -166,6 +173,12 @@ class WaitingRabbitMqFlowTest {
                         && FIXED_NOW.plusSeconds(180).equals(task.validUntil())
                         && message.eventId().equals(task.eventId())),
                 Mockito.eq(Duration.ofSeconds(90))
+        );
+        Mockito.verify(waitingExpireDelayPublisher).publish(
+                Mockito.argThat(task -> Long.valueOf(301L).equals(task.waitingId())
+                        && FIXED_NOW.plusSeconds(180).equals(task.expiresAt())
+                        && message.eventId().equals(task.eventId())),
+                Mockito.eq(Duration.ofSeconds(180))
         );
     }
 
@@ -242,6 +255,7 @@ class WaitingRabbitMqFlowTest {
     void WAITING_CALLED_흐름이_eventPolicy_fallback과_snapshot을_함께_반영한다() {
         final WaitingEventPublishListener publishListener = new WaitingEventPublishListener(waitingEventPublisher);
         final BoothManagerWaitingEventConsumer sseConsumer = createSseConsumer();
+        final WaitingExpireTaskScheduler expireTaskScheduler = createExpireTaskScheduler();
         final WaitingFcmEventConsumer fcmConsumer = createFcmConsumer();
         final WaitingStatusChangeCommand command = new WaitingStatusChangeCommand(
                 WaitingEventType.WAITING_CALLED,
@@ -293,6 +307,7 @@ class WaitingRabbitMqFlowTest {
         final WaitingEventMessage message = dispatch(command);
 
         publishListener.handle(message);
+        expireTaskScheduler.handle(message);
         sseConsumer.consume(message);
         fcmConsumer.consume(message);
 
@@ -308,6 +323,12 @@ class WaitingRabbitMqFlowTest {
                         && FIXED_NOW.plusSeconds(60).equals(task.validUntil())
                         && message.eventId().equals(task.eventId())),
                 Mockito.eq(Duration.ofSeconds(30))
+        );
+        Mockito.verify(waitingExpireDelayPublisher).publish(
+                Mockito.argThat(task -> Long.valueOf(303L).equals(task.waitingId())
+                        && FIXED_NOW.plusSeconds(60).equals(task.expiresAt())
+                        && message.eventId().equals(task.eventId())),
+                Mockito.eq(Duration.ofSeconds(60))
         );
     }
 
@@ -431,6 +452,18 @@ class WaitingRabbitMqFlowTest {
 
     private BoothManagerWaitingEventConsumer createSseConsumer() {
         return new BoothManagerWaitingEventConsumer(boothManagerSseService);
+    }
+
+    private WaitingExpireTaskScheduler createExpireTaskScheduler() {
+        return new WaitingExpireTaskScheduler(
+                waitingExpireDelayPublisher,
+                boothWaitingRepository,
+                new WaitingPolicyResolver(
+                        boothRepository,
+                        boothPolicyRepository,
+                        eventPolicyRepository
+                )
+        );
     }
 
     private WaitingFcmEventConsumer createFcmConsumer() {

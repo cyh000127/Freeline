@@ -19,8 +19,12 @@ public class RabbitMqWaitingProperties {
     private String fcmDeadLetterQueue = "waiting.fcm.dlq";
     private String fcmDelayQueue = "waiting.fcm.delay.queue";
     private String fcmDelayedQueue = "waiting.fcm.delayed.queue";
+    private String expireDeadLetterQueue = "waiting.expire.dlq";
+    private String expireDelayQueue = "waiting.expire.delay.queue";
+    private String expireDelayedQueue = "waiting.expire.delayed.queue";
     private String sseRoutingKeyPattern = "waiting.sse.*";
     private String fcmRoutingKeyPattern = "waiting.fcm.*";
     private String fcmDelayedRoutingKey = "waiting.fcm.delayed";
+    private String expireDelayedRoutingKey = "waiting.expire.delayed";
     private int consumerMaxAttempts = 3;
 }
