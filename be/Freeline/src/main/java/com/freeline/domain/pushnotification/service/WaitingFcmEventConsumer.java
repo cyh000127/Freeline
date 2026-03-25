@@ -69,7 +69,14 @@ public class WaitingFcmEventConsumer {
             return;
         }
 
-        sendNotificationOrSkip(message.waitingId(), PushNotificationType.FRONT_QUEUE_CALLED, message.eventId());
+        final NotificationDispatchResult dispatchResult = sendNotificationOrSkip(
+                message.waitingId(),
+                PushNotificationType.FRONT_QUEUE_CALLED,
+                message.eventId()
+        );
+        if (!shouldScheduleCalledReminder(dispatchResult)) {
+            return;
+        }
 
         final Duration reminderDelay = resolveCallReminderDelay(waiting);
         if (reminderDelay.isNegative() || reminderDelay.isZero()) {
@@ -134,7 +141,7 @@ public class WaitingFcmEventConsumer {
                 });
     }
 
-    private void sendNotificationOrSkip(
+    private NotificationDispatchResult sendNotificationOrSkip(
             final Long waitingId,
             final PushNotificationType notificationType,
             final UUID eventId
@@ -147,8 +154,10 @@ public class WaitingFcmEventConsumer {
                             .customMessage("")
                             .build()
             );
+            return NotificationDispatchResult.SENT;
         } catch (final PushNotificationException ex) {
-            if (shouldSkip(ex.getErrorCode())) {
+            final NotificationDispatchResult dispatchResult = resolveDispatchResult(ex.getErrorCode());
+            if (dispatchResult != null) {
                 log.warn(
                         "[PushNotification] FCM consumer skipped {eventId: {}, waitingId: {}, notificationType: {}, reason: {}}",
                         eventId,
@@ -156,19 +165,31 @@ public class WaitingFcmEventConsumer {
                         notificationType,
                         ex.getErrorCode()
                 );
-                return;
+                return dispatchResult;
             }
 
             throw ex;
         }
     }
 
-    private boolean shouldSkip(final ErrorCode errorCode) {
-        return errorCode == ErrorCode.NOT_FOUND
+    private NotificationDispatchResult resolveDispatchResult(final ErrorCode errorCode) {
+        if (errorCode == ErrorCode.PUSH_NOTIFICATION_TOKEN_NOT_FOUND) {
+            return NotificationDispatchResult.TOKEN_NOT_FOUND;
+        }
+
+        if (errorCode == ErrorCode.NOT_FOUND
                 || errorCode == ErrorCode.PUSH_NOTIFICATION_NOT_CONFIGURED
-                || errorCode == ErrorCode.PUSH_NOTIFICATION_TOKEN_NOT_FOUND
                 || errorCode == ErrorCode.PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH
-                || errorCode == ErrorCode.INVALID_INPUT;
+                || errorCode == ErrorCode.INVALID_INPUT) {
+            return NotificationDispatchResult.STOP_DELAYED_TASK;
+        }
+
+        return null;
+    }
+
+    private boolean shouldScheduleCalledReminder(final NotificationDispatchResult dispatchResult) {
+        return dispatchResult == NotificationDispatchResult.SENT
+                || dispatchResult == NotificationDispatchResult.TOKEN_NOT_FOUND;
     }
 
     private Duration resolveCallReminderDelay(final BoothWaiting waiting) {
@@ -221,5 +242,11 @@ public class WaitingFcmEventConsumer {
         }
 
         return UUID.randomUUID();
+    }
+
+    private enum NotificationDispatchResult {
+        SENT,
+        TOKEN_NOT_FOUND,
+        STOP_DELAYED_TASK
     }
 }

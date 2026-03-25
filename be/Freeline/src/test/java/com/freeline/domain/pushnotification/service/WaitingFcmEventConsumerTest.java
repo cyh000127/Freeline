@@ -14,6 +14,7 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.freeline.common.error.ErrorCode;
 import com.freeline.common.event.waiting.model.WaitingEventMessage;
 import com.freeline.common.event.waiting.model.WaitingEventType;
 import com.freeline.common.util.TimeUtils;
@@ -28,6 +29,7 @@ import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.entity.EventPolicy;
 import com.freeline.domain.event.repository.EventPolicyRepository;
 import com.freeline.domain.pushnotification.entity.PushNotificationType;
+import com.freeline.domain.pushnotification.exception.PushNotificationException;
 import com.freeline.domain.waiting.service.WaitingPolicyResolver;
 
 @ExtendWith(MockitoExtension.class)
@@ -119,6 +121,117 @@ class WaitingFcmEventConsumerTest {
                         && eventId.equals(task.eventId())),
                 Mockito.eq(Duration.ofSeconds(90))
         );
+    }
+
+    @Test
+    void consume_calledEvent_schedulesReminderWhenTokenIsMissing() {
+        final WaitingFcmEventConsumer consumer = createConsumer();
+        final UUID eventId = UUID.randomUUID();
+        final BoothWaiting waiting = BoothWaiting.builder()
+                .id(301L)
+                .boothId(12L)
+                .visitorId(21L)
+                .status(WaitingStatus.CALLED)
+                .calledAt(FIXED_NOW)
+                .callExpiresAt(FIXED_NOW.plusSeconds(180))
+                .build();
+        final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
+                .eventId(eventId)
+                .eventType(WaitingEventType.WAITING_CALLED)
+                .waitingId(301L)
+                .boothId(12L)
+                .visitorId(21L)
+                .previousStatus("WAITING")
+                .currentStatus("CALLED")
+                .occurredAt(FIXED_NOW)
+                .snapshot(null)
+                .build();
+
+        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+        Mockito.doThrow(new PushNotificationException(ErrorCode.PUSH_NOTIFICATION_TOKEN_NOT_FOUND))
+                .when(pushNotificationService)
+                .sendNotification(Mockito.eq(301L), Mockito.any());
+
+        consumer.consume(message);
+
+        Mockito.verify(waitingFcmDelayPublisher).publish(
+                Mockito.argThat(task -> task.notificationType() == PushNotificationType.QR_CHECK_REMINDER
+                        && "CALLED".equals(task.expectedStatus())
+                        && eventId.equals(task.eventId())),
+                Mockito.eq(Duration.ofSeconds(90))
+        );
+    }
+
+    @Test
+    void consume_calledEvent_doesNotScheduleReminderWhenWaitingStatusMismatches() {
+        final WaitingFcmEventConsumer consumer = createConsumer();
+        final BoothWaiting waiting = BoothWaiting.builder()
+                .id(301L)
+                .boothId(12L)
+                .visitorId(21L)
+                .status(WaitingStatus.CALLED)
+                .calledAt(FIXED_NOW)
+                .callExpiresAt(FIXED_NOW.plusSeconds(180))
+                .build();
+        final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
+                .eventId(UUID.randomUUID())
+                .eventType(WaitingEventType.WAITING_CALLED)
+                .waitingId(301L)
+                .boothId(12L)
+                .visitorId(21L)
+                .previousStatus("WAITING")
+                .currentStatus("CALLED")
+                .occurredAt(FIXED_NOW)
+                .snapshot(null)
+                .build();
+
+        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+        Mockito.doThrow(new PushNotificationException(ErrorCode.PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH))
+                .when(pushNotificationService)
+                .sendNotification(Mockito.eq(301L), Mockito.any());
+
+        consumer.consume(message);
+
+        Mockito.verifyNoInteractions(waitingFcmDelayPublisher);
+    }
+
+    @Test
+    void consume_calledEvent_doesNotScheduleReminderWhenWaitingIsMissingDuringImmediateSend() {
+        final WaitingFcmEventConsumer consumer = createConsumer();
+        final BoothWaiting waiting = BoothWaiting.builder()
+                .id(301L)
+                .boothId(12L)
+                .visitorId(21L)
+                .status(WaitingStatus.CALLED)
+                .calledAt(FIXED_NOW)
+                .callExpiresAt(FIXED_NOW.plusSeconds(180))
+                .build();
+        final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
+                .eventId(UUID.randomUUID())
+                .eventType(WaitingEventType.WAITING_CALLED)
+                .waitingId(301L)
+                .boothId(12L)
+                .visitorId(21L)
+                .previousStatus("WAITING")
+                .currentStatus("CALLED")
+                .occurredAt(FIXED_NOW)
+                .snapshot(null)
+                .build();
+
+        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+        Mockito.doThrow(new PushNotificationException(ErrorCode.NOT_FOUND))
+                .when(pushNotificationService)
+                .sendNotification(Mockito.eq(301L), Mockito.any());
+
+        consumer.consume(message);
+
+        Mockito.verifyNoInteractions(waitingFcmDelayPublisher);
     }
 
     @Test
