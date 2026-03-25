@@ -144,13 +144,16 @@ if ! command -v curl &>/dev/null; then
 fi
 log_ok "curl 확인"
 
-# psql: docker exec fallback
+# psql check: prefer docker exec if container is running (more reliable for DB access)
 USE_DOCKER_PSQL=false
-if ! command -v psql &>/dev/null; then
-  log_warn "psql이 없습니다 — docker exec 시도"
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^freeline-db$'; then
+  log_ok "freeline-db 컨테이너 확인"
   USE_DOCKER_PSQL=true
+elif command -v psql &>/dev/null; then
+  log_ok "로컬 psql 확인"
 else
-  log_ok "psql 확인"
+  log_fail "psql 또는 docker freeline-db를 찾을 수 없습니다"
+  exit 1
 fi
 
 # ─── Step 1: 관리자 로그인 ──────────────────────────────────────────────────
@@ -244,13 +247,14 @@ run_sql() {
   fi
 }
 
-log_info "방문자 ${VU_COUNT}명 생성 중..."
+TOTAL_VISITORS=$((VU_COUNT * ITERATIONS))
+log_info "방문자 ${TOTAL_VISITORS}명 (${VU_COUNT} VUs × ${ITERATIONS} iterations) 생성 중..."
 
 ENTRY_PREFIX="E${EVENT_ID}_"
 
 SQL="INSERT INTO visitors (event_id, entry_code, name, is_active, created_at, updated_at) VALUES "
 VALUES=""
-for i in $(seq 1 "${VU_COUNT}"); do
+for i in $(seq 1 "${TOTAL_VISITORS}"); do
   CODE=$(printf "${ENTRY_PREFIX}%03d" "$i")
   if [ -n "$VALUES" ]; then VALUES="${VALUES},"; fi
   VALUES="${VALUES}(${EVENT_ID}, '${CODE}', 'E2E Visitor ${i}', true, NOW(), NOW())"
@@ -261,13 +265,13 @@ INSERT_RESULT=$(run_sql "$SQL" 2>&1) || true
 
 # 검증
 AFTER_COUNT=$(run_sql "SELECT COUNT(*) FROM visitors WHERE entry_code LIKE '${ENTRY_PREFIX}%' AND event_id = ${EVENT_ID};" 2>/dev/null || echo "0")
-if [ "${AFTER_COUNT}" -ge "${VU_COUNT}" ]; then
+if [ "${AFTER_COUNT}" -ge "${TOTAL_VISITORS}" ]; then
   log_ok "방문자 ${AFTER_COUNT}명 준비 완료"
   record_pass "방문자 사전 생성 (${AFTER_COUNT}명)"
 else
-  log_warn "방문자 생성 결과: ${AFTER_COUNT}/${VU_COUNT}"
+  log_warn "방문자 생성 결과: ${AFTER_COUNT}/${TOTAL_VISITORS}"
   if [ "${AFTER_COUNT}" -gt 0 ]; then
-    record_pass "방문자 사전 생성 (일부: ${AFTER_COUNT}/${VU_COUNT})"
+    record_pass "방문자 사전 생성 (일부: ${AFTER_COUNT}/${TOTAL_VISITORS})"
   else
     log_fail "방문자 생성 실패"
     log_info "SQL 결과: ${INSERT_RESULT}"

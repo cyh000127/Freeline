@@ -203,9 +203,10 @@ export function setup() {
     console.log(`[Setup] 행사 OPEN 완료`);
   }
 
-  // 5. 방문자 entry code 목록
+  // 5. 방문자 entry code 목록 (모든 iteration에 대해 유니크하게 생성)
+  const totalVisitors = VU_COUNT * ITERATIONS;
   const entryCodes = [];
-  for (let i = 1; i <= VU_COUNT; i++) {
+  for (let i = 1; i <= totalVisitors; i++) {
     entryCodes.push(`${ENTRY_PREFIX}${String(i).padStart(3, "0")}`);
   }
 
@@ -230,7 +231,8 @@ export default function (data) {
 
   const { eventId, boothIds, boothNames, entryCodes } = data;
   const vuId = __VU - 1; // 0-indexed
-  const entryCode = entryCodes[vuId % entryCodes.length];
+  const iterationIndex = vuId * ITERATIONS + __ITER;
+  const entryCode = entryCodes[iterationIndex % entryCodes.length];
   const sessionId = generateSessionId();
   const actionLogs = [];
 
