@@ -12,9 +12,8 @@ export const boothMapApi = {
     uploadMapImage: (eventId: number, file: File, isVisible: boolean = true) => {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("isVisible", isVisible.toString());
 
-        return api.post(`/v1/boothmaps/events/${eventId}/image`, formData, {
+        return api.post(`/v1/boothmaps/events/${eventId}/image?isVisible=${isVisible}`, formData, {
             headers: {
                 "Content-Type": "multipart/form-data",
             },
