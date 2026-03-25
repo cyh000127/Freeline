@@ -138,8 +138,10 @@ export default function EventDetailPage() {
     }, [layoutImageUrl]);
 
     const handleLayoutUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+        const file = e.target.files?.[0];
+        if (!file) {
+            return;
+        }
 
         try {
             setIsLoading(true);
@@ -331,9 +333,7 @@ export default function EventDetailPage() {
               >
             {layoutImageUrl ? (
                 <BoothMapEditor
-                    eventId={eventId}
                     layoutImageUrl={layoutImageUrl}
-                    eventMapId={eventMapId}
                     initialAreas={areas}
                     isEditMode={isEditMode}
                     containerWidth={containerSize.width}

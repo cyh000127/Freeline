@@ -2,7 +2,7 @@
 
 import React, {useState, useEffect, useRef} from "react";
 import {X, Search} from "lucide-react";
-import api from "@/lib/api/axios";
+import {api} from "@/lib/api/axios";
 
 interface BoothSearchResDto {
     boothId: number;
@@ -104,15 +104,19 @@ export function BoothSearchModal({
 
                 {/* Booth List */}
                 <div className="overflow-y-auto flex-1 p-2">
-                    {loading ? (
+                    {loading && (
                         <div className="flex justify-center items-center py-10">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         </div>
-                    ) : booths.length === 0 ? (
+                    )}
+
+                    {!loading && booths.length === 0 && (
                         <div className="text-center py-10 text-gray-500 dark:text-gray-400">
                             {keyword ? "검색 결과가 없습니다." : "매핑 가능한 부스가 없습니다."}
                         </div>
-                    ) : (
+                    )}
+
+                    {!loading && booths.length > 0 && (
                         <ul className="space-y-2">
                             {booths.map((booth) => (
                                 <li key={booth.boothId}>
