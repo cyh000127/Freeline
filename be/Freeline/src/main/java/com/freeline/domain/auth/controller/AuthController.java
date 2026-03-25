@@ -52,7 +52,7 @@ public class AuthController {
     private final AuthService authService;
 
     /**
-     * 아이디 중복 확인
+     * 아이디 중복 확인임
      */
     @Operation(summary = "아이디 중복 확인", description = "이미 가입된 이메일인지 확인합니다.")
     @GetMapping("/check-id")
