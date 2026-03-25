@@ -92,3 +92,54 @@ ROW FORMAT DELIMITED
     LINES TERMINATED BY '\n'
 STORED AS TEXTFILE
 LOCATION 'hdfs://namenode:9000/data/db_dump/booth_goods';
+
+-- ============================================
+-- 분석 결과 테이블 (Hive 배치 분석 → PostgreSQL 적재)
+-- ============================================
+CREATE TABLE IF NOT EXISTS booth_performance_result (
+    event_id        BIGINT  COMMENT '행사 ID',
+    booth_id        BIGINT  COMMENT '부스 ID',
+    booth_name      STRING  COMMENT '부스명',
+    view_count      BIGINT  COMMENT '조회 수',
+    register_count  BIGINT  COMMENT '대기 등록 수',
+    dropout_count   BIGINT  COMMENT '대기 취소 수',
+    conversion_rate DOUBLE  COMMENT '전환율 (등록/조회)',
+    dropout_rate    DOUBLE  COMMENT '이탈률 (취소/등록)',
+    analyzed_at     STRING  COMMENT '분석 시각'
+);
+
+CREATE TABLE IF NOT EXISTS hourly_traffic_result (
+    event_id          BIGINT  COMMENT '행사 ID',
+    datetime_hour     STRING  COMMENT '시간대 (yyyy-MM-ddTHH)',
+    active_user_count BIGINT  COMMENT '활성 사용자 수',
+    register_count    BIGINT  COMMENT '대기 등록 수',
+    analyzed_at       STRING  COMMENT '분석 시각'
+);
+
+CREATE TABLE IF NOT EXISTS visitor_path_result (
+    event_id      BIGINT  COMMENT '행사 ID',
+    path_string   STRING  COMMENT '방문 경로 (부스ID → 부스ID)',
+    visitor_count BIGINT  COMMENT '해당 경로 방문자 수',
+    analyzed_at   STRING  COMMENT '분석 시각'
+);
+
+CREATE TABLE IF NOT EXISTS problem_spots_result (
+    event_id     BIGINT  COMMENT '행사 ID',
+    issue_type   STRING  COMMENT '문제 유형 (HIGH_DROPOUT 등)',
+    target_id    STRING  COMMENT '대상 ID',
+    target_name  STRING  COMMENT '대상명',
+    severity     STRING  COMMENT '심각도 (CRITICAL/HIGH/MEDIUM)',
+    issue_metric DOUBLE  COMMENT '관련 지표 값',
+    description  STRING  COMMENT '설명',
+    analyzed_at  STRING  COMMENT '분석 시각'
+);
+
+CREATE TABLE IF NOT EXISTS event_summary_result (
+    event_id             BIGINT  COMMENT '행사 ID',
+    total_visitors       BIGINT  COMMENT '총 방문자 수',
+    total_registrations  BIGINT  COMMENT '총 대기 등록 수',
+    avg_waiting_seconds  DOUBLE  COMMENT '평균 대기 시간(초)',
+    overall_dropout_rate DOUBLE  COMMENT '전체 이탈률',
+    peak_hour            STRING  COMMENT '피크 시간대',
+    analyzed_at          STRING  COMMENT '분석 시각'
+);
