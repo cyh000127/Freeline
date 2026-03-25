@@ -8,6 +8,7 @@ import com.freeline.domain.auth.entity.Role;
 public record LoginResDto(
         String accessToken,
         String refreshToken,
-        Role role
+        Role role,
+        Long boothId
 ) {
 }

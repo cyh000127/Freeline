@@ -40,10 +40,10 @@ public class JwtProvider {
         claims.put("role", role);
 
         return Jwts.builder()
-                .setClaims(claims)
-                .setSubject(String.valueOf(id))
-                .setIssuedAt(now)
-                .setExpiration(expiry)
+                .claims(claims)
+                .subject(String.valueOf(id))
+                .issuedAt(now)
+                .expiration(expiry)
                 .signWith(key)
                 .compact();
     }
@@ -63,16 +63,21 @@ public class JwtProvider {
         }
     }
 
-    public String createRefreshToken(Long id) {
+    public String createRefreshToken(Long id, String role) {
 
         Date now = new Date();
 
         Date expiry = new Date(now.getTime() + refreshTokenExpiration);
 
+        Map<String, Object> claims = new HashMap<>();
+
+        claims.put("role", role);
+
         return Jwts.builder()
-                .setSubject(String.valueOf(id))
-                .setIssuedAt(now)
-                .setExpiration(expiry)
+                .claims(claims)
+                .subject(String.valueOf(id))
+                .issuedAt(now)
+                .expiration(expiry)
                 .signWith(key)
                 .compact();
     }

@@ -29,6 +29,7 @@ import com.freeline.domain.auth.dto.request.SignupReqDto;
 import com.freeline.domain.auth.dto.request.UpdateMyInfoReqDto;
 import com.freeline.domain.auth.dto.request.VisitorEnterReqDto;
 import com.freeline.domain.auth.dto.response.BoothAdminCreateResDto;
+import com.freeline.domain.auth.dto.response.BoothAdminMeResDto;
 import com.freeline.domain.auth.dto.response.BoothAdminResDto;
 import com.freeline.domain.auth.dto.response.CheckIdResDto;
 import com.freeline.domain.auth.dto.response.LoginResDto;
@@ -58,7 +59,6 @@ public class AuthService {
     private static final String SPECIAL_CHAR = "!@#$%^&*()_+-=";
     private static final String PASSWORD_ALLOW_BASE = CHAR_LOWER + CHAR_UPPER + NUMBER + SPECIAL_CHAR;
     private static final String REDIS_KEY_PREFIX_EMAIL_VERIFIED = "email:verified:";
-    private static final String REDIS_KEY_PREFIX_REFRESH = "refresh:";
     private static final SecureRandom random = new SecureRandom();
     private final AuthProperties authProperties;
     private final EventAdminRepository eventAdminRepository;
@@ -164,7 +164,7 @@ public class AuthService {
             if (eventAdminOpt.isPresent()) {
                 EventAdmin eventAdmin = eventAdminOpt.get();
                 validatePassword(req.password(), eventAdmin.getPassword());
-                return generateLoginResponse(eventAdmin.getId(), Role.EVENT_ADMIN, eventAdmin.getEmail());
+                return generateLoginResponse(eventAdmin.getId(), Role.EVENT_ADMIN, eventAdmin.getEmail(), null);
             }
         }
         var boothAdminOpt = boothAdminRepository.findByLoginId(identifier);
@@ -175,7 +175,12 @@ public class AuthService {
                 throw new AuthException(ErrorCode.ACCESS_DENIED);
             }
             boothAdmin.recordLogin();
-            return generateLoginResponse(boothAdmin.getId(), Role.BOOTH_ADMIN, boothAdmin.getLoginId());
+            return generateLoginResponse(
+                    boothAdmin.getId(),
+                    Role.BOOTH_ADMIN,
+                    boothAdmin.getLoginId(),
+                    boothAdmin.getBoothId()
+            );
         }
         throw new AuthException(ErrorCode.USER_NOT_FOUND);
     }
@@ -186,14 +191,19 @@ public class AuthService {
     public LoginResDto refresh(final String refreshToken) {
         Claims claims = jwtProvider.getClaims(refreshToken);
         Long userId = Long.parseLong(claims.getSubject());
+        String roleValue = claims.get("role", String.class);
+        if (roleValue == null || roleValue.isBlank()) {
+            throw new AuthException(ErrorCode.INVALID_TOKEN);
+        }
+
+        Role role = Role.valueOf(roleValue);
         String saved = redisTemplate.opsForValue()
-                .get(REDIS_KEY_PREFIX_REFRESH + userId);
+                .get(buildRefreshKey(userId, role));
         if (saved == null || !saved.equals(refreshToken)) {
             throw new AuthException(ErrorCode.INVALID_TOKEN);
         }
-        Role role = eventAdminRepository.existsById(userId) ? Role.EVENT_ADMIN : Role.BOOTH_ADMIN;
         String newAccessToken = jwtProvider.createToken(userId, role.name());
-        return authConverter.toLoginResDto(newAccessToken, refreshToken, role);
+        return authConverter.toLoginResDto(newAccessToken, refreshToken, role, resolveBoothId(role, userId));
     }
 
     /**
@@ -204,6 +214,16 @@ public class AuthService {
         EventAdmin eventAdmin = eventAdminRepository.findById(userId)
                 .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
         return authConverter.toMyInfoResDto(eventAdmin);
+    }
+
+    /**
+     * 부스 관리자 내 정보 조회
+     */
+    @Transactional(readOnly = true)
+    public BoothAdminMeResDto getBoothAdminMyInfo(final Long boothAdminId) {
+        final BoothAdmin boothAdmin = boothAdminRepository.findById(boothAdminId)
+                .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
+        return authConverter.toBoothAdminMeResDto(boothAdmin);
     }
 
     /**
@@ -237,12 +257,13 @@ public class AuthService {
     public void logout(final String token) {
         Claims claims = jwtProvider.getClaims(token);
         Long userId = Long.parseLong(claims.getSubject());
+        Role role = Role.valueOf(claims.get("role", String.class));
         Date expiration = claims.getExpiration();
         long remainTime = expiration.getTime() - System.currentTimeMillis();
         if (remainTime > 0) {
             redisTemplate.opsForValue().set("blacklist:" + token, "logout", remainTime, TimeUnit.MILLISECONDS);
         }
-        redisTemplate.delete(REDIS_KEY_PREFIX_REFRESH + userId);
+        redisTemplate.delete(buildRefreshKey(userId, role));
         log.info("[Auth] User logged out, userId: {}", userId);
     }
 
@@ -253,7 +274,7 @@ public class AuthService {
     public void deleteUser(final Long userId) {
         EventAdmin eventAdmin = eventAdminRepository.findById(userId)
                 .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
-        redisTemplate.delete(REDIS_KEY_PREFIX_REFRESH + userId);
+        redisTemplate.delete(buildRefreshKey(userId, Role.EVENT_ADMIN));
         eventAdminRepository.delete(eventAdmin);
         log.info("[Auth] Event admin deleted: {}", eventAdmin.getEmail());
     }
@@ -326,7 +347,7 @@ public class AuthService {
                 .orElseThrow(() -> new AuthException(ErrorCode.VISITOR_NOT_FOUND));
         String token = jwtProvider.createToken(visitor.getId(), Role.VISITOR.name());
         log.info("[Auth] Visitor entered, visitorId: {}", visitor.getId());
-        return authConverter.toLoginResDto(token, null, Role.VISITOR);
+        return authConverter.toLoginResDto(token, null, Role.VISITOR, null);
     }
 
     private String createVerificationCode() {
@@ -347,19 +368,37 @@ public class AuthService {
         }
     }
 
-    private LoginResDto generateLoginResponse(final Long id, final Role role, final String identifier) {
+    private LoginResDto generateLoginResponse(
+            final Long id,
+            final Role role,
+            final String identifier,
+            final Long boothId
+    ) {
         String accessToken = jwtProvider.createToken(id, role.name());
-        String refreshToken = jwtProvider.createRefreshToken(id);
+        String refreshToken = jwtProvider.createRefreshToken(id, role.name());
 
         redisTemplate.opsForValue().set(
-                REDIS_KEY_PREFIX_REFRESH + id,
+                buildRefreshKey(id, role),
                 refreshToken,
                 refreshTokenExpiration,
                 TimeUnit.MILLISECONDS
         );
 
         log.info("[Auth] {} logged in: {}", role.name(), identifier);
-        return authConverter.toLoginResDto(accessToken, refreshToken, role);
+        return authConverter.toLoginResDto(accessToken, refreshToken, role, boothId);
+    }
+    private Long resolveBoothId(final Role role, final Long userId) {
+        if (role != Role.BOOTH_ADMIN) {
+            return null;
+        }
+
+        return boothAdminRepository.findById(userId)
+                .map(BoothAdmin::getBoothId)
+                .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    private String buildRefreshKey(final Long id, final Role role) {
+        return "refresh:%s:%d".formatted(role.name(), id);
     }
 
     private BoothAdminCreateResDto createSingleBoothAdminAuto(
