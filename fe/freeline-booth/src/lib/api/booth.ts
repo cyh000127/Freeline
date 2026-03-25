@@ -23,7 +23,8 @@ export interface BoothResponse {
     locationCode: string;
     openTime: string;
     closeTime: string;
-    images?: BoothImage[]; // Added images field
+    representativeImageUrl?: string;
+    boothImageUrls?: string[];
   };
 }
 

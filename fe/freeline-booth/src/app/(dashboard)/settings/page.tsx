@@ -16,8 +16,7 @@ import {
   getBoothPolicy,
   updateBoothPolicy,
   uploadBoothImage,
-  uploadRepresentativeImage,
-  getBoothImages
+  uploadRepresentativeImage
 } from "@/lib/api/booth";
 import { getQR, generateQR, reissueQR, QRData } from "@/lib/api/qr";
 import { useAuth } from "@/context/AuthContext";
@@ -80,11 +79,10 @@ export default function SettingsPage() {
     if (!boothId) return;
     setIsLoading(true);
     try {
-      const [boothRes, qrRes, policyRes, imagesRes] = await Promise.all([
+      const [boothRes, qrRes, policyRes] = await Promise.all([
         getBoothInfo(boothId),
         getQR(boothId).catch(() => null),
         getBoothPolicy(boothId).catch(() => null),
-        getBoothImages(boothId).catch(() => null),
       ]);
 
       if (boothRes.success && boothRes.data) {
@@ -110,13 +108,13 @@ export default function SettingsPage() {
         });
       }
 
-      // Handle images persistence
-      if (imagesRes && imagesRes.success && imagesRes.data) {
-        const repImage = imagesRes.data.find(img => img.isRepresentative);
-        const logoImage = imagesRes.data.find(img => !img.isRepresentative);
-
-        if (repImage) setRepImagePreview(repImage.imageUri);
-        if (logoImage) setLogoImagePreview(logoImage.imageUri);
+      if (boothRes.success && boothRes.data) {
+        if (boothRes.data.representativeImageUrl) {
+          setRepImagePreview(boothRes.data.representativeImageUrl);
+        }
+        if (boothRes.data.boothImageUrls && boothRes.data.boothImageUrls.length > 0) {
+          setLogoImagePreview(boothRes.data.boothImageUrls[0]);
+        }
       }
     } catch (error) {
       console.error("Failed to fetch initial data:", error);
