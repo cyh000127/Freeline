@@ -391,68 +391,59 @@ log_step "7" "액션 로그 → HDFS 적재"
 HDFS_SERVER="${HDFS_SERVER:-172.26.15.39}"
 HDFS_LOG_UPLOADED=false
 
-# 방법 1: Flume spool-mover를 통한 자동 적재 시도
-if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^flume-spool-mover$'; then
-  log_info "spool-mover에서 rolled 로그 이동 트리거..."
-  docker exec flume-spool-mover sh -c \
-    'find /var/log/action/source -name "action.*.log" -o -name "action.log.*" 2>/dev/null | while read f; do mv "$f" /var/log/action/spool/ && echo "Moved: $(basename $f)"; done' \
-    2>&1 || true
+# 직접 HDFS 업로드 (E2E에서는 active action.log가 아직 롤링 전이므로 직접 업로드가 필수)
+TMP_LOG="/tmp/e2e_action_${EVENT_ID}.log"
 
-  # Flume 전송 대기 (최대 30초)
-  log_info "Flume → HDFS 전송 대기 (30초)..."
-  sleep 30
+log_info "백엔드에서 액션 로그 추출..."
+docker cp freeline-backend:/app/logs/action/action.log "$TMP_LOG" 2>/dev/null || true
 
-  # HDFS에 데이터 있는지 확인
-  HDFS_COUNT=$(ssh -o ConnectTimeout=5 "${HDFS_SERVER}" \
-    "docker exec hadoop-namenode hdfs dfs -ls -R /data/logs/action/ 2>/dev/null | grep -c '.log'" 2>/dev/null || echo "0")
-  if [ "${HDFS_COUNT}" -gt 0 ]; then
-    log_ok "Flume 경유 HDFS 적재 확인 (${HDFS_COUNT}개 파일)"
-    HDFS_LOG_UPLOADED=true
-  else
-    log_warn "Flume 적재 확인 불가 — 직접 업로드로 fallback"
-  fi
-fi
+if [ -s "$TMP_LOG" ]; then
+  LOG_LINES=$(wc -l < "$TMP_LOG")
+  log_ok "로그 파일 추출: ${LOG_LINES}줄"
 
-# 방법 2: Flume 실패/미사용 시 직접 HDFS 업로드
-if [ "$HDFS_LOG_UPLOADED" = "false" ]; then
-  log_info "백엔드에서 active 로그를 직접 HDFS에 업로드..."
+  HDFS_DATE=$(date +%Y-%m-%d)
+  HDFS_HOUR=$(date +%H)
+  HDFS_TARGET_PATH="/data/logs/action/${HDFS_DATE}/${HDFS_HOUR}"
+  HDFS_TARGET_FILE="action-e2e-${EVENT_ID}.log"
 
-  # 백엔드 컨테이너에서 현재 로그 복사
-  TMP_LOG="/tmp/e2e_action_${EVENT_ID}.log"
-  docker cp freeline-backend:/app/logs/action/action.log "$TMP_LOG" 2>/dev/null || true
+  log_info "HDFS 업로드: ${HDFS_TARGET_PATH}/${HDFS_TARGET_FILE}"
+  scp -o ConnectTimeout=5 "$TMP_LOG" "${HDFS_SERVER}:/tmp/e2e_action.log" && \
+  ssh -o ConnectTimeout=5 "${HDFS_SERVER}" "
+    docker cp /tmp/e2e_action.log hadoop-namenode:/tmp/e2e_action.log && \
+    docker exec hadoop-namenode hdfs dfs -mkdir -p ${HDFS_TARGET_PATH} && \
+    docker exec hadoop-namenode hdfs dfs -put -f /tmp/e2e_action.log ${HDFS_TARGET_PATH}/${HDFS_TARGET_FILE}
+  "
 
-  if [ -s "$TMP_LOG" ]; then
-    LOG_LINES=$(wc -l < "$TMP_LOG")
-    log_info "로그 파일 추출: ${LOG_LINES}줄"
-
-    # Server B로 전송 → HDFS 업로드
-    HDFS_DATE=$(date +%Y-%m-%d)
-    HDFS_HOUR=$(date +%H)
-    scp -o ConnectTimeout=5 "$TMP_LOG" "${HDFS_SERVER}:/tmp/e2e_action.log" 2>/dev/null && \
-    ssh -o ConnectTimeout=5 "${HDFS_SERVER}" "
-      docker cp /tmp/e2e_action.log hadoop-namenode:/tmp/e2e_action.log && \
-      docker exec hadoop-namenode hdfs dfs -mkdir -p /data/logs/action/${HDFS_DATE}/${HDFS_HOUR} && \
-      docker exec hadoop-namenode hdfs dfs -put -f /tmp/e2e_action.log /data/logs/action/${HDFS_DATE}/${HDFS_HOUR}/action-e2e-${EVENT_ID}.log
-    " 2>/dev/null
-
-    if [ $? -eq 0 ]; then
-      log_ok "HDFS 직접 업로드 완료"
+  if [ $? -eq 0 ]; then
+    # 업로드된 파일 존재 확인
+    VERIFY=$(ssh -o ConnectTimeout=5 "${HDFS_SERVER}" \
+      "docker exec hadoop-namenode hdfs dfs -test -e ${HDFS_TARGET_PATH}/${HDFS_TARGET_FILE} && echo OK" 2>/dev/null || echo "")
+    if [ "$VERIFY" = "OK" ]; then
+      log_ok "HDFS 업로드 및 검증 완료"
       HDFS_LOG_UPLOADED=true
     else
-      log_fail "HDFS 업로드 실패"
+      log_fail "HDFS 업로드 후 검증 실패"
     fi
-    rm -f "$TMP_LOG"
   else
-    log_warn "백엔드 로그 파일이 비어있거나 없음"
-    rm -f "$TMP_LOG"
+    log_fail "HDFS 업로드 실패 (scp/ssh 오류)"
   fi
+  rm -f "$TMP_LOG"
+else
+  log_fail "백엔드 로그 파일이 비어있거나 없음 (freeline-backend 실행 중인지 확인)"
+  rm -f "$TMP_LOG"
+fi
+
+# 롤링된 파일이 있으면 spool-mover도 트리거 (보조)
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^flume-spool-mover$'; then
+  docker exec flume-spool-mover sh -c \
+    'find /var/log/action/source -name "action.*.log" -mmin +1 2>/dev/null | while read f; do mv "$f" /var/log/action/spool/ 2>/dev/null && echo "Moved: $(basename $f)"; done' \
+    2>&1 || true
 fi
 
 if [ "$HDFS_LOG_UPLOADED" = "true" ]; then
   record_pass "액션 로그 HDFS 적재"
 else
-  log_warn "HDFS 적재를 확인할 수 없음 — 이전 데이터가 있으면 리포트 생성은 가능"
-  record_pass "액션 로그 HDFS 적재 (이전 데이터 사용)"
+  record_fail "액션 로그 HDFS 적재"
 fi
 
 # ─── Step 8: 리포트 생성 트리거 ──────────────────────────────────────────────
