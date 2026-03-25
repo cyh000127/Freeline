@@ -192,7 +192,18 @@ pipeline {
             updateGitlabCommitStatus name: 'freeline-fe', state: 'failed'
         }
         cleanup {
-            sh 'docker image prune -f --filter "until=24h" || true'
+            sh """
+                # 현재 빌드 + latest 외 이전 태그 이미지 삭제
+                for img in ${USER_IMAGE} ${BOOTH_IMAGE} ${SUPER_IMAGE}; do
+                    docker images "\$img" --format '{{.Tag}}' \
+                        | grep -v -E '^(latest|${DOCKER_TAG})\$' \
+                        | xargs -r -I{} docker rmi "\$img:{}" 2>/dev/null || true
+                done
+                # dangling 이미지 정리
+                docker image prune -f || true
+                # 7일 지난 빌드 캐시 정리
+                docker builder prune -f --filter 'until=168h' 2>/dev/null || true
+            """
             cleanWs()
         }
     }
