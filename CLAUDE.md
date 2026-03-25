@@ -62,7 +62,7 @@ cd infra/nginx/ && docker-compose up -d
 - `infra/` — Docker Compose configs, Nginx, Jenkins pipelines, monitoring
 
 ### Backend Architecture
-Domain-driven layered design with 10 domains: `actionlog`, `auth`, `booth`, `boothmanager`, `boothmap`, `event`, `goods`, `pushnotification`, `qr`, `waiting`.
+Domain-driven layered design with 11 domains: `actionlog`, `auth`, `booth`, `boothmanager`, `boothmap`, `event`, `goods`, `pushnotification`, `qr`, `report`, `waiting`.
 
 Each domain follows: `controller/ → service/ → repository/ → entity/` with `dto/{request,response}/`, `converter/`, and `exception/` subdirectories.
 
