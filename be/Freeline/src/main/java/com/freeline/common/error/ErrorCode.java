@@ -45,6 +45,7 @@ public enum ErrorCode {
     ALREADY_ASSIGNED_BOOTH_ADMIN(HttpStatus.CONFLICT, "U-010", "이미 관리자가 배정된 부스입니다."),
     VISITOR_NOT_FOUND(HttpStatus.NOT_FOUND, "U-011", "방문자 정보를 찾을 수 없습니다."),
     EMAIL_ALREADY_SENT(HttpStatus.CONFLICT, "U-012", "이미 인증 코드가 발송되었습니다."),
+    ENTRY_CODE_ALREADY_USED(HttpStatus.CONFLICT, "U-013", "이미 사용된 엔트리 코드입니다."),
 
     /**
      * Event Error (E-xxx)
