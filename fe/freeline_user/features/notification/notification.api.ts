@@ -48,7 +48,7 @@ export const subscribeNotifications = ({
   onMessage,
   onError,
 }: SubscribeNotificationsOptions): NotificationSubscription => {
-  const baseUrl = api.getUri();
+  const baseUrl = api.defaults.baseURL;
 
   if (!baseUrl) {
     throw new Error('API baseURL이 설정되어 있지 않습니다.');

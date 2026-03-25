@@ -1,8 +1,15 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  Image,
+  View,
+  Pressable,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-
+import { TAB_ROUTES } from '@/constants/tabRoutes';
 import BottomTabBar, { TabKey } from '@/components/navigation/BottomTabBar';
 import ReservationCard from '@/components/reservation/ReservationCard';
 import ReservationCardExpandable from '@/components/reservation/ReservationCardExpandable';
@@ -17,15 +24,6 @@ import {
   exitWaiting,
 } from '@/features/waiting/waiting.api';
 import type { WaitingItem, WaitingStatus } from '@/features/waiting/types';
-
-const TAB_ROUTES: Record<TabKey, '/home' | '/reservation' | '/map' | '/my' | '/search'> =
-  {
-    home: '/home',
-    reservation: '/reservation',
-    map: '/map',
-    my: '/my',
-    search: '/search',
-  };
 
 type ReservationStatus = WaitingStatus;
 
@@ -309,8 +307,16 @@ export default function ReservationScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>예약 내역</Text>
 
-          <Pressable style={styles.iconButton} onPress={() => {}}>
-            <Ionicons name="notifications-outline" size={24} color="#222222" />
+          <Pressable
+            style={styles.iconButton}
+            onPress={() => {
+              router.push('/notifications');
+            }}
+          >
+            <Image
+              source={require('@/assets/icons/notifications.png')}
+              style={styles.icon}
+            />
           </Pressable>
         </View>
 
@@ -382,6 +388,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  icon: {
+    width: 30,
+    height: 30,
+    resizeMode: 'contain',
   },
   cardList: {
     marginTop: 4,
