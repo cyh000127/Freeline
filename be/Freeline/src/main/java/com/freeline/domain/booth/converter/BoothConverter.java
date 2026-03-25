@@ -13,7 +13,6 @@ import com.freeline.domain.booth.dto.response.BoothImageUploadResDto;
 import com.freeline.domain.booth.dto.response.BoothListResDto;
 import com.freeline.domain.booth.dto.response.BoothPolicyResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueEntryResDto;
-import com.freeline.domain.booth.dto.response.BoothQueueResDto;
 import com.freeline.domain.booth.dto.response.BoothResDto;
 import com.freeline.domain.booth.dto.response.BoothStatusResDto;
 import com.freeline.domain.booth.entity.Booth;
@@ -82,6 +81,8 @@ public class BoothConverter {
             final long waitingCount,
             final int callCount,
             final int callValidSeconds,
+            final String representativeImageUrl,
+            final List<String> boothImageUrls,
             final List<BoothGoodsResDto> goods
     ) {
         return BoothResDto.builder()
@@ -92,6 +93,8 @@ public class BoothConverter {
                 .waitingCount(waitingCount)
                 .callCount(callCount)
                 .callValidSeconds(callValidSeconds)
+                .representativeImageUrl(representativeImageUrl)
+                .boothImageUrls(boothImageUrls)
                 .goods(goods)
                 .build();
     }
@@ -151,22 +154,6 @@ public class BoothConverter {
                 .waitingId(waiting.getId())
                 .visitorName(waiting.getVisitor() != null ? waiting.getVisitor().getName() : null)
                 .waitingNumber(waiting.getWaitingNumber())
-                .build();
-    }
-
-    public BoothQueueResDto toBoothQueueResDto(
-            final Long boothId,
-            final long backQueueCount,
-            final long frontQueueCount,
-            final List<BoothQueueEntryResDto> frontQueue,
-            final BoothCalledUserResDto currentCalledUser
-    ) {
-        return BoothQueueResDto.builder()
-                .boothId(boothId)
-                .backQueueCount(backQueueCount)
-                .frontQueueCount(frontQueueCount)
-                .frontQueue(frontQueue)
-                .currentCalledUser(currentCalledUser)
                 .build();
     }
 }
