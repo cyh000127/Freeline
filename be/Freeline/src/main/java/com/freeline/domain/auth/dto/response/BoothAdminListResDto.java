@@ -4,19 +4,16 @@ import java.time.LocalDateTime;
 
 import lombok.Builder;
 
-import com.freeline.domain.auth.entity.BoothAdminStatus;
-
 @Builder
-public record BoothAdminResDto(
-        Long id,
+public record BoothAdminListResDto(
+        Long adminId,
         Long boothId,
         String boothName,
         String loginId,
-        String email,
         String name,
+        String email,
         String company,
-        BoothAdminStatus status,
-        boolean isActive,
+        String status,
         LocalDateTime lastLoginAt
 ) {
 }
