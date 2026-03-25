@@ -292,32 +292,41 @@ fi
 
 log_step "7" "액션 로그 → HDFS 적재"
 
-# Flume 자동 적재 + 직접 업로드 fallback
 HDFS_OK=false
 
-# spool-mover 트리거
-if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^flume-spool-mover$'; then
-  docker exec flume-spool-mover sh -c \
-    'find /var/log/action/source -name "action.*.log" -o -name "action.log.*" 2>/dev/null | while read f; do mv "$f" /var/log/action/spool/; done' \
-    2>&1 || true
-  log_info "Flume spool-mover 트리거 완료, 30초 대기..."
-  sleep 30
-fi
-
-# 직접 HDFS 업로드 (확실한 fallback)
+# 직접 HDFS 업로드 (E2E에서는 active action.log가 아직 롤링 전이므로 직접 업로드가 필수)
 TMP_LOG="/tmp/demo_action_${EVENT_ID}.log"
+
+log_info "백엔드에서 액션 로그 추출..."
 docker cp freeline-backend:/app/logs/action/action.log "$TMP_LOG" 2>/dev/null || true
 
 if [ -s "$TMP_LOG" ]; then
+  LOG_LINES=$(wc -l < "$TMP_LOG")
+  log_ok "로그 파일 추출: ${LOG_LINES}줄"
+
   HDFS_DATE=$(date +%Y-%m-%d)
   HDFS_HOUR=$(date +%H)
-  scp -o ConnectTimeout=5 "$TMP_LOG" "${HDFS_SERVER}:/tmp/demo_action.log" 2>/dev/null && \
+  HDFS_TARGET_PATH="/data/logs/action/${HDFS_DATE}/${HDFS_HOUR}"
+  HDFS_TARGET_FILE="action-demo-${EVENT_ID}.log"
+
+  log_info "HDFS 업로드: ${HDFS_TARGET_PATH}/${HDFS_TARGET_FILE}"
+  scp -o ConnectTimeout=5 "$TMP_LOG" "${HDFS_SERVER}:/tmp/demo_action.log" && \
   ssh -o ConnectTimeout=5 "${HDFS_SERVER}" "
     docker cp /tmp/demo_action.log hadoop-namenode:/tmp/demo_action.log && \
-    docker exec hadoop-namenode hdfs dfs -mkdir -p /data/logs/action/${HDFS_DATE}/${HDFS_HOUR} && \
-    docker exec hadoop-namenode hdfs dfs -put -f /tmp/demo_action.log /data/logs/action/${HDFS_DATE}/${HDFS_HOUR}/action-demo-${EVENT_ID}.log
-  " 2>/dev/null && HDFS_OK=true
+    docker exec hadoop-namenode hdfs dfs -mkdir -p ${HDFS_TARGET_PATH} && \
+    docker exec hadoop-namenode hdfs dfs -put -f /tmp/demo_action.log ${HDFS_TARGET_PATH}/${HDFS_TARGET_FILE}
+  " && HDFS_OK=true
   rm -f "$TMP_LOG"
+else
+  log_warn "백엔드 로그 파일이 비어있거나 없음"
+  rm -f "$TMP_LOG"
+fi
+
+# 롤링된 파일이 있으면 spool-mover도 트리거 (보조)
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^flume-spool-mover$'; then
+  docker exec flume-spool-mover sh -c \
+    'find /var/log/action/source -name "action.*.log" -mmin +1 2>/dev/null | while read f; do mv "$f" /var/log/action/spool/ 2>/dev/null && echo "Moved: $(basename $f)"; done' \
+    2>&1 || true
 fi
 
 if [ "$HDFS_OK" = "true" ]; then

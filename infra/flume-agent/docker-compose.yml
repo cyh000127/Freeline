@@ -29,7 +29,7 @@ services:
     entrypoint: [ "sh", "/scripts/spool-logs.sh" ]
     volumes:
       - ./scripts/spool-logs.sh:/scripts/spool-logs.sh:ro
-      - freeline-action-logs:/var/log/action/source:ro
+      - freeline-action-logs:/var/log/action/source
       - flume-spool:/var/log/action/spool
     networks:
       - infra-public

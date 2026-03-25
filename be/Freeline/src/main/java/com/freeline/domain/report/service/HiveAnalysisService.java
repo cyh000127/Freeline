@@ -203,12 +203,12 @@ public class HiveAnalysisService {
                 + "  s.avg_waiting_seconds, s.overall_dropout_rate, "
                 + "  h.datetime_hour, s.analyzed_at "
                 + "FROM freeline.event_summary_result s "
-                + "JOIN ("
+                + "LEFT JOIN ("
                 + "  SELECT datetime_hour "
                 + "  FROM freeline.hourly_traffic_result "
                 + "  WHERE event_id = " + eventId + " "
                 + "  ORDER BY active_user_count DESC LIMIT 1"
-                + ") h "
+                + ") h ON true "
                 + "WHERE s.event_id = " + eventId;
 
         stmt.execute(sql);
