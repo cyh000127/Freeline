@@ -78,12 +78,6 @@ public class BoothService {
             WaitingStatus.REGISTERED
     );
 
-    private static final List<WaitingStatus> CALL_BLOCKING_STATUSES = List.of(
-            WaitingStatus.CALLED,
-            WaitingStatus.REGISTERED,
-            WaitingStatus.ENTERED
-    );
-
     private final BoothRepository boothRepository;
     private final BoothGoodsRepository boothGoodsRepository;
     private final BoothImageRepository boothImageRepository;
@@ -93,22 +87,22 @@ public class BoothService {
     private final EventRepository eventRepository;
     private final EventPolicyRepository eventPolicyRepository;
     private final FileService fileService;
-private final PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
-@Transactional(readOnly = true)
-public List<BoothSearchResDto> searchBooths(final Long eventId, final String keyword) {
-    validateEventExists(eventId);
+    @Transactional(readOnly = true)
+    public List<BoothSearchResDto> searchBooths(final Long eventId, final String keyword) {
+        validateEventExists(eventId);
 
-    return boothRepository.searchBoothsByKeyword(eventId, keyword)
-            .stream()
-            .map(row -> BoothSearchResDto.builder()
-                    .boothId((Long) row[0])
-                    .boothName((String) row[1])
-                    .adminName((String) row[2])
-                    .company((String) row[3])
-                    .build())
-            .toList();
-}
+        return boothRepository.searchBoothsByKeyword(eventId, keyword)
+                .stream()
+                .map(row -> BoothSearchResDto.builder()
+                        .boothId((Long) row[0])
+                        .boothName((String) row[1])
+                        .adminName((String) row[2])
+                        .company((String) row[3])
+                        .build())
+                .toList();
+    }
 
 // TODO: 부스 정책 조회/설정 기능이 생기면 메서드를 분리하여 BoothPolicyRepository를 직접 사용하는 새 API로 이전합니다.
 
@@ -172,9 +166,18 @@ public List<BoothSearchResDto> searchBooths(final Long eventId, final String key
         final Booth booth = getBoothEntity(boothId);
         final long waitingCount = boothWaitingRepository.countByBoothIdAndStatus(boothId, WaitingStatus.WAITING);
         final Optional<BoothPolicy> boothPolicy = boothPolicyRepository.findByBoothId(boothId);
+        final List<BoothImage> boothImages = boothImageRepository.findAllByBoothIdOrderByIdAsc(boothId);
         final List<BoothGoodsResDto> goods = boothGoodsRepository.findAllByBoothIdOrderByIdAsc(boothId)
                 .stream()
                 .map(BoothConverter::toBoothGoodsResDto)
+                .toList();
+        final String representativeImageUrl = boothImages.stream()
+                .filter(BoothImage::isRepresentative)
+                .map(BoothImage::getImagePath)
+                .findFirst()
+                .orElse(null);
+        final List<String> boothImageUrls = boothImages.stream()
+                .map(BoothImage::getImagePath)
                 .toList();
 
         return BoothConverter.toBoothResDto(
@@ -182,6 +185,8 @@ public List<BoothSearchResDto> searchBooths(final Long eventId, final String key
                 waitingCount,
                 boothPolicy.map(BoothPolicy::getCallCount).orElse(0),
                 boothPolicy.map(BoothPolicy::getCallValidTime).orElse(0),
+                representativeImageUrl,
+                boothImageUrls,
                 goods
         );
     }

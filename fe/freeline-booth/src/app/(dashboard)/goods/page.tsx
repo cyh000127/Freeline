@@ -5,8 +5,11 @@ import Image from "next/image";
 import { Card } from "@/components/ui/card";
 import { PauseCircle, XCircle, Plus, X, Trash2 } from "lucide-react";
 import { getGoodsList, createGoods, updateGoodsStatus, deleteGoods, Goods } from "@/lib/api/goods";
+import {useAuth} from "@/context/AuthContext";
 
 export default function GoodsPage() {
+  const {user, isLoading: authLoading} = useAuth();
+  const boothId = user?.boothId || 0;
   const [goods, setGoods] = useState<Goods[]>([]);
   const [filter, setFilter] = useState<"ALL" | "ON_SALE" | "SOLD_OUT">("ALL");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,12 +18,11 @@ export default function GoodsPage() {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
-  // For testing purposes, we hardcode boothId to 1.
-  const boothId = 1;
-
   useEffect(() => {
-    fetchGoods();
-  }, []);
+    if (boothId) {
+      fetchGoods();
+    }
+  }, [boothId]);
 
   const fetchGoods = async () => {
     try {
@@ -184,9 +186,23 @@ export default function GoodsPage() {
         </div>
 
         {/* Goods Grid */}
-        {isLoading ? (
+        {authLoading || (isLoading && boothId) ? (
           <div className="flex flex-1 items-center justify-center text-lg font-medium text-gray-400 mt-10">
             로딩 중...
+          </div>
+        ) : !boothId && !authLoading ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 mt-10">
+              <div className="text-lg font-medium text-red-400">부스 정보를 찾을 수 없습니다.</div>
+              <button
+                  onClick={() => {
+                    localStorage.removeItem("accessToken");
+                    localStorage.removeItem("boothId");
+                    window.location.href = "/login";
+                  }}
+                  className="px-6 py-2 rounded-xl bg-[#2D2A4A] text-white font-bold"
+              >
+                다시 로그인하기
+              </button>
           </div>
         ) : filteredGoods.length === 0 ? (
           <div className="flex flex-1 items-center justify-center text-lg font-medium text-gray-400 mt-10">

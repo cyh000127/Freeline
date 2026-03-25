@@ -20,6 +20,21 @@ export interface Event {
   createdAt?: string;
 }
 
+export interface BoothCoordinate {
+    startX: number;
+    startY: number;
+    widthRatio: number;
+    heightRatio: number;
+}
+
+export interface MapUploadResponse {
+    eventMapId: number;
+    eventId: number;
+    imagePath: string;
+    isVisible: boolean;
+    booths: BoothCoordinate[];
+}
+
 export interface PaginatedResponse<T> {
   content: T[];
   hasNext: boolean;
@@ -64,7 +79,14 @@ export const eventApi = {
   }) => api.put<ApiResponse<any>>(`/v1/events/${eventId}/policies`, payload),
 
   // 특정 행사 부스 목록 조회
-  getBooths: (eventId: number | string) => api.get<ApiResponse<any>>(`/v1/events/${eventId}/booths`),
+    getBooths: (eventId: number | string) => api.get<ApiResponse<any>>(`/v1/auth/booth-admins/events/${eventId}`),
+
+    // 특정 행사 부스 상세 조회 (위치, 운영시간 등)
+    getBoothDetails: (eventId: number | string) => api.get<ApiResponse<any>>(`/v1/booths/events/${eventId}`),
+
+    // 관리자 로그인 정보 일괄 전송
+    sendLoginInfo: (payload: { boothAdminIds: number[] }) =>
+        api.post<ApiResponse<any>>(`/v1/auth/booth-admins/send-login-info`, payload),
 
   // 부스 및 부스 관리자 통합 CSV 일괄 등록
   onboardBooths: (eventId: number | string, file: File) => {
@@ -74,4 +96,24 @@ export const eventApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+
+    // 박람회 배치도 이미지 업로드 및 AI 분석
+    uploadMapImage: (eventId: number | string, file: File, isVisible: boolean = true) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post<ApiResponse<MapUploadResponse>>(
+            `/v1/boothmaps/events/${eventId}/image?isVisible=${isVisible}`,
+            formData,
+            {
+                headers: {'Content-Type': 'multipart/form-data'},
+            }
+        );
+    },
+
+    // 행사 지도에 대한 부스 영역 일괄 저장
+    saveMapAreas: (eventId: number | string, payload: {
+        eventMapId: number,
+        areas: { boothId: number, startX: number, startY: number, widthRatio: number, heightRatio: number }[]
+    }) =>
+        api.put<ApiResponse<any>>(`/v1/boothmaps/events/${eventId}/areas/bulk`, payload),
 };
