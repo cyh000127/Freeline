@@ -20,12 +20,12 @@ import {
   getBoothImages
 } from "@/lib/api/booth";
 import { getQR, generateQR, reissueQR, QRData } from "@/lib/api/qr";
-import { useAuth } from "@/context/AuthContext";
+import {useAuth} from "@/context/AuthContext";
 
 type TabType = 'info' | 'policy' | 'qr';
 
 export default function SettingsPage() {
-  const { user, isLoading: authLoading } = useAuth();
+  const {user, isLoading: authLoading} = useAuth();
   const boothId = user?.boothId || 0;
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [isLoading, setIsLoading] = useState(true);
@@ -391,19 +391,19 @@ export default function SettingsPage() {
 
   if (!boothId && !authLoading) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4">
-        <div className="text-lg font-medium text-red-400">부스 정보를 찾을 수 없습니다.</div>
-        <Button
-          onClick={() => {
-            localStorage.removeItem("accessToken");
-            localStorage.removeItem("boothId");
-            window.location.href = "/login";
-          }}
-          className="bg-[#2D2A4A] text-white"
-        >
-          다시 로그인하기
-        </Button>
-      </div>
+        <div className="flex h-full flex-col items-center justify-center gap-4">
+          <div className="text-lg font-medium text-red-400">부스 정보를 찾을 수 없습니다.</div>
+          <Button
+              onClick={() => {
+                localStorage.removeItem("accessToken");
+                localStorage.removeItem("boothId");
+                window.location.href = "/login";
+              }}
+              className="bg-[#2D2A4A] text-white"
+          >
+            다시 로그인하기
+          </Button>
+        </div>
     );
   }
 
@@ -670,15 +670,18 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="callValidSeconds">호출 유효 시간(초)</Label>
-                  <Input
-                    id="callValidSeconds"
-                    type="number"
-                    value={policyInfo.callValidSeconds}
-                    onChange={(e) => setPolicyInfo({ ...policyInfo, callValidSeconds: parseInt(e.target.value) || 0 })}
-                    className="h-12 bg-[#F8F9FA] border-0 rounded-xl"
-                    required
-                  />
+                    <Label htmlFor="callValidSeconds">호출 유효 시간(초)</Label>
+                    <Input
+                        id="callValidSeconds"
+                        type="number"
+                        value={policyInfo.callValidSeconds}
+                        onChange={(e) => setPolicyInfo({
+                          ...policyInfo,
+                          callValidSeconds: parseInt(e.target.value) || 0
+                        })}
+                        className="h-12 bg-[#F8F9FA] border-0 rounded-xl"
+                        required
+                    />
                 </div>
 
                 <Button

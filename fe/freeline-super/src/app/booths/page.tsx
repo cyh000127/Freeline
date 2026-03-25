@@ -315,10 +315,10 @@ export default function BoothManagementPage() {
     setIsSendingMail(true);
     try {
       const adminIds = selected.map((r) => r.adminId!);
-      const res = await eventApi.sendLoginInfo({ boothAdminIds: adminIds });
+      const res = await eventApi.sendLoginInfo({boothAdminIds: adminIds});
       if (res.data?.success) {
         alert("성공적으로 이메일 전송을 요청했습니다.");
-        setRows((prev) => prev.map((r) => selected.some((s) => s.id === r.id) ? { ...r, selected: false } : r));
+        setRows((prev) => prev.map((r) => selected.some((s) => s.id === r.id) ? {...r, selected: false} : r));
       }
     } catch (err: any) {
       alert(err.response?.data?.message || err.message || "이메일 전송에 실패했습니다.");
@@ -603,18 +603,19 @@ export default function BoothManagementPage() {
                   disabled={isCreating || rows.length === 0}
                   className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#2D2A4A] text-white text-sm font-bold hover:bg-[#3A375C] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md group"
                 >
-                  {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />}
+                  {isCreating ? <Loader2 className="w-4 h-4 animate-spin"/> :
+                      <CheckSquare className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform"/>}
                   일괄 등록 및 ID/PW 생성
                 </button>
 
                 <div className="h-4 w-[1px] bg-gray-300 mx-2" />
 
                 <button
-                  onClick={handleSendMail}
-                  disabled={isSendingMail || selectedRows.length === 0}
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#C4FF00] text-[#2D2A4A] text-sm font-bold hover:bg-[#bcfd00] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
+                    onClick={handleSendMail}
+                    disabled={isSendingMail || selectedRows.length === 0}
+                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#C4FF00] text-[#2D2A4A] text-sm font-bold hover:bg-[#bcfd00] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
                 >
-                  {isSendingMail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                  {isSendingMail ? <Loader2 className="w-4 h-4 animate-spin"/> : <Mail className="w-4 h-4"/>}
                   이메일 일괄 전송
                 </button>
               </div>

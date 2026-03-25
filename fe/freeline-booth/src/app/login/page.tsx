@@ -28,12 +28,12 @@ export default function LoginPage() {
       
       if (token) {
         localStorage.setItem("accessToken", token);
-        
-        // Store additional booth/user info from response
-        const userData = response.data?.data || response.data;
-        if (userData.boothId) localStorage.setItem("boothId", userData.boothId.toString());
-        if (userData.boothName) localStorage.setItem("boothName", userData.boothName);
-        if (userData.name) localStorage.setItem("adminName", userData.name);
+
+          // Store additional booth/user info from response
+          const userData = response.data?.data || response.data;
+          if (userData.boothId) localStorage.setItem("boothId", userData.boothId.toString());
+          if (userData.boothName) localStorage.setItem("boothName", userData.boothName);
+          if (userData.name) localStorage.setItem("adminName", userData.name);
       }
       
       router.push("/");

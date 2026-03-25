@@ -35,7 +35,7 @@ api.interceptors.response.use(
       // Handle logout or redirect to login page
       if (typeof window !== 'undefined') {
         localStorage.removeItem('accessToken');
-        window.location.href = '/super/login';
+          window.location.href = '/super/login';
       }
     }
     return Promise.reject(error);

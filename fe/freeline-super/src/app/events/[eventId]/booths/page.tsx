@@ -208,11 +208,11 @@ export default function EventBoothsPage() {
   // ── Row actions ───────────────────────────────────────────────────────────
   const toggleAll = () => {
     const allSelected = rows.every((r) => r.selected);
-    setRows((prev) => prev.map((r) => ({ ...r, selected: !allSelected })));
+    setRows((prev) => prev.map((r) => ({...r, selected: !allSelected})));
   };
 
   const toggleRow = (id: string) => {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, selected: !r.selected } : r)));
+    setRows((prev) => prev.map((r) => (r.id === id ? {...r, selected: !r.selected} : r)));
   };
 
   const deleteRow = (id: string) => {
@@ -258,11 +258,11 @@ export default function EventBoothsPage() {
     setIsSendingMail(true);
     try {
       const adminIds = selected.map((r) => r.adminId!);
-      const res = await eventApi.sendLoginInfo({ boothAdminIds: adminIds });
+      const res = await eventApi.sendLoginInfo({boothAdminIds: adminIds});
       if (res.data?.success) {
         alert("성공적으로 이메일 전송을 요청했습니다.");
         // optionally refresh UI or clear selection
-        setRows((prev) => prev.map((r) => selected.some((s) => s.id === r.id) ? { ...r, selected: false } : r));
+        setRows((prev) => prev.map((r) => selected.some((s) => s.id === r.id) ? {...r, selected: false} : r));
       }
     } catch (err: any) {
       alert(err.response?.data?.message || err.message || "이메일 전송에 실패했습니다.");
@@ -430,9 +430,9 @@ export default function EventBoothsPage() {
                       <th className="w-12 px-4 py-3 text-center">
                         <button onClick={toggleAll} className="flex items-center justify-center">
                           {allSelected ? (
-                            <CheckSquare className="w-4 h-4 text-[#2D2A4A]" />
+                              <CheckSquare className="w-4 h-4 text-[#2D2A4A]"/>
                           ) : (
-                            <Square className="w-4 h-4 text-gray-400" />
+                              <Square className="w-4 h-4 text-gray-400"/>
                           )}
                         </button>
                       </th>
@@ -455,9 +455,9 @@ export default function EventBoothsPage() {
                         <td className="px-4 py-3 text-center">
                           <button onClick={() => toggleRow(row.id)} className="flex items-center justify-center">
                             {row.selected ? (
-                              <CheckSquare className="w-4 h-4 text-[#2D2A4A]" />
+                                <CheckSquare className="w-4 h-4 text-[#2D2A4A]"/>
                             ) : (
-                              <Square className="w-4 h-4 text-gray-300" />
+                                <Square className="w-4 h-4 text-gray-300"/>
                             )}
                           </button>
                         </td>
@@ -490,7 +490,8 @@ export default function EventBoothsPage() {
               {/* Action bar */}
               <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-[#F8F9FA]">
                 <p className="text-[11px] text-gray-400 font-medium">
-                  <span className="text-[#2D2A4A] font-bold uppercase tracking-widest mr-1">안내:</span> CSV 파일을 업로드하여 정보를 일괄 등록하고 로그인 정보를 발송하세요.
+                  <span className="text-[#2D2A4A] font-bold uppercase tracking-widest mr-1">안내:</span> CSV 파일을 업로드하여
+                  정보를 일괄 등록하고 로그인 정보를 발송하세요.
                 </p>
                 <div className="flex items-center gap-4">
                   <button
@@ -498,18 +499,20 @@ export default function EventBoothsPage() {
                     disabled={isCreating || rows.length === 0}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2D2A4A] text-white text-xs font-bold hover:bg-[#3A375C] disabled:opacity-50 transition-all shadow-md active:scale-95 group"
                   >
-                    {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />}
+                    {isCreating ? <Loader2 className="w-4 h-4 animate-spin"/> :
+                        <CheckSquare className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform"/>}
                     일괄 등록 및 ID/PW 생성
                   </button>
 
                   <div className="h-4 w-[1px] bg-gray-300" />
 
                   <button
-                    onClick={handleSendMail}
-                    disabled={isSendingMail || selectedRows.length === 0}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#C4FF00] text-[#2D2A4A] text-xs font-bold hover:bg-[#bcfd00] disabled:opacity-50 transition-all shadow-md active:scale-95"
+                      onClick={handleSendMail}
+                      disabled={isSendingMail || selectedRows.length === 0}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#C4FF00] text-[#2D2A4A] text-xs font-bold hover:bg-[#bcfd00] disabled:opacity-50 transition-all shadow-md active:scale-95"
                   >
-                    {isSendingMail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                    {isSendingMail ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> :
+                        <Mail className="w-3.5 h-3.5"/>}
                     이메일 일괄 전송
                   </button>
                 </div>
