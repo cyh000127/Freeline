@@ -165,6 +165,7 @@ public class AuthController {
     ) {
         authService.changeBoothAdminInitialPassword(request);
         return ResponseUtils.ok(null);
+    }
 
     @Operation(summary = "엔트리 코드 일괄 생성", description = "행사 관리자가 방문자용 일회성 엔트리 코드를 일괄 생성합니다.")
     @PostMapping("/entry-codes/bulk")
