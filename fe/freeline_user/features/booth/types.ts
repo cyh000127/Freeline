@@ -2,7 +2,6 @@ export interface EventBoothItem {
   boothId: number;
   name: string;
   locationCode: string;
-  boothAdminId: number;
   isEmergencyClosed: boolean;
   openTime: string;
   closeTime: string;
