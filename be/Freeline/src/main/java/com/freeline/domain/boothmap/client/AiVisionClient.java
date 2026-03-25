@@ -17,11 +17,9 @@ public class AiVisionClient {
 
     private final RestClient restClient;
 
-    // 스프링 부트가 자동으로 RestClient.Builder를 주입해 줍니다.
-    public AiVisionClient(RestClient.Builder restClientBuilder,
-                          @org.springframework.beans.factory.annotation.Value("${ai.vision.url:http://localhost:8000}") String aiVisionUrl) {
+    public AiVisionClient(@org.springframework.beans.factory.annotation.Value("${ai.vision.url:http://localhost:8000}") String aiVisionUrl) {
         // 파이썬 AI 서버의 기본 주소를 설정합니다. (기본값: localhost, 도커에서는 환경변수로 덮어씀)
-        this.restClient = restClientBuilder.baseUrl(aiVisionUrl).build();
+        this.restClient = RestClient.builder().baseUrl(aiVisionUrl).build();
     }
 
     public record AiAnalysisResult(int imageWidth, int imageHeight, List<AiBoothRect> booths) {
