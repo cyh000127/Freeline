@@ -25,30 +25,14 @@ import {
 interface BoothRow {
   id: string;
   boothName: string;
-  email: string;
-  loginId: string;
-  password: string;
+  locationCode: string;
+  openTime: string;
+  closeTime: string;
+  adminName: string;
+  adminEmail: string;
+  adminCompany: string;
   selected: boolean;
-  status: "pending" | "created" | "sent" | "error";
-  boothAdminId?: number;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-const SPECIALS = "!@#$%^&*";
-
-function genLoginId() {
-  return (
-    "booth_" +
-    Array.from({ length: 6 }, () => CHARS[Math.floor(Math.random() * CHARS.length)]).join("")
-  );
-}
-
-function genPassword() {
-  const pool = CHARS + SPECIALS;
-  const arr = Array.from({ length: 10 }, () => pool[Math.floor(Math.random() * pool.length)]);
-  arr[Math.floor(Math.random() * 10)] = SPECIALS[Math.floor(Math.random() * SPECIALS.length)];
-  return arr.join("");
+  status: "pending" | "registered" | "error";
 }
 
 function parseFile(file: File): Promise<BoothRow[]> {
@@ -56,20 +40,45 @@ function parseFile(file: File): Promise<BoothRow[]> {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const wb = XLSX.read(e.target?.result, { type: "array" });
+        const data = e.target?.result;
+        let wb;
+        const isCsv = file.name.toLowerCase().endsWith(".csv");
+
+        if (isCsv && data instanceof ArrayBuffer) {
+          // For CSV, try UTF-8 first, then fallback to EUC-KR
+          let str = "";
+          try {
+            const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+            str = utf8Decoder.decode(new Uint8Array(data));
+          } catch {
+            const eucDecoder = new TextDecoder("euc-kr");
+            str = eucDecoder.decode(new Uint8Array(data));
+          }
+          wb = XLSX.read(str, { type: "string" });
+        } else {
+          wb = XLSX.read(data, { type: "array" });
+        }
+
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const json: Record<string, string>[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
-        const rows: BoothRow[] = json
-          .map((r) => ({
-            boothName: (r["부스명"] || r["name"] || r["booth_name"] || "").trim(),
-            email: (r["이메일"] || r["email"] || r["Email"] || "").trim(),
-          }))
-          .filter((r) => r.boothName && r.email)
+        const dataRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+        // Skip first row which is the header
+        const rows: BoothRow[] = dataRows.slice(1)
+          .filter((r) => {
+            // Requirement: boothName (index 0) and adminEmail (index 5) are required (Y)
+            const name = r[0]?.toString().trim() || "";
+            const email = r[5]?.toString().trim() || "";
+            return name && email;
+          })
           .map((r) => ({
             id: crypto.randomUUID(),
-            ...r,
-            loginId: genLoginId(),
-            password: genPassword(),
+            boothName: r[0]?.toString().trim() || "",
+            locationCode: r[1]?.toString().trim() || "",
+            openTime: r[2]?.toString().trim() || "",
+            closeTime: r[3]?.toString().trim() || "",
+            adminName: r[4]?.toString().trim() || "",
+            adminEmail: r[5]?.toString().trim() || "",
+            adminCompany: r[6]?.toString().trim() || "",
             selected: true,
             status: "pending" as const,
           }));
@@ -93,13 +102,36 @@ export default function EventBoothsPage() {
   const [event, setEvent] = useState<Event | null>(null);
 
   const [rows, setRows] = useState<BoothRow[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showPasswords, setShowPasswords] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [isSending, setIsSending] = useState(false);
+
+  // ── File handling ─────────────────────────────────────────────────────────
+  const fetchBooths = useCallback(async () => {
+    try {
+      const res = await eventApi.getBooths(eventId);
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        const existingRows: BoothRow[] = res.data.data.map((b: any) => ({
+          id: b.boothId.toString(),
+          boothName: b.boothName || "",
+          locationCode: b.locationCode || "",
+          openTime: b.openTime || "",
+          closeTime: b.closeTime || "",
+          adminName: b.adminName || "",
+          adminEmail: b.adminEmail || "",
+          adminCompany: b.adminCompany || "",
+          selected: true,
+          status: "registered" as const,
+        }));
+        setRows(existingRows);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [eventId]);
 
   useEffect(() => {
     const load = async () => {
@@ -112,14 +144,15 @@ export default function EventBoothsPage() {
           setUserName(userRes.data.data.name);
         const detail = eventRes.data?.success ? eventRes.data.data : (eventRes.data as any);
         if (detail?.eventId) setEvent(detail as Event);
+        
+        await fetchBooths();
       } catch {
         /* ignore */
       }
     };
     if (eventId) load();
-  }, [eventId]);
+  }, [eventId, fetchBooths]);
 
-  // ── File handling ─────────────────────────────────────────────────────────
   const handleFile = useCallback(async (file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (!["csv", "xlsx", "xls"].includes(ext || "")) {
@@ -132,9 +165,10 @@ export default function EventBoothsPage() {
       const parsed = await parseFile(file);
       if (parsed.length === 0) {
         alert(
-          "데이터를 찾을 수 없습니다.\n필수 컬럼: 부스명 (name), 이메일 (email)"
+          "데이터를 찾을 수 없습니다.\n필수 컬럼: 부스 이름, 관리자 이메일을 확인해 주세요."
         );
       }
+      setSelectedFile(file);
       setRows((prev) => [...prev, ...parsed]);
     } catch {
       alert("파일 파싱에 실패했습니다.");
@@ -157,91 +191,50 @@ export default function EventBoothsPage() {
   };
 
   // ── Row actions ───────────────────────────────────────────────────────────
-  const toggleAll = () => {
-    const allSelected = rows.every((r) => r.selected);
-    setRows((p) => p.map((r) => ({ ...r, selected: !allSelected })));
-  };
-  const toggleRow = (id: string) =>
-    setRows((p) => p.map((r) => (r.id === id ? { ...r, selected: !r.selected } : r)));
-  const deleteRow = (id: string) =>
+  const deleteRow = (id: string) => {
     setRows((p) => p.filter((r) => r.id !== id));
-  const regenOne = (id: string) =>
-    setRows((p) =>
-      p.map((r) => (r.id === id ? { ...r, loginId: genLoginId(), password: genPassword() } : r))
-    );
-  const regenAll = () =>
-    setRows((p) => p.map((r) => ({ ...r, loginId: genLoginId(), password: genPassword() })));
+    if (rows.length <= 1) {
+      setSelectedFile(null);
+      setFileName("");
+    }
+  };
   const clearAll = () => {
     setRows([]);
+    setSelectedFile(null);
     setFileName("");
   };
 
-  // ── API actions ───────────────────────────────────────────────────────────
-  const handleCreate = async () => {
-    if (rows.length === 0) { alert("업로드된 데이터가 없습니다."); return; }
+  // ───── API actions ─────────────────────────────────────────────────────────
+  const handleOnboarding = async () => {
+    if (!selectedFile) { alert("업로드할 파일을 선택해주세요."); return; }
     setIsCreating(true);
     try {
-      const res = await authApi.bulkCreateBoothAdmins({
-        eventId: Number(eventId),
-        booths: rows.map((r) => ({
-          boothName: r.boothName,
-          loginId: r.loginId,
-          password: r.password,
-          email: r.email,
-        })),
-      });
-      const created = res.data?.data;
-      setRows((p) =>
-        p.map((r, i) => ({
-          ...r,
-          status: "created" as const,
-          boothAdminId: Array.isArray(created)
-            ? (created[i]?.boothAdminId ?? created[i]?.id)
-            : undefined,
-        }))
-      );
-      alert(`${rows.length}개 부스 관리자 계정이 성공적으로 생성되었습니다.`);
+      const res = await eventApi.onboardBooths(eventId, selectedFile);
+      if (res.data?.success || res.status === 201) {
+        alert("부스 및 관리자 정보가 성공적으로 등록되었습니다.\n다음 단계인 ID/PW 생성을 진행할 수 있습니다.");
+        await fetchBooths();
+        setSelectedFile(null);
+        setFileName("");
+      }
     } catch (err: any) {
-      alert(err.response?.data?.message || "계정 생성에 실패했습니다.");
+      alert(err.response?.data?.message || err.message || "테이블 등록에 실패했습니다.");
     } finally {
       setIsCreating(false);
     }
   };
 
-  const handleSend = async (targetRows: BoothRow[]) => {
-    if (targetRows.length === 0) { alert("선택된 부스가 없습니다."); return; }
-    setIsSending(true);
-    try {
-      const ids = targetRows.map((r) => r.boothAdminId).filter(Boolean) as number[];
-      const payload: Record<string, any> = { eventId: Number(eventId) };
-      if (ids.length > 0) payload.boothAdminIds = ids;
-      await authApi.bulkSendBoothAdminLogins(payload);
-      const sentIds = new Set(targetRows.map((r) => r.id));
-      setRows((p) =>
-        p.map((r) => (sentIds.has(r.id) ? { ...r, status: "sent" as const } : r))
-      );
-      alert(`${targetRows.length}개 부스에 로그인 정보가 이메일로 전송되었습니다.`);
-    } catch (err: any) {
-      alert(err.response?.data?.message || "이메일 전송에 실패했습니다.");
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const selectedRows = rows.filter((r) => r.selected);
-  const allSelected = rows.length > 0 && rows.every((r) => r.selected);
+  const selectedEventId = eventId;
 
   const statusBadge = (s: BoothRow["status"]) => {
     const map = {
       pending: "bg-gray-100 text-gray-500",
-      created: "bg-blue-100 text-blue-700",
-      sent: "bg-green-100 text-green-700",
+      registered: "bg-green-100 text-green-700",
       error: "bg-red-100 text-red-700",
     } as const;
-    const label = { pending: "대기", created: "계정생성", sent: "전송완료", error: "오류" } as const;
+    const label = { pending: "대기", registered: "등록완료", error: "오류" } as const;
     return (
       <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${map[s]}`}>
-        {label[s]}
+        {label[s as keyof typeof label]}
       </span>
     );
   };
@@ -259,9 +252,9 @@ export default function EventBoothsPage() {
                 <Users className="w-5 h-5 text-[#C4FF00]" />
               </div>
               <div>
-                <h1 className="text-xl font-black text-[#2D2A4A]">부스 관리자 계정 관리</h1>
+                <h1 className="text-xl font-black text-[#2D2A4A]">부스 관리자 계정 생성</h1>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {event?.name} · CSV/XLSX 업로드로 계정을 일괄 생성하고 이메일로 전송하세요
+                  {event?.name} · CSV/XLSX 정보를 일괄 등록하고 계정을 생성하세요
                 </p>
               </div>
             </div>
@@ -284,17 +277,47 @@ export default function EventBoothsPage() {
                 1
               </span>
               <h2 className="text-sm font-bold text-gray-900">파일 업로드</h2>
-              <span className="ml-auto text-xs text-gray-400">
-                필수 컬럼: <code className="bg-gray-100 px-1 rounded">부스명</code>{" "}
-                <code className="bg-gray-100 px-1 rounded">이메일</code>
-              </span>
+            </div>
+
+            {/* Example Template Table */}
+            <div className="mb-5 overflow-x-auto">
+              <p className="text-[11px] font-bold text-gray-400 mb-2 ml-1 flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-red-400"></span>
+                업로드 양식 예시 (CSV/XLSX)
+              </p>
+              <table className="w-full text-[10px] border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500 font-bold border-b border-gray-100">
+                    <th className="px-4 py-2.5 text-left border-r border-gray-100 whitespace-nowrap">부스 이름</th>
+                    <th className="px-4 py-2.5 text-left border-r border-gray-100 whitespace-nowrap">위치 코드</th>
+                    <th className="px-4 py-2.5 text-left border-r border-gray-100 whitespace-nowrap">운영 시작</th>
+                    <th className="px-4 py-2.5 text-left border-r border-gray-100 whitespace-nowrap">운영 종료</th>
+                    <th className="px-4 py-2.5 text-left border-r border-gray-100 whitespace-nowrap">관리자 이름</th>
+                    <th className="px-4 py-2.5 text-left border-r border-gray-100 whitespace-nowrap">관리자 이메일</th>
+                    <th className="px-4 py-2.5 text-left whitespace-nowrap">소속</th>
+                  </tr>
+                </thead>
+                <tbody className="text-gray-400 bg-white">
+                  <tr>
+                    <td className="px-4 py-2.5 border-r border-gray-100">A-01 부스</td>
+                    <td className="px-4 py-2.5 border-r border-gray-100">A-01</td>
+                    <td className="px-4 py-2.5 border-r border-gray-100">10:00:00</td>
+                    <td className="px-4 py-2.5 border-r border-gray-100">18:00:00</td>
+                    <td className="px-4 py-2.5 border-r border-gray-100">홍길동</td>
+                    <td className="px-4 py-2.5 border-r border-gray-100">booth@test.com</td>
+                    <td className="px-4 py-2.5">(주)컴퍼니</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="mt-2 text-[10px] text-red-400 italic">
+                * 부스 이름과 관리자 이메일은 필수 항목입니다.
+              </p>
             </div>
             <div
-              className={`relative flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-2xl p-8 cursor-pointer transition-all ${
-                isDragging
-                  ? "border-[#2D2A4A] bg-indigo-50 scale-[1.01]"
-                  : "border-gray-200 hover:border-[#2D2A4A] hover:bg-gray-50"
-              }`}
+              className={`relative flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-2xl p-8 cursor-pointer transition-all ${isDragging
+                ? "border-[#2D2A4A] bg-indigo-50 scale-[1.01]"
+                : "border-gray-200 hover:border-[#2D2A4A] hover:bg-gray-50"
+                }`}
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
               onDrop={onDrop}
@@ -342,23 +365,10 @@ export default function EventBoothsPage() {
                   <span className="px-2 py-0.5 bg-gray-100 rounded-full text-xs font-bold text-gray-600">
                     {rows.length}개
                   </span>
-                  <span className="text-xs text-gray-400">/ 선택 {selectedRows.length}개</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowPasswords((p) => !p)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
-                  >
-                    {showPasswords ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                    {showPasswords ? "숨기기" : "비밀번호 보기"}
-                  </button>
-                  <button
-                    onClick={regenAll}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    전체 재생성
-                  </button>
+                  <div className="flex items-center gap-2">
+                  </div>
                 </div>
               </div>
 
@@ -366,22 +376,15 @@ export default function EventBoothsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-[#F8F9FA] text-gray-500 text-xs font-bold">
-                      <th className="w-10 px-4 py-2.5 text-center">
-                        <button onClick={toggleAll}>
-                          {allSelected ? (
-                            <CheckSquare className="w-4 h-4 text-[#2D2A4A] mx-auto" />
-                          ) : (
-                            <Square className="w-4 h-4 text-gray-400 mx-auto" />
-                          )}
-                        </button>
-                      </th>
-                      <th className="px-4 py-2.5 text-left">부스명</th>
-                      <th className="px-4 py-2.5 text-left">이메일</th>
-                      <th className="px-4 py-2.5 text-left">아이디</th>
-                      <th className="px-4 py-2.5 text-left">비밀번호</th>
-                      <th className="px-4 py-2.5 text-center">상태</th>
-                      <th className="px-4 py-2.5 text-center">작업</th>
+                    <tr className="bg-[#F8F9FA] text-gray-500 text-xs font-bold border-b border-gray-100">
+                      <th className="px-4 py-3 text-left">부스명</th>
+                      <th className="px-4 py-3 text-left">위치 코드</th>
+                      <th className="px-4 py-3 text-left">운영시간</th>
+                      <th className="px-4 py-3 text-left">관리자</th>
+                      <th className="px-4 py-3 text-left">이메일</th>
+                      <th className="px-4 py-3 text-left">소속</th>
+                      <th className="px-4 py-3 text-center">상태</th>
+                      <th className="px-4 py-3 text-center">작업</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -390,37 +393,17 @@ export default function EventBoothsPage() {
                         key={row.id}
                         className={`transition-colors ${row.selected ? "bg-indigo-50/40" : "bg-white"} hover:bg-gray-50`}
                       >
-                        <td className="px-4 py-2 text-center">
-                          <button onClick={() => toggleRow(row.id)}>
-                            {row.selected ? (
-                              <CheckSquare className="w-4 h-4 text-[#2D2A4A] mx-auto" />
-                            ) : (
-                              <Square className="w-4 h-4 text-gray-300 mx-auto" />
-                            )}
-                          </button>
+                        <td className="px-4 py-3 font-bold text-gray-800">{row.boothName}</td>
+                        <td className="px-4 py-2 text-gray-500 text-xs">{row.locationCode}</td>
+                        <td className="px-4 py-2 text-gray-400 text-[10px]">
+                          {row.openTime} ~ {row.closeTime}
                         </td>
-                        <td className="px-4 py-2 font-semibold text-gray-900">{row.boothName}</td>
-                        <td className="px-4 py-2 text-gray-500 text-xs">{row.email}</td>
-                        <td className="px-4 py-2">
-                          <code className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono text-[#2D2A4A]">
-                            {row.loginId}
-                          </code>
-                        </td>
-                        <td className="px-4 py-2">
-                          <code className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono text-gray-500">
-                            {showPasswords ? row.password : "•".repeat(row.password.length)}
-                          </code>
-                        </td>
+                        <td className="px-4 py-2 text-gray-600 text-xs">{row.adminName}</td>
+                        <td className="px-4 py-2 text-gray-600 font-medium text-xs">{row.adminEmail}</td>
+                        <td className="px-4 py-2 text-gray-400 text-[10px]">{row.adminCompany}</td>
                         <td className="px-4 py-2 text-center">{statusBadge(row.status)}</td>
                         <td className="px-4 py-2">
                           <div className="flex items-center justify-center gap-1">
-                            <button
-                              title="재생성"
-                              onClick={() => regenOne(row.id)}
-                              className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#2D2A4A] transition-colors"
-                            >
-                              <RefreshCw className="w-3.5 h-3.5" />
-                            </button>
                             <button
                               title="삭제"
                               onClick={() => deleteRow(row.id)}
@@ -438,33 +421,35 @@ export default function EventBoothsPage() {
 
               {/* Action bar */}
               <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-[#F8F9FA]">
-                <p className="text-xs text-gray-400">
-                  ① 계정 일괄 생성 후 ② 이메일 전송 순으로 진행하세요
+                <p className="text-[11px] text-gray-400 font-medium">
+                  <span className="text-[#2D2A4A] font-bold uppercase tracking-widest mr-1">Phase 1:</span> CSV 파일을 업로드하여 정보를 일괄 등록합니다.
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
                   <button
-                    onClick={handleCreate}
+                    onClick={handleOnboarding}
                     disabled={isCreating || rows.length === 0}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#2D2A4A] text-white text-xs font-bold hover:bg-[#3A375C] disabled:opacity-50 transition-all shadow-sm"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2D2A4A] text-white text-xs font-bold hover:bg-[#3A375C] disabled:opacity-50 transition-all shadow-md active:scale-95 group"
                   >
-                    {isCreating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />}
-                    계정 일괄 생성
+                    {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />}
+                    테이블 일괄 등록 (Step 1)
                   </button>
+
+                  <div className="h-4 w-[1px] bg-gray-300" />
+
                   <button
-                    onClick={() => handleSend(selectedRows)}
-                    disabled={isSending || selectedRows.length === 0}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-50 transition-all shadow-sm"
+                    disabled
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 text-gray-400 text-xs font-bold cursor-not-allowed"
                   >
-                    {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
-                    선택 전송 ({selectedRows.length})
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    ID/PW 일괄 생성 (대기)
                   </button>
+
                   <button
-                    onClick={() => handleSend(rows)}
-                    disabled={isSending || rows.length === 0}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#C4FF00] text-[#2D2A4A] text-xs font-bold hover:bg-[#bcfd00] disabled:opacity-50 transition-all shadow-sm"
+                    disabled
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 text-gray-400 text-xs font-bold cursor-not-allowed"
                   >
-                    {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MailCheck className="w-3.5 h-3.5" />}
-                    전체 전송
+                    <Mail className="w-3.5 h-3.5" />
+                    이메일 일괄 전송 (대기)
                   </button>
                 </div>
               </div>
