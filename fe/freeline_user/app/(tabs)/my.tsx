@@ -60,9 +60,9 @@ export default function My() {
             iconName="qr-code-outline"
             label="티켓 다시 스캔"
             helperText="행사 참여 정보를 다시 불러와요"
-            onPress={() => {
-              router.replace('/register/ticket');
-            }}
+            // onPress={() => {
+            //   router.replace('/register/ticket');
+            // }}
           />
         </MySection>
 
