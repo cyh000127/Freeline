@@ -1,6 +1,7 @@
 package com.freeline.domain.auth.service;
 
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -24,6 +25,7 @@ import com.freeline.domain.auth.dto.request.BoothAdminBulkCreateReqDto;
 import com.freeline.domain.auth.dto.request.BoothAdminEmailSendReqDto;
 import com.freeline.domain.auth.dto.request.ChangePasswordReqDto;
 import com.freeline.domain.auth.dto.request.EmailVerifyReqDto;
+import com.freeline.domain.auth.dto.request.EntryCodeBulkCreateReqDto;
 import com.freeline.domain.auth.dto.request.LoginReqDto;
 import com.freeline.domain.auth.dto.request.SignupReqDto;
 import com.freeline.domain.auth.dto.request.UpdateMyInfoReqDto;
@@ -32,6 +34,7 @@ import com.freeline.domain.auth.dto.response.BoothAdminCreateResDto;
 import com.freeline.domain.auth.dto.response.BoothAdminListResDto;
 import com.freeline.domain.auth.dto.response.BoothAdminMeResDto;
 import com.freeline.domain.auth.dto.response.CheckIdResDto;
+import com.freeline.domain.auth.dto.response.EntryCodeBulkCreateResDto;
 import com.freeline.domain.auth.dto.response.LoginResDto;
 import com.freeline.domain.auth.dto.response.MyInfoResDto;
 import com.freeline.domain.auth.dto.response.SignupResDto;
@@ -44,6 +47,8 @@ import com.freeline.domain.auth.repository.EventAdminRepository;
 import com.freeline.domain.booth.entity.Visitor;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.VisitorRepository;
+import com.freeline.domain.event.entity.Event;
+import com.freeline.domain.event.repository.EventRepository;
 
 import io.jsonwebtoken.Claims;
 
@@ -58,12 +63,15 @@ public class AuthService {
     private static final String SPECIAL_CHAR = "!@#$%^&*()_+-=";
     private static final String PASSWORD_ALLOW_BASE = CHAR_LOWER + CHAR_UPPER + NUMBER + SPECIAL_CHAR;
     private static final String REDIS_KEY_PREFIX_EMAIL_VERIFIED = "email:verified:";
+    private static final String ENTRY_CODE_PREFIX = "E";
+    private static final int ENTRY_CODE_SEQUENCE_LENGTH = 6;
     private static final SecureRandom random = new SecureRandom();
     private final AuthProperties authProperties;
     private final EventAdminRepository eventAdminRepository;
     private final BoothAdminRepository boothAdminRepository;
     private final VisitorRepository visitorRepository;
     private final BoothRepository boothRepository;
+    private final EventRepository eventRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final StringRedisTemplate redisTemplate;
@@ -326,15 +334,88 @@ public class AuthService {
     }
 
     /**
+     * 방문자 엔트리 코드 일괄 생성
+     */
+    @Transactional
+    public EntryCodeBulkCreateResDto createEntryCodesBulk(
+            final Long userId,
+            final EntryCodeBulkCreateReqDto request
+    ) {
+        validateEventOwnership(userId, request.eventId());
+
+        final int quantity = request.quantity();
+        long nextSequence = visitorRepository.countByEventId(request.eventId()) + 1;
+        final List<Visitor> visitorsToCreate = new ArrayList<>(quantity);
+
+        while (visitorsToCreate.size() < quantity) {
+            final String entryCode = formatEntryCode(request.eventId(), nextSequence++);
+            if (visitorRepository.existsByEntryCode(entryCode)) {
+                continue;
+            }
+
+            visitorsToCreate.add(Visitor.builder()
+                    .eventId(request.eventId())
+                    .entryCode(entryCode)
+                    .name(null)
+                    .active(true)
+                    .build());
+        }
+
+        final List<Visitor> savedVisitors = visitorRepository.saveAll(visitorsToCreate);
+
+        log.info(
+                "[Auth] Entry codes bulk created {eventId: {}, requestedCount: {}, createdCount: {}}",
+                request.eventId(),
+                quantity,
+                savedVisitors.size()
+        );
+
+        return EntryCodeBulkCreateResDto.builder()
+                .eventId(request.eventId())
+                .requestedCount(quantity)
+                .createdCount(savedVisitors.size())
+                .entryCodes(savedVisitors.stream()
+                        .map(visitor -> EntryCodeBulkCreateResDto.EntryCodeItem.builder()
+                                .visitorId(visitor.getId())
+                                .entryCode(visitor.getEntryCode())
+                                .active(visitor.isActive())
+                                .build())
+                        .toList())
+                .build();
+    }
+
+    /**
      * 방문자 입장
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResDto visitorEnter(final VisitorEnterReqDto req) {
-        Visitor visitor = visitorRepository.findByEntryCode(req.entryCode())
-                .orElseThrow(() -> new AuthException(ErrorCode.VISITOR_NOT_FOUND));
+        final Visitor visitor = visitorRepository.findByEntryCodeAndActiveTrue(req.entryCode())
+                .orElseGet(() -> resolveInactiveOrMissingVisitor(req.entryCode()));
+
+        visitor.updateActive(false);
         String token = jwtProvider.createToken(visitor.getId(), Role.VISITOR.name());
         log.info("[Auth] Visitor entered, visitorId: {}", visitor.getId());
         return authConverter.toLoginResDto(token, null, Role.VISITOR, null);
+    }
+
+    private void validateEventOwnership(final Long eventAdminId, final Long eventId) {
+        final Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new AuthException(ErrorCode.EVENT_NOT_FOUND));
+
+        if (!event.getEventAdminId().equals(eventAdminId)) {
+            throw new AuthException(ErrorCode.ACCESS_DENIED);
+        }
+    }
+
+    private String formatEntryCode(final Long eventId, final long sequence) {
+        return String.format("%s%d-%0" + ENTRY_CODE_SEQUENCE_LENGTH + "d", ENTRY_CODE_PREFIX, eventId, sequence);
+    }
+
+    private Visitor resolveInactiveOrMissingVisitor(final String entryCode) {
+        if (visitorRepository.findByEntryCode(entryCode).isPresent()) {
+            throw new AuthException(ErrorCode.ENTRY_CODE_ALREADY_USED);
+        }
+        throw new AuthException(ErrorCode.VISITOR_NOT_FOUND);
     }
 
     private String createVerificationCode() {
@@ -374,6 +455,7 @@ public class AuthService {
         log.info("[Auth] {} logged in: {}", role.name(), identifier);
         return authConverter.toLoginResDto(accessToken, refreshToken, role, boothId);
     }
+
     private Long resolveBoothId(final Role role, final Long userId) {
         if (role != Role.BOOTH_ADMIN) {
             return null;

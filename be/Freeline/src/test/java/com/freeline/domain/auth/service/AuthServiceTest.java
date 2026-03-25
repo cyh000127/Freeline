@@ -27,6 +27,7 @@ import com.freeline.domain.auth.repository.BoothAdminRepository;
 import com.freeline.domain.auth.repository.EventAdminRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.VisitorRepository;
+import com.freeline.domain.event.repository.EventRepository;
 
 import io.jsonwebtoken.Claims;
 
@@ -47,6 +48,9 @@ class AuthServiceTest {
 
     @Mock
     private BoothRepository boothRepository;
+
+    @Mock
+    private EventRepository eventRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -73,6 +77,7 @@ class AuthServiceTest {
                 boothAdminRepository,
                 visitorRepository,
                 boothRepository,
+                eventRepository,
                 passwordEncoder,
                 jwtProvider,
                 redisTemplate,

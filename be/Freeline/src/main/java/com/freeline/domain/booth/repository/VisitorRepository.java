@@ -9,4 +9,10 @@ import com.freeline.domain.booth.entity.Visitor;
 public interface VisitorRepository extends JpaRepository<Visitor, Long> {
 
     Optional<Visitor> findByEntryCode(String entryCode);
+
+    Optional<Visitor> findByEntryCodeAndActiveTrue(String entryCode);
+
+    boolean existsByEntryCode(String entryCode);
+
+    long countByEventId(Long eventId);
 }
