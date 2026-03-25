@@ -30,6 +30,12 @@ public record BoothResDto(
         @Schema(description = "호출 유효 시간(초)", example = "180")
         int callValidSeconds,
 
+        @Schema(description = "대표 이미지 URL", example = "https://example.com/images/booth-thumbnail.png")
+        String representativeImageUrl,
+
+        @Schema(description = "부스 이미지 URL 목록")
+        List<String> boothImageUrls,
+
         @Schema(description = "굿즈 목록")
         List<BoothGoodsResDto> goods
 ) {
