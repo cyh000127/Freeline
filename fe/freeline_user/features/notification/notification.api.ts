@@ -9,7 +9,6 @@ import type {
   NotificationSubscription,
   MarkAllNotificationsAsReadData,
 } from './types';
-import EventSource from 'react-native-sse';
 
 function unwrapResponse<T>(response: { data: ApiResponse<T> }): T {
   const { success, data, error } = response.data;
@@ -40,7 +39,8 @@ export const saveFcmToken = async (
   return unwrapResponse(response);
 };
 
-// 실시간 알림/순번 구독 (SSE)
+/*
+// DEPRECATED: 실시간 알림/순번 구독 (SSE) - Backend API does not exist
 export const subscribeNotifications = ({
   accessToken,
   lastEventId,
@@ -48,79 +48,27 @@ export const subscribeNotifications = ({
   onMessage,
   onError,
 }: SubscribeNotificationsOptions): NotificationSubscription => {
-  const baseUrl = api.defaults.baseURL;
-
-  if (!baseUrl) {
-    throw new Error('API baseURL이 설정되어 있지 않습니다.');
-  }
-
-  const url = new URL(joinUrl(baseUrl, 'notifications/subscribe'));
-
-  if (lastEventId) {
-    url.searchParams.set('lastEventId', lastEventId);
-  }
-
-  const eventSource = new EventSource(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    },
-  });
-
-  eventSource.addEventListener('open', () => {
-    onOpen?.();
-  });
-
-  eventSource.addEventListener('message', (event: any) => {
-    onMessage?.({
-      type: event.type,
-      data: event.data,
-      lastEventId: event.lastEventId,
-    });
-  });
-
-  eventSource.addEventListener('error', (error: any) => {
-    onError?.(error);
-  });
-
-  return {
-    close: () => {
-      eventSource.close();
-    },
-  };
+  console.warn('subscribeNotifications is deprecated. SSE is not supported for visitors on backend.');
+  return { close: () => {} };
 };
 
+// DEPRECATED: Backend API does not exist
 export const getNotifications = async (
   params?: GetNotificationsParams,
 ): Promise<GetNotificationsData> => {
-  const response = await api.get<ApiResponse<GetNotificationsData>>('notifications', {
-    params: {
-      unreadOnly: params?.unreadOnly ?? false,
-      page: params?.page ?? 0,
-      size: params?.size ?? 20,
-    },
-  });
-
-  return unwrapResponse(response);
+  console.warn('getNotifications is deprecated. Backend API does not exist.');
+  return { notifications: [], unreadCount: 0 };
 };
 
-// 개별 알림 읽음 처리
+// DEPRECATED: 개별 알림 읽음 처리 - Backend API does not exist
 export const markNotificationAsRead = async (notificationId: number): Promise<void> => {
-  const response = await api.patch<ApiResponse<null>>(`notifications/${notificationId}`);
-
-  const { success, error } = response.data;
-
-  if (!success) {
-    throw new Error(error?.message ?? '알림 읽음 처리에 실패했습니다.');
-  }
+  console.warn('markNotificationAsRead is deprecated. Backend API does not exist.');
 };
 
+// DEPRECATED: Backend API does not exist
 export const markAllNotificationsAsRead =
   async (): Promise<MarkAllNotificationsAsReadData> => {
-    const response =
-      await api.patch<ApiResponse<MarkAllNotificationsAsReadData>>('notifications');
-
-    return unwrapResponse(response);
+    console.warn('markAllNotificationsAsRead is deprecated. Backend API does not exist.');
+    return { updatedCount: 0 };
   };
+*/

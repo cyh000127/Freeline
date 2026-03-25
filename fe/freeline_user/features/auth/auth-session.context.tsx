@@ -56,8 +56,10 @@ const initialState: AuthSessionState = {
 
 async function authenticateEntryCodeRequest(entryCode: string) {
   const response = await api.post<EntryAuthApiResponse>(
-    '/visitors/entry-code/authenticate',
-    { entryCode },
+    'auth/visitors/entry-code/authenticate',
+    {
+      entryCode,
+    },
   );
 
   const payload = response.data;

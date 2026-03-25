@@ -68,7 +68,7 @@ function getCompactStatusUI(status: ReservationStatus) {
         statusLabel: '예약 취소' as const,
         statusTone: 'gray' as const,
       };
-    case 'AUTO_CANCELED':
+    case 'EXPIRED':
       return {
         statusLabel: '자동 취소' as const,
         statusTone: 'red' as const,
@@ -83,7 +83,7 @@ function getCompactStatusUI(status: ReservationStatus) {
 }
 
 function isFinishedStatus(status: ReservationStatus) {
-  return status === 'EXITED' || status === 'CANCELED' || status === 'AUTO_CANCELED';
+  return status === 'EXITED' || status === 'CANCELED' || status === 'EXPIRED';
 }
 
 export default function ReservationScreen() {
@@ -218,7 +218,7 @@ export default function ReservationScreen() {
       {
         waitingId: 'history-2',
         boothName: '한화',
-        status: 'AUTO_CANCELED',
+        status: 'EXPIRED',
         estimatedWaitText: '자동 취소됨',
         reservedAt: '2026.03.05 16:00',
       },
