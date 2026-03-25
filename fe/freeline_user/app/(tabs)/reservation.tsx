@@ -23,6 +23,7 @@ import {
   postponeWaiting,
   exitWaiting,
 } from '@/features/waiting/waiting.api';
+import { useAuthSession } from '@/features/auth/auth-session.context';
 import type { WaitingItem, WaitingStatus } from '@/features/waiting/types';
 
 type ReservationStatus = WaitingStatus;
@@ -97,13 +98,15 @@ export default function ReservationScreen() {
   const [creating, setCreating] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
 
-  const accessToken = 'TEMPORARY_TOKEN';
+  const { accessToken } = useAuthSession();
 
   const handleTabPress = (tab: TabKey) => {
     router.replace(TAB_ROUTES[tab]);
   };
 
   const loadWaitings = async () => {
+    if (!accessToken) return;
+
     try {
       setLoading(true);
       setError(null);
@@ -120,6 +123,11 @@ export default function ReservationScreen() {
   };
 
   const handleAddReservation = async (boothId: number) => {
+    if (!accessToken) {
+      Alert.alert('오류', '로그인이 필요합니다.');
+      return;
+    }
+
     try {
       setCreating(true);
       await createWaiting(accessToken, boothId);
@@ -134,6 +142,7 @@ export default function ReservationScreen() {
   };
 
   const handleCancelReservation = async (waitingId: number) => {
+    if (!accessToken) return;
     try {
       setActionLoadingId(waitingId);
       await cancelWaiting(accessToken, waitingId);
@@ -148,6 +157,7 @@ export default function ReservationScreen() {
   };
 
   const handlePostponeReservation = async (waitingId: number) => {
+    if (!accessToken) return;
     try {
       setActionLoadingId(waitingId);
       await postponeWaiting(accessToken, waitingId);
@@ -161,6 +171,7 @@ export default function ReservationScreen() {
     }
   };
   const handleExitReservation = async (waitingId: number) => {
+    if (!accessToken) return;
     try {
       setActionLoadingId(waitingId);
       await exitWaiting(accessToken, waitingId);

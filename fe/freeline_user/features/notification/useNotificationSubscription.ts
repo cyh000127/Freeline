@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import {
+/*
   connectNotificationSse,
   disconnectNotificationSse,
+*/
 } from './notification.service';
 
 type UseNotificationSubscriptionParams = {
@@ -15,6 +17,8 @@ export function useNotificationSubscription({
   onMessage,
 }: UseNotificationSubscriptionParams) {
   useEffect(() => {
+    // SSE is deprecated on backend, so we do nothing here.
+    /*
     if (!accessToken) {
       disconnectNotificationSse();
       return;
@@ -78,5 +82,6 @@ export function useNotificationSubscription({
       subscription.remove();
       disconnect();
     };
+    */
   }, [accessToken, onMessage]);
 }
