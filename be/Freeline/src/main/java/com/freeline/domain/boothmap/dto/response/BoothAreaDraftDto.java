@@ -7,17 +7,7 @@ import lombok.Builder;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Builder
-public record BoothMapAreaUpsertResDto(
-
-        @Schema(description = "영역 ID", example = "1")
-        Long areaId,
-
-        @Schema(description = "행사 지도 ID", example = "10")
-        Long eventMapId,
-
-        @Schema(description = "부스 ID", example = "101")
-        Long boothId,
-
+public record BoothAreaDraftDto(
         @Schema(description = "x 비율", example = "0.1050")
         BigDecimal xRatio,
 

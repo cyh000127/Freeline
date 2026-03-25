@@ -42,6 +42,7 @@ import com.freeline.domain.booth.dto.response.BoothPolicyResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueEntryResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueResDto;
 import com.freeline.domain.booth.dto.response.BoothResDto;
+import com.freeline.domain.booth.dto.response.BoothSearchResDto;
 import com.freeline.domain.booth.dto.response.BoothStatusResDto;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothImage;
@@ -92,7 +93,24 @@ public class BoothService {
     private final EventRepository eventRepository;
     private final EventPolicyRepository eventPolicyRepository;
     private final FileService fileService;
-    private final PasswordEncoder passwordEncoder;
+private final PasswordEncoder passwordEncoder;
+
+@Transactional(readOnly = true)
+public List<BoothSearchResDto> searchBooths(final Long eventId, final String keyword) {
+    validateEventExists(eventId);
+
+    return boothRepository.searchBoothsByKeyword(eventId, keyword)
+            .stream()
+            .map(row -> BoothSearchResDto.builder()
+                    .boothId((Long) row[0])
+                    .boothName((String) row[1])
+                    .adminName((String) row[2])
+                    .company((String) row[3])
+                    .build())
+            .toList();
+}
+
+// TODO: 부스 정책 조회/설정 기능이 생기면 메서드를 분리하여 BoothPolicyRepository를 직접 사용하는 새 API로 이전합니다.
 
     public BoothCreateResDto createBooth(final Long eventId, final BoothCreateReqDto request) {
         validateEventExists(eventId);

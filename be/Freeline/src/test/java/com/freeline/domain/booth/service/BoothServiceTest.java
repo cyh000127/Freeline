@@ -23,6 +23,7 @@ import com.freeline.domain.booth.dto.response.BoothCreateResDto;
 import com.freeline.domain.booth.dto.response.BoothPolicyResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueResDto;
 import com.freeline.domain.booth.dto.response.BoothResDto;
+import com.freeline.domain.booth.dto.response.BoothSearchResDto;
 import com.freeline.domain.booth.dto.response.BoothStatusResDto;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothGoods;
@@ -72,6 +73,25 @@ class BoothServiceTest {
 
     @InjectMocks
     private BoothService boothService;
+
+    @Test
+    void 부스_검색_성공() {
+        final Object[] row1 = {101L, "A-1 민음사", "김싸피", "민음사 출판그룹"};
+        final Object[] row2 = {102L, "A-2 문학동네", "이싸피", null};
+
+        Mockito.when(eventRepository.existsById(5L)).thenReturn(true);
+        Mockito.when(boothRepository.searchBoothsByKeyword(5L, "민음"))
+                .thenReturn(List.of(row1, row2));
+
+        final List<BoothSearchResDto> result = boothService.searchBooths(5L, "민음");
+
+        Assertions.assertThat(result).hasSize(2);
+        Assertions.assertThat(result.get(0).boothId()).isEqualTo(101L);
+        Assertions.assertThat(result.get(0).boothName()).isEqualTo("A-1 민음사");
+        Assertions.assertThat(result.get(0).adminName()).isEqualTo("김싸피");
+        Assertions.assertThat(result.get(0).company()).isEqualTo("민음사 출판그룹");
+        Assertions.assertThat(result.get(1).company()).isNull();
+    }
 
     @Test
     void 부스_등록_성공() {

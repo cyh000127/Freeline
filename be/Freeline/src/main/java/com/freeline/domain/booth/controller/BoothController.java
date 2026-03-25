@@ -33,6 +33,7 @@ import com.freeline.domain.booth.dto.response.BoothListResDto;
 import com.freeline.domain.booth.dto.response.BoothPolicyResDto;
 import com.freeline.domain.booth.dto.response.BoothQueueResDto;
 import com.freeline.domain.booth.dto.response.BoothResDto;
+import com.freeline.domain.booth.dto.response.BoothSearchResDto;
 import com.freeline.domain.booth.dto.response.BoothStatusResDto;
 import com.freeline.domain.booth.service.BoothService;
 
@@ -46,6 +47,16 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class BoothController {
 
     private final BoothService boothService;
+
+    @Operation(summary = "부스 검색", description = "지도 매핑을 위해 부스 이름이나 관리자 정보로 업체를 검색합니다.")
+    @GetMapping("/booths/events/{eventId}/search")
+    public ResponseEntity<BaseResponse<List<BoothSearchResDto>>> searchBooths(
+            @PathVariable final Long eventId,
+            @RequestParam(required = false) final String keyword
+    ) {
+        final List<BoothSearchResDto> response = boothService.searchBooths(eventId, keyword);
+        return ResponseUtils.ok(response);
+    }
 
     @Operation(summary = "부스 이미지 업로드", description = "부스 이미지를 업로드하고 boothId와 매핑하여 저장합니다.")
     @PostMapping(value = "/booths/{boothId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
