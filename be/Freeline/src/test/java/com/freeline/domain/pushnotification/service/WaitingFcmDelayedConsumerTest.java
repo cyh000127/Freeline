@@ -1,5 +1,6 @@
 package com.freeline.domain.pushnotification.service;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import org.assertj.core.api.Assertions;
@@ -18,6 +19,8 @@ import com.freeline.domain.pushnotification.exception.PushNotificationException;
 @ExtendWith(MockitoExtension.class)
 class WaitingFcmDelayedConsumerTest {
 
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 3, 25, 15, 0);
+
     @Mock
     private PushNotificationService pushNotificationService;
 
@@ -30,19 +33,70 @@ class WaitingFcmDelayedConsumerTest {
                 .boothId(12L)
                 .visitorId(21L)
                 .expectedStatus("CALLED")
+                .validUntil(FIXED_NOW.plusMinutes(1))
                 .notificationType(PushNotificationType.QR_CHECK_REMINDER)
                 .build();
 
-        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
-        Mockito.when(pushNotificationService.isWaitingStatus(301L, WaitingStatus.CALLED))
-                .thenReturn(true);
+        try (var timeUtilsMock = Mockito.mockStatic(com.freeline.common.util.TimeUtils.class)) {
+            timeUtilsMock.when(com.freeline.common.util.TimeUtils::nowDateTime).thenReturn(FIXED_NOW);
 
-        consumer.consume(message);
+            Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+            Mockito.when(pushNotificationService.isWaitingStatus(301L, WaitingStatus.CALLED))
+                    .thenReturn(true);
+
+            consumer.consume(message);
+        }
 
         Mockito.verify(pushNotificationService).sendNotification(
                 Mockito.eq(301L),
                 Mockito.argThat(request -> request.notificationType() == PushNotificationType.QR_CHECK_REMINDER)
         );
+    }
+
+    @Test
+    void consume_qrReminderWithoutValidUntil_skips() {
+        final WaitingFcmDelayedConsumer consumer = new WaitingFcmDelayedConsumer(pushNotificationService);
+        final WaitingFcmTaskMessage message = WaitingFcmTaskMessage.builder()
+                .eventId(UUID.randomUUID())
+                .waitingId(301L)
+                .boothId(12L)
+                .visitorId(21L)
+                .expectedStatus("CALLED")
+                .notificationType(PushNotificationType.QR_CHECK_REMINDER)
+                .build();
+
+        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+
+        consumer.consume(message);
+
+        Mockito.verify(pushNotificationService).isConfigured();
+        Mockito.verify(pushNotificationService, Mockito.never()).isWaitingStatus(Mockito.anyLong(), Mockito.any());
+        Mockito.verify(pushNotificationService, Mockito.never()).sendNotification(Mockito.anyLong(), Mockito.any());
+    }
+
+    @Test
+    void consume_qrReminderAfterValidUntil_skips() {
+        final WaitingFcmDelayedConsumer consumer = new WaitingFcmDelayedConsumer(pushNotificationService);
+        final WaitingFcmTaskMessage message = WaitingFcmTaskMessage.builder()
+                .eventId(UUID.randomUUID())
+                .waitingId(301L)
+                .boothId(12L)
+                .visitorId(21L)
+                .expectedStatus("CALLED")
+                .validUntil(FIXED_NOW.minusSeconds(1))
+                .notificationType(PushNotificationType.QR_CHECK_REMINDER)
+                .build();
+
+        try (var timeUtilsMock = Mockito.mockStatic(com.freeline.common.util.TimeUtils.class)) {
+            timeUtilsMock.when(com.freeline.common.util.TimeUtils::nowDateTime).thenReturn(FIXED_NOW);
+            Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+
+            consumer.consume(message);
+        }
+
+        Mockito.verify(pushNotificationService).isConfigured();
+        Mockito.verify(pushNotificationService, Mockito.never()).isWaitingStatus(Mockito.anyLong(), Mockito.any());
+        Mockito.verify(pushNotificationService, Mockito.never()).sendNotification(Mockito.anyLong(), Mockito.any());
     }
 
     @Test
@@ -68,17 +122,21 @@ class WaitingFcmDelayedConsumerTest {
                 .boothId(12L)
                 .visitorId(21L)
                 .expectedStatus("CALLED")
+                .validUntil(FIXED_NOW.plusMinutes(1))
                 .notificationType(PushNotificationType.QR_CHECK_REMINDER)
                 .build();
 
-        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
-        Mockito.when(pushNotificationService.isWaitingStatus(301L, WaitingStatus.CALLED))
-                .thenReturn(true);
-        Mockito.doThrow(new PushNotificationException(ErrorCode.PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH))
-                .when(pushNotificationService)
-                .sendNotification(Mockito.eq(301L), Mockito.any());
+        try (var timeUtilsMock = Mockito.mockStatic(com.freeline.common.util.TimeUtils.class)) {
+            timeUtilsMock.when(com.freeline.common.util.TimeUtils::nowDateTime).thenReturn(FIXED_NOW);
+            Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+            Mockito.when(pushNotificationService.isWaitingStatus(301L, WaitingStatus.CALLED))
+                    .thenReturn(true);
+            Mockito.doThrow(new PushNotificationException(ErrorCode.PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH))
+                    .when(pushNotificationService)
+                    .sendNotification(Mockito.eq(301L), Mockito.any());
 
-        consumer.consume(message);
+            consumer.consume(message);
+        }
 
         Mockito.verify(pushNotificationService).sendNotification(Mockito.eq(301L), Mockito.any());
     }
@@ -92,19 +150,23 @@ class WaitingFcmDelayedConsumerTest {
                 .boothId(12L)
                 .visitorId(21L)
                 .expectedStatus("CALLED")
+                .validUntil(FIXED_NOW.plusMinutes(1))
                 .notificationType(PushNotificationType.QR_CHECK_REMINDER)
                 .build();
 
-        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
-        Mockito.when(pushNotificationService.isWaitingStatus(301L, WaitingStatus.CALLED))
-                .thenReturn(true);
-        Mockito.doThrow(new PushNotificationException(ErrorCode.PUSH_NOTIFICATION_SEND_FAILED))
-                .when(pushNotificationService)
-                .sendNotification(Mockito.eq(301L), Mockito.any());
+        try (var timeUtilsMock = Mockito.mockStatic(com.freeline.common.util.TimeUtils.class)) {
+            timeUtilsMock.when(com.freeline.common.util.TimeUtils::nowDateTime).thenReturn(FIXED_NOW);
+            Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+            Mockito.when(pushNotificationService.isWaitingStatus(301L, WaitingStatus.CALLED))
+                    .thenReturn(true);
+            Mockito.doThrow(new PushNotificationException(ErrorCode.PUSH_NOTIFICATION_SEND_FAILED))
+                    .when(pushNotificationService)
+                    .sendNotification(Mockito.eq(301L), Mockito.any());
 
-        Assertions.assertThatThrownBy(() -> consumer.consume(message))
-                .isInstanceOf(PushNotificationException.class)
-                .hasMessage(ErrorCode.PUSH_NOTIFICATION_SEND_FAILED.getMessage());
+            Assertions.assertThatThrownBy(() -> consumer.consume(message))
+                    .isInstanceOf(PushNotificationException.class)
+                    .hasMessage(ErrorCode.PUSH_NOTIFICATION_SEND_FAILED.getMessage());
+        }
     }
 
     @Test
@@ -116,6 +178,7 @@ class WaitingFcmDelayedConsumerTest {
                 .boothId(12L)
                 .visitorId(21L)
                 .expectedStatus("CALLED")
+                .validUntil(FIXED_NOW.plusMinutes(1))
                 .notificationType(PushNotificationType.QR_CHECK_REMINDER)
                 .build();
 
@@ -136,14 +199,18 @@ class WaitingFcmDelayedConsumerTest {
                 .boothId(12L)
                 .visitorId(21L)
                 .expectedStatus("CALLED")
+                .validUntil(FIXED_NOW.plusMinutes(1))
                 .notificationType(PushNotificationType.QR_CHECK_REMINDER)
                 .build();
 
-        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
-        Mockito.when(pushNotificationService.isWaitingStatus(301L, WaitingStatus.CALLED))
-                .thenReturn(false);
+        try (var timeUtilsMock = Mockito.mockStatic(com.freeline.common.util.TimeUtils.class)) {
+            timeUtilsMock.when(com.freeline.common.util.TimeUtils::nowDateTime).thenReturn(FIXED_NOW);
+            Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+            Mockito.when(pushNotificationService.isWaitingStatus(301L, WaitingStatus.CALLED))
+                    .thenReturn(false);
 
-        consumer.consume(message);
+            consumer.consume(message);
+        }
 
         Mockito.verify(pushNotificationService).isWaitingStatus(301L, WaitingStatus.CALLED);
         Mockito.verify(pushNotificationService, Mockito.never()).sendNotification(Mockito.anyLong(), Mockito.any());
@@ -158,12 +225,16 @@ class WaitingFcmDelayedConsumerTest {
                 .boothId(12L)
                 .visitorId(21L)
                 .expectedStatus("INVALID_STATUS")
+                .validUntil(FIXED_NOW.plusMinutes(1))
                 .notificationType(PushNotificationType.QR_CHECK_REMINDER)
                 .build();
 
-        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+        try (var timeUtilsMock = Mockito.mockStatic(com.freeline.common.util.TimeUtils.class)) {
+            timeUtilsMock.when(com.freeline.common.util.TimeUtils::nowDateTime).thenReturn(FIXED_NOW);
+            Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
 
-        consumer.consume(message);
+            consumer.consume(message);
+        }
 
         Mockito.verify(pushNotificationService).isConfigured();
         Mockito.verify(pushNotificationService, Mockito.never()).isWaitingStatus(Mockito.anyLong(), Mockito.any());
@@ -179,17 +250,45 @@ class WaitingFcmDelayedConsumerTest {
                 .boothId(12L)
                 .visitorId(21L)
                 .expectedStatus("CALLED")
+                .validUntil(FIXED_NOW.plusMinutes(1))
                 .notificationType(PushNotificationType.QR_CHECK_REMINDER)
                 .build();
 
-        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
-        Mockito.when(pushNotificationService.isWaitingStatus(301L, WaitingStatus.CALLED))
-                .thenReturn(true);
-        Mockito.doThrow(new PushNotificationException(ErrorCode.PUSH_NOTIFICATION_NOT_CONFIGURED))
-                .when(pushNotificationService)
-                .sendNotification(Mockito.eq(301L), Mockito.any());
+        try (var timeUtilsMock = Mockito.mockStatic(com.freeline.common.util.TimeUtils.class)) {
+            timeUtilsMock.when(com.freeline.common.util.TimeUtils::nowDateTime).thenReturn(FIXED_NOW);
+            Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+            Mockito.when(pushNotificationService.isWaitingStatus(301L, WaitingStatus.CALLED))
+                    .thenReturn(true);
+            Mockito.doThrow(new PushNotificationException(ErrorCode.PUSH_NOTIFICATION_NOT_CONFIGURED))
+                    .when(pushNotificationService)
+                    .sendNotification(Mockito.eq(301L), Mockito.any());
 
-        Assertions.assertThatCode(() -> consumer.consume(message))
-                .doesNotThrowAnyException();
+            Assertions.assertThatCode(() -> consumer.consume(message))
+                    .doesNotThrowAnyException();
+        }
+    }
+
+    @Test
+    void consume_exitReminderWithoutValidUntil_stillSends() {
+        final WaitingFcmDelayedConsumer consumer = new WaitingFcmDelayedConsumer(pushNotificationService);
+        final WaitingFcmTaskMessage message = WaitingFcmTaskMessage.builder()
+                .eventId(UUID.randomUUID())
+                .waitingId(302L)
+                .boothId(12L)
+                .visitorId(21L)
+                .expectedStatus("ENTERED")
+                .notificationType(PushNotificationType.EXIT_ACTION_REQUIRED)
+                .build();
+
+        Mockito.when(pushNotificationService.isConfigured()).thenReturn(true);
+        Mockito.when(pushNotificationService.isWaitingStatus(302L, WaitingStatus.ENTERED))
+                .thenReturn(true);
+
+        consumer.consume(message);
+
+        Mockito.verify(pushNotificationService).sendNotification(
+                Mockito.eq(302L),
+                Mockito.argThat(request -> request.notificationType() == PushNotificationType.EXIT_ACTION_REQUIRED)
+        );
     }
 }

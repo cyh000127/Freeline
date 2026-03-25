@@ -90,6 +90,7 @@ public class WaitingFcmEventConsumer {
                         .boothId(waiting.getBoothId())
                         .visitorId(waiting.getVisitorId())
                         .expectedStatus(WaitingStatus.CALLED.name())
+                        .validUntil(resolveCallExpiresAt(waiting))
                         .notificationType(PushNotificationType.QR_CHECK_REMINDER)
                         .build(),
                 reminderDelay

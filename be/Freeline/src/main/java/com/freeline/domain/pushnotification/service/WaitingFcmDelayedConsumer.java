@@ -1,5 +1,7 @@
 package com.freeline.domain.pushnotification.service;
 
+import java.time.LocalDateTime;
+
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -8,9 +10,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.freeline.common.error.ErrorCode;
+import com.freeline.common.util.TimeUtils;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.pushnotification.dto.message.WaitingFcmTaskMessage;
 import com.freeline.domain.pushnotification.dto.request.PushNotificationSendReqDto;
+import com.freeline.domain.pushnotification.entity.PushNotificationType;
 import com.freeline.domain.pushnotification.exception.PushNotificationException;
 
 @Slf4j
@@ -43,6 +47,30 @@ public class WaitingFcmDelayedConsumer {
                     message.notificationType()
             );
             return;
+        }
+
+        if (isQrReminder(message)) {
+            final LocalDateTime validUntil = message.validUntil();
+            if (validUntil == null) {
+                log.warn(
+                        "[PushNotification] delayed task skipped due to missing validUntil {eventId: {}, waitingId: {}, notificationType: {}}",
+                        message.eventId(),
+                        message.waitingId(),
+                        message.notificationType()
+                );
+                return;
+            }
+
+            if (TimeUtils.nowDateTime().isAfter(validUntil)) {
+                log.warn(
+                        "[PushNotification] delayed task skipped because validUntil has expired {eventId: {}, waitingId: {}, validUntil: {}, notificationType: {}}",
+                        message.eventId(),
+                        message.waitingId(),
+                        validUntil,
+                        message.notificationType()
+                );
+                return;
+            }
         }
 
         if (StringUtils.hasText(message.expectedStatus())) {
@@ -85,6 +113,10 @@ public class WaitingFcmDelayedConsumer {
 
             throw ex;
         }
+    }
+
+    private boolean isQrReminder(final WaitingFcmTaskMessage message) {
+        return message.notificationType() == PushNotificationType.QR_CHECK_REMINDER;
     }
 
     private boolean shouldSkip(final ErrorCode errorCode) {

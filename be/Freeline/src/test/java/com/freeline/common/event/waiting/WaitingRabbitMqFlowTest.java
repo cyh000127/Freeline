@@ -163,6 +163,7 @@ class WaitingRabbitMqFlowTest {
         Mockito.verify(waitingFcmDelayPublisher).publish(
                 Mockito.argThat(task -> task.notificationType() == PushNotificationType.QR_CHECK_REMINDER
                         && "CALLED".equals(task.expectedStatus())
+                        && FIXED_NOW.plusSeconds(180).equals(task.validUntil())
                         && message.eventId().equals(task.eventId())),
                 Mockito.eq(Duration.ofSeconds(90))
         );
@@ -304,6 +305,7 @@ class WaitingRabbitMqFlowTest {
         Mockito.verify(waitingFcmDelayPublisher).publish(
                 Mockito.argThat(task -> task.notificationType() == PushNotificationType.QR_CHECK_REMINDER
                         && "CALLED".equals(task.expectedStatus())
+                        && FIXED_NOW.plusSeconds(60).equals(task.validUntil())
                         && message.eventId().equals(task.eventId())),
                 Mockito.eq(Duration.ofSeconds(30))
         );

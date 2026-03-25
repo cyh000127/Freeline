@@ -1,5 +1,6 @@
 package com.freeline.domain.pushnotification.dto.message;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import lombok.Builder;
@@ -13,6 +14,7 @@ public record WaitingFcmTaskMessage(
         Long boothId,
         Long visitorId,
         String expectedStatus,
+        LocalDateTime validUntil,
         PushNotificationType notificationType
 ) {
 }
