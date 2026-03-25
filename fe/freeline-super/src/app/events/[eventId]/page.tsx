@@ -148,6 +148,21 @@ export default function EventDetailPage() {
             const res = await boothMapApi.uploadMapImage(eventId, file, true);
 
             if (res.data?.success && res.data?.data) {
+                // Get original image dimensions to maintain aspect ratio
+                const img = new Image();
+                img.onload = () => {
+                    const aspect = img.width / img.height;
+                    if (containerRef.current) {
+                        const containerWidth = containerRef.current.offsetWidth;
+                        const calculatedHeight = containerWidth / aspect;
+                        setContainerSize({
+                            width: containerWidth,
+                            height: calculatedHeight
+                        });
+                    }
+                };
+                img.src = res.data.data.imagePath;
+
                 setLayoutImageUrl(res.data.data.imagePath);
                 setEventMapId(res.data.data.eventMapId);
 
