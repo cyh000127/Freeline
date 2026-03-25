@@ -62,19 +62,24 @@ pipeline {
             steps {
                 dir('be/Freeline') {
                     sh 'chmod +x ./gradlew'
-                    sh '''set +x
-                        export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
-                            --client-id=$INFISICAL_CLIENT_ID \
-                            --client-secret=$INFISICAL_CLIENT_SECRET \
-                            --domain=$INFISICAL_URL/api \
-                            --silent --plain)
-                        set -x
-                        infisical run \
-                            --domain=$INFISICAL_URL/api \
-                            --projectId=$INFISICAL_PROJECT_ID \
-                            --env=prod --path=/be \
-                            -- ./gradlew clean build
-                    '''
+                    script {
+                        // CD(main push): 테스트는 MR CI에서 이미 통과 → JAR만 빌드
+                        // CI(MR):        전체 빌드 (테스트 + 체크스타일)
+                        def gradleCmd = isMainBranch() ? 'clean bootJar -x test' : 'clean build'
+                        sh """set +x
+                            export INFISICAL_TOKEN=\$(infisical login --method=universal-auth \
+                                --client-id=\$INFISICAL_CLIENT_ID \
+                                --client-secret=\$INFISICAL_CLIENT_SECRET \
+                                --domain=\$INFISICAL_URL/api \
+                                --silent --plain)
+                            set -x
+                            infisical run \
+                                --domain=\$INFISICAL_URL/api \
+                                --projectId=\$INFISICAL_PROJECT_ID \
+                                --env=prod --path=/be \
+                                -- ./gradlew ${gradleCmd}
+                        """
+                    }
                 }
             }
             post {
@@ -143,7 +148,16 @@ pipeline {
             updateGitlabCommitStatus name: 'freeline-be', state: 'failed'
         }
         cleanup {
-            sh 'docker image prune -f --filter "until=24h" || true'
+            sh """
+                # 현재 빌드 + latest 외 이전 태그 이미지 삭제
+                docker images ${IMAGE_NAME} --format '{{.Tag}}' \
+                    | grep -v -E '^(latest|${BUILD_NUMBER})\$' \
+                    | xargs -r -I{} docker rmi ${IMAGE_NAME}:{} 2>/dev/null || true
+                # dangling 이미지 정리
+                docker image prune -f || true
+                # 7일 지난 빌드 캐시 정리
+                docker builder prune -f --filter 'until=168h' 2>/dev/null || true
+            """
             cleanWs()
         }
     }
