@@ -29,7 +29,7 @@ import com.freeline.domain.auth.dto.request.SignupReqDto;
 import com.freeline.domain.auth.dto.request.UpdateMyInfoReqDto;
 import com.freeline.domain.auth.dto.request.VisitorEnterReqDto;
 import com.freeline.domain.auth.dto.response.BoothAdminCreateResDto;
-import com.freeline.domain.auth.dto.response.BoothAdminResDto;
+import com.freeline.domain.auth.dto.response.BoothAdminListResDto;
 import com.freeline.domain.auth.dto.response.CheckIdResDto;
 import com.freeline.domain.auth.dto.response.LoginResDto;
 import com.freeline.domain.auth.dto.response.MyInfoResDto;
@@ -40,7 +40,6 @@ import com.freeline.domain.auth.entity.Role;
 import com.freeline.domain.auth.exception.AuthException;
 import com.freeline.domain.auth.repository.BoothAdminRepository;
 import com.freeline.domain.auth.repository.EventAdminRepository;
-import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.Visitor;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.VisitorRepository;
@@ -295,25 +294,13 @@ public class AuthService {
      * 행사별 부스 관리자 현황 조회
      */
     @Transactional(readOnly = true)
-    public List<BoothAdminResDto> getBoothAdminsByEvent(final Long userId, final Long eventId) {
+    public List<BoothAdminListResDto> getBoothAdminsByEvent(final Long userId, final Long eventId) {
         if (!eventAdminRepository.existsById(userId)) {
             throw new AuthException(ErrorCode.USER_NOT_FOUND);
         }
-        List<Long> boothIds = boothRepository.findAllByEventIdOrderByIdAsc(eventId)
-                .stream().map(Booth::getId).toList();
-        return boothAdminRepository.findAllByBoothIdInOrderByBoothIdAsc(boothIds)
-                .stream().map(admin -> BoothAdminResDto.builder()
-                        .id(admin.getId())
-                        .boothId(admin.getBoothId())
-                        .boothName(admin.getBooth() != null ? admin.getBooth().getName() : null)
-                        .loginId(admin.getLoginId())
-                        .email(admin.getEmail())
-                        .name(admin.getName())
-                        .company(admin.getCompany())
-                        .status(admin.getStatus())
-                        .isActive(admin.isActive())
-                        .lastLoginAt(admin.getLastLoginAt())
-                        .build())
+        return boothAdminRepository.findAllWithBoothByEventId(eventId)
+                .stream()
+                .map(authConverter::toBoothAdminListResDto)
                 .toList();
     }
 

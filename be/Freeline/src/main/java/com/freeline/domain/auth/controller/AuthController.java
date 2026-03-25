@@ -32,7 +32,7 @@ import com.freeline.domain.auth.dto.request.SignupReqDto;
 import com.freeline.domain.auth.dto.request.UpdateMyInfoReqDto;
 import com.freeline.domain.auth.dto.request.VisitorEnterReqDto;
 import com.freeline.domain.auth.dto.response.BoothAdminCreateResDto;
-import com.freeline.domain.auth.dto.response.BoothAdminResDto;
+import com.freeline.domain.auth.dto.response.BoothAdminListResDto;
 import com.freeline.domain.auth.dto.response.CheckIdResDto;
 import com.freeline.domain.auth.dto.response.LoginResDto;
 import com.freeline.domain.auth.dto.response.MyInfoResDto;
@@ -117,7 +117,7 @@ public class AuthController {
     @Operation(summary = "행사별 부스 관리자 현황 조회")
     @GetMapping("/booth-admins/events/{eventId}")
     @PreAuthorize("hasRole('EVENT_ADMIN')")
-    public ResponseEntity<BaseResponse<List<BoothAdminResDto>>> getBoothAdminsByEvent(
+    public ResponseEntity<BaseResponse<List<BoothAdminListResDto>>> getBoothAdminsByEvent(
             final Authentication authentication,
             @PathVariable final Long eventId
     ) {

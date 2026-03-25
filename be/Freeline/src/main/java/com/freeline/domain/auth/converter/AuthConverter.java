@@ -3,9 +3,11 @@ package com.freeline.domain.auth.converter;
 import org.springframework.stereotype.Component;
 
 import com.freeline.domain.auth.dto.request.SignupReqDto;
+import com.freeline.domain.auth.dto.response.BoothAdminListResDto;
 import com.freeline.domain.auth.dto.response.LoginResDto;
 import com.freeline.domain.auth.dto.response.MyInfoResDto;
 import com.freeline.domain.auth.dto.response.SignupResDto;
+import com.freeline.domain.auth.entity.BoothAdmin;
 import com.freeline.domain.auth.entity.EventAdmin;
 import com.freeline.domain.auth.entity.Role;
 
@@ -26,6 +28,20 @@ public class AuthConverter {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .role(role)
+                .build();
+    }
+
+    public BoothAdminListResDto toBoothAdminListResDto(final BoothAdmin boothAdmin) {
+        return BoothAdminListResDto.builder()
+                .adminId(boothAdmin.getId())
+                .boothId(boothAdmin.getBoothId())
+                .boothName(boothAdmin.getBooth().getName())
+                .loginId(boothAdmin.getLoginId())
+                .name(boothAdmin.getName())
+                .email(boothAdmin.getEmail())
+                .company(boothAdmin.getCompany())
+                .status(boothAdmin.getStatus().name())
+                .lastLoginAt(boothAdmin.getLastLoginAt())
                 .build();
     }
 
