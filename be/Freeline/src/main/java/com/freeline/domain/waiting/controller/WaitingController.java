@@ -138,7 +138,7 @@ public class WaitingController {
         return ResponseUtils.ok(response);
     }
 
-    @Operation(summary = "부스 예상 대기 시간 조회", description = "특정 부스의 현재 대기 수와 예상 대기 시간을 조회합니다.")
+    @Operation(summary = "부스 예상 대기 시간 조회", description = "특정 부스에 신규 방문자가 지금 대기를 등록할 때의 예상 대기 시간을 조회합니다.")
     @GetMapping("/booths/{boothId}/waitings/expected-time")
     public ResponseEntity<BaseResponse<WaitingExpectedTimeResDto>> getExpectedWaitingTime(
             @PathVariable final Long boothId,

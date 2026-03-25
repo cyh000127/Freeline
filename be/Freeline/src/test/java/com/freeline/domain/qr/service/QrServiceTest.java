@@ -24,6 +24,9 @@ import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.event.entity.Event;
+import com.freeline.domain.event.entity.EventPolicy;
+import com.freeline.domain.event.repository.EventPolicyRepository;
 import com.freeline.domain.qr.dto.request.QrScanReqDto;
 import com.freeline.domain.qr.dto.response.BoothQrResDto;
 import com.freeline.domain.qr.entity.BoothQr;
@@ -31,6 +34,8 @@ import com.freeline.domain.qr.entity.BoothQrStatus;
 import com.freeline.domain.qr.entity.QrPurpose;
 import com.freeline.domain.qr.exception.QrException;
 import com.freeline.domain.qr.repository.BoothQrRepository;
+import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
+import com.freeline.domain.waiting.service.WaitingPolicyResolver;
 import com.freeline.domain.waiting.service.WaitingStatusPersistenceService;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +48,9 @@ class QrServiceTest {
 
     @Mock
     private BoothPolicyRepository boothPolicyRepository;
+
+    @Mock
+    private EventPolicyRepository eventPolicyRepository;
 
     @Mock
     private BoothWaitingRepository boothWaitingRepository;
@@ -75,13 +83,18 @@ class QrServiceTest {
         final QrProperties qrProperties = new QrProperties(30L, 30L, 5L);
         qrService = new QrService(
                 boothRepository,
-                boothPolicyRepository,
                 boothWaitingRepository,
                 boothQrRepository,
                 stringRedisTemplate,
                 qrProperties,
                 waitingEventDispatcher,
-                waitingStatusPersistenceService
+                waitingStatusPersistenceService,
+                new WaitingEventSnapshotAssembler(),
+                new WaitingPolicyResolver(
+                        boothRepository,
+                        boothPolicyRepository,
+                        eventPolicyRepository
+                )
         );
     }
 
@@ -230,7 +243,7 @@ class QrServiceTest {
                 .qrKey("fixed-key")
                 .payloadVersion("v1")
                 .issuedAt(LocalDateTime.of(2026, 3, 12, 10, 0))
-                .expiresAt(LocalDateTime.now().plusDays(1))
+                .expiresAt(FIXED_NOW.plusDays(1))
                 .status(BoothQrStatus.ACTIVE)
                 .build();
 
@@ -431,6 +444,79 @@ class QrServiceTest {
 
         Mockito.verify(waitingStatusPersistenceService).expireWaiting(100L, FIXED_NOW.minusSeconds(1));
         Mockito.verify(stringRedisTemplate).delete("qr:scan:lock:booth:12:visitor:21");
+    }
+
+    @Test
+    void QR_스캔_호출_만료_계산시_eventPolicy_fallback을_사용한다() {
+        final BoothQr boothQr = BoothQr.builder()
+                .id(1L)
+                .boothId(12L)
+                .purpose(QrPurpose.FRONT_QUEUE_ARRIVAL)
+                .qrKey("fixed-key")
+                .payloadVersion("v1")
+                .issuedAt(LocalDateTime.of(2026, 3, 12, 10, 0))
+                .expiresAt(FIXED_NOW.plusDays(1))
+                .status(BoothQrStatus.ACTIVE)
+                .build();
+        final BoothWaiting waiting = BoothWaiting.builder()
+                .id(100L)
+                .boothId(12L)
+                .visitorId(21L)
+                .status(WaitingStatus.CALLED)
+                .waitingNumber(7)
+                .deferCount(0)
+                .requestedAt(LocalDateTime.of(2026, 3, 12, 9, 30))
+                .calledAt(FIXED_NOW.minusMinutes(2))
+                .callExpiresAt(null)
+                .build();
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(
+                com.freeline.domain.booth.entity.Booth.builder()
+                        .id(12L)
+                        .eventId(3L)
+                        .name("Goods Booth")
+                        .build()
+        ));
+        Mockito.when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        Mockito.when(valueOperations.setIfAbsent(
+                Mockito.eq("qr:scan:lock:booth:12:visitor:21"),
+                Mockito.eq("1"),
+                Mockito.eq(Duration.ofSeconds(5L))
+        )).thenReturn(true);
+        Mockito.when(boothQrRepository.findByBoothIdAndPurposeAndQrKeyAndStatus(
+                12L,
+                QrPurpose.FRONT_QUEUE_ARRIVAL,
+                "fixed-key",
+                BoothQrStatus.ACTIVE
+        )).thenReturn(Optional.of(boothQr));
+        Mockito.when(boothWaitingRepository.findFirstByBoothIdAndVisitorIdAndStatusOrderByCalledAtDesc(
+                12L,
+                21L,
+                WaitingStatus.CALLED
+        )).thenReturn(Optional.of(waiting));
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.empty());
+        Mockito.when(eventPolicyRepository.findByEvent_Id(3L)).thenReturn(Optional.of(
+                EventPolicy.builder()
+                        .id(1L)
+                        .event(Event.builder().id(3L).build())
+                        .defaultStaySec(600)
+                        .defaultMaxWaiting(100)
+                        .defaultCallCount(5)
+                        .defaultCallTtl(60)
+                        .defaultDeferLimit(2)
+                        .build()
+        ));
+        Mockito.when(waitingStatusPersistenceService.expireWaiting(100L, FIXED_NOW.minusMinutes(1))).thenReturn(true);
+
+        Assertions.assertThatThrownBy(() -> qrService.scanQr(
+                        QrScanReqDto.builder()
+                                .qrCode("FREELINE|FRONT_QUEUE_ARRIVAL|v1|12|fixed-key")
+                                .build(),
+                        21L))
+                .isInstanceOf(QrException.class)
+                .hasMessage("호출 유효 시간이 만료되었습니다.");
+
+        Mockito.verify(waitingStatusPersistenceService).expireWaiting(100L, FIXED_NOW.minusMinutes(1));
     }
 }
 

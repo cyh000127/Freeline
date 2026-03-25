@@ -18,6 +18,8 @@ import com.freeline.common.event.waiting.model.WaitingEventType;
 
 class WaitingEventDispatcherTest {
 
+    private static final LocalDateTime FIXED_OCCURRED_AT = LocalDateTime.of(2026, 3, 24, 15, 0);
+
     private final WaitingStatusChangeDetector waitingStatusChangeDetector =
             Mockito.mock(WaitingStatusChangeDetector.class);
     private final ApplicationEventPublisher applicationEventPublisher =
@@ -37,6 +39,7 @@ class WaitingEventDispatcherTest {
                 "CALLED"
         );
         final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
                 .eventId(UUID.randomUUID())
                 .eventType(WaitingEventType.WAITING_CALLED)
                 .waitingId(1L)
@@ -44,7 +47,8 @@ class WaitingEventDispatcherTest {
                 .visitorId(3L)
                 .previousStatus("WAITING")
                 .currentStatus("CALLED")
-                .occurredAt(LocalDateTime.now())
+                .occurredAt(FIXED_OCCURRED_AT)
+                .snapshot(null)
                 .build();
 
         Mockito.when(waitingStatusChangeDetector.detect(command))

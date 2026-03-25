@@ -43,7 +43,12 @@ public class FcmToken extends BaseEntity {
     @Column(name = "platform", nullable = false, length = 20)
     private NotificationPlatform platform;
 
-    public void updateToken(final String fcmToken, final NotificationPlatform platform) {
+    public void updateToken(
+            final Long visitorId,
+            final String fcmToken,
+            final NotificationPlatform platform
+    ) {
+        this.visitorId = visitorId;
         this.fcmToken = fcmToken;
         this.platform = platform;
     }

@@ -10,10 +10,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.freeline.common.error.ErrorCode;
@@ -28,6 +28,10 @@ import com.freeline.domain.booth.exception.BoothException;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.event.entity.Event;
+import com.freeline.domain.event.entity.EventPolicy;
+import com.freeline.domain.event.repository.EventPolicyRepository;
+import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
@@ -56,6 +60,17 @@ class WaitingServiceTest {
             WaitingStatus.REGISTERED
     );
 
+    private static final List<WaitingStatus> FRONT_QUEUE_STATUSES = List.of(
+            WaitingStatus.CALLED,
+            WaitingStatus.REGISTERED
+    );
+
+    private static final List<WaitingStatus> BOOTH_WAITING_CAPACITY_STATUSES = List.of(
+            WaitingStatus.WAITING,
+            WaitingStatus.CALLED,
+            WaitingStatus.REGISTERED
+    );
+
     private static final List<WaitingStatus> OTHER_BOOTH_FRONT_QUEUE_STATUSES = List.of(
             WaitingStatus.CALLED,
             WaitingStatus.REGISTERED,
@@ -72,9 +87,14 @@ class WaitingServiceTest {
     private BoothPolicyRepository boothPolicyRepository;
 
     @Mock
+    private EventPolicyRepository eventPolicyRepository;
+
+    @Mock
     private WaitingEventDispatcher waitingEventDispatcher;
 
-    @InjectMocks
+    @Spy
+    private WaitingEventSnapshotAssembler waitingEventSnapshotAssembler;
+
     private WaitingService waitingService;
 
     private MockedStatic<TimeUtils> timeUtilsMock;
@@ -85,6 +105,17 @@ class WaitingServiceTest {
         timeUtilsMock.when(TimeUtils::nowDateTime).thenReturn(FIXED_NOW);
         timeUtilsMock.when(TimeUtils::today).thenReturn(FIXED_NOW.toLocalDate());
         timeUtilsMock.when(TimeUtils::nowTime).thenReturn(FIXED_NOW.toLocalTime());
+        waitingService = new WaitingService(
+                boothRepository,
+                boothWaitingRepository,
+                waitingEventDispatcher,
+                waitingEventSnapshotAssembler,
+                new WaitingPolicyResolver(
+                        boothRepository,
+                        boothPolicyRepository,
+                        eventPolicyRepository
+                )
+        );
     }
 
     @AfterEach
@@ -104,6 +135,7 @@ class WaitingServiceTest {
                 ACTIVE_WAITING_STATUSES
         )).thenReturn(false);
         Mockito.when(boothWaitingRepository.countByVisitorIdAndStatusIn(21L, ACTIVE_WAITING_STATUSES)).thenReturn(1L);
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, BOOTH_WAITING_CAPACITY_STATUSES)).thenReturn(3L);
         Mockito.when(boothWaitingRepository.findTopByBoothIdOrderByWaitingNumberDesc(12L)).thenReturn(Optional.of(
                 createWaiting(300L, 12L, 19L, WaitingStatus.WAITING, 3, 0, null)
         ));
@@ -166,12 +198,68 @@ class WaitingServiceTest {
     }
 
     @Test
+    void createWaiting_fail_whenBoothMaxWaitingCountExceeded() {
+        final Booth booth = createBooth(12L, "Goods Booth");
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.existsByVisitorIdAndBoothIdAndStatusIn(
+                21L,
+                12L,
+                ACTIVE_WAITING_STATUSES
+        )).thenReturn(false);
+        Mockito.when(boothWaitingRepository.countByVisitorIdAndStatusIn(21L, ACTIVE_WAITING_STATUSES)).thenReturn(1L);
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
+                BoothPolicy.builder()
+                        .id(1L)
+                        .boothId(12L)
+                        .maxWaitingCount(2)
+                        .build()
+        ));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, BOOTH_WAITING_CAPACITY_STATUSES)).thenReturn(2L);
+
+        Assertions.assertThatThrownBy(() -> waitingService.createWaiting(12L, 21L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.BOOTH_MAX_WAITING_EXCEEDED.getMessage());
+    }
+
+    @Test
+    void createWaiting_fail_whenEventPolicyFallbackMaxWaitingCountExceeded() {
+        final Booth booth = createBooth(12L, "Goods Booth");
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.existsByVisitorIdAndBoothIdAndStatusIn(
+                21L,
+                12L,
+                ACTIVE_WAITING_STATUSES
+        )).thenReturn(false);
+        Mockito.when(boothWaitingRepository.countByVisitorIdAndStatusIn(21L, ACTIVE_WAITING_STATUSES)).thenReturn(1L);
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.empty());
+        Mockito.when(eventPolicyRepository.findByEvent_Id(3L)).thenReturn(Optional.of(
+                EventPolicy.builder()
+                        .id(1L)
+                        .event(Event.builder().id(3L).build())
+                        .defaultStaySec(300)
+                        .defaultMaxWaiting(1)
+                        .defaultCallCount(5)
+                        .defaultCallTtl(180)
+                        .defaultDeferLimit(2)
+                        .build()
+        ));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, BOOTH_WAITING_CAPACITY_STATUSES)).thenReturn(1L);
+
+        Assertions.assertThatThrownBy(() -> waitingService.createWaiting(12L, 21L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.BOOTH_MAX_WAITING_EXCEEDED.getMessage());
+    }
+
+    @Test
     void callNextWaiting_success_skipsVisitorInFrontQueueAtOtherBooth() {
         final Booth booth = createBooth(12L, "Goods Booth");
         final BoothWaiting firstWaiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 1, 0, null);
         final BoothWaiting secondWaiting = createWaiting(302L, 12L, 22L, WaitingStatus.WAITING, 2, 0, null);
 
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, FRONT_QUEUE_STATUSES)).thenReturn(0L);
         Mockito.when(boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
                 12L,
                 List.of(WaitingStatus.WAITING)
@@ -190,6 +278,7 @@ class WaitingServiceTest {
                 BoothPolicy.builder()
                         .id(1L)
                         .boothId(12L)
+                        .callCount(1)
                         .callValidTime(180)
                         .build()
         ));
@@ -204,6 +293,8 @@ class WaitingServiceTest {
         Assertions.assertThat(result.waitingId()).isEqualTo(302L);
         Assertions.assertThat(result.waitingNum()).isEqualTo(2);
         Assertions.assertThat(result.status()).isEqualTo("CALLED");
+        Assertions.assertThat(result.calledCount()).isEqualTo(1);
+        Assertions.assertThat(result.waitingIds()).containsExactly(302L);
     }
 
     @Test
@@ -211,6 +302,7 @@ class WaitingServiceTest {
         final Booth booth = createBooth(12L, "Goods Booth");
 
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, FRONT_QUEUE_STATUSES)).thenReturn(0L);
         Mockito.when(boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
                 12L,
                 List.of(WaitingStatus.WAITING)
@@ -219,6 +311,68 @@ class WaitingServiceTest {
         Assertions.assertThatThrownBy(() -> waitingService.callNextWaiting(12L))
                 .isInstanceOf(WaitingException.class)
                 .hasMessage(ErrorCode.CALL_CANDIDATE_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    void callNextWaiting_success_callsMultipleWaitingsUpToConfiguredCallCount() {
+        final Booth booth = createBooth(12L, "Goods Booth");
+        final BoothWaiting firstWaiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 1, 0, null);
+        final BoothWaiting secondWaiting = createWaiting(302L, 12L, 22L, WaitingStatus.WAITING, 2, 0, null);
+        final BoothWaiting thirdWaiting = createWaiting(303L, 12L, 23L, WaitingStatus.WAITING, 3, 0, null);
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, FRONT_QUEUE_STATUSES)).thenReturn(0L);
+        Mockito.when(boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
+                12L,
+                List.of(WaitingStatus.WAITING)
+        )).thenReturn(List.of(firstWaiting, secondWaiting, thirdWaiting));
+        Mockito.when(boothWaitingRepository.existsByVisitorIdAndBoothIdNotAndStatusIn(
+                ArgumentMatchers.anyLong(),
+                ArgumentMatchers.eq(12L),
+                ArgumentMatchers.eq(OTHER_BOOTH_FRONT_QUEUE_STATUSES)
+        )).thenReturn(false);
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
+                BoothPolicy.builder()
+                        .id(1L)
+                        .boothId(12L)
+                        .callCount(2)
+                        .callValidTime(180)
+                        .build()
+        ));
+
+        final WaitingCallResDto result = waitingService.callNextWaiting(12L);
+
+        Assertions.assertThat(firstWaiting.getStatus()).isEqualTo(WaitingStatus.CALLED);
+        Assertions.assertThat(secondWaiting.getStatus()).isEqualTo(WaitingStatus.CALLED);
+        Assertions.assertThat(thirdWaiting.getStatus()).isEqualTo(WaitingStatus.WAITING);
+        Assertions.assertThat(result.calledCount()).isEqualTo(2);
+        Assertions.assertThat(result.waitingIds()).containsExactly(301L, 302L);
+        Mockito.verify(waitingEventDispatcher, Mockito.times(2))
+                .dispatch(ArgumentMatchers.any());
+    }
+
+    @Test
+    void callNextWaiting_fail_whenFrontQueueAlreadyFull() {
+        final Booth booth = createBooth(12L, "Goods Booth");
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
+                BoothPolicy.builder()
+                        .id(1L)
+                        .boothId(12L)
+                        .callCount(2)
+                        .build()
+        ));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, FRONT_QUEUE_STATUSES)).thenReturn(2L);
+
+        Assertions.assertThatThrownBy(() -> waitingService.callNextWaiting(12L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.FRONT_QUEUE_FULL.getMessage());
+
+        Mockito.verify(boothWaitingRepository, Mockito.never()).findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
+                ArgumentMatchers.anyLong(),
+                ArgumentMatchers.anyCollection()
+        );
     }
 
     @Test
@@ -492,7 +646,7 @@ class WaitingServiceTest {
         final Booth booth = createBooth(12L, "Goods Booth");
 
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
-        Mockito.when(boothWaitingRepository.countByBoothIdAndStatus(12L, WaitingStatus.WAITING)).thenReturn(7L);
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, ACTIVE_WAITING_STATUSES)).thenReturn(7L);
         Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
                 BoothPolicy.builder()
                         .id(1L)
@@ -507,6 +661,52 @@ class WaitingServiceTest {
         Assertions.assertThat(result.currentRank()).isEqualTo(7);
         Assertions.assertThat(result.avgStayTime()).isEqualTo(10);
         Assertions.assertThat(result.estimatedMinutes()).isEqualTo(70);
+    }
+
+    @Test
+    void getExpectedWaitingTime_success_whenEventPolicyFallbackApplies() {
+        final Booth booth = createBooth(12L, "Goods Booth");
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, ACTIVE_WAITING_STATUSES)).thenReturn(4L);
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.empty());
+        Mockito.when(eventPolicyRepository.findByEvent_Id(3L)).thenReturn(Optional.of(
+                EventPolicy.builder()
+                        .id(1L)
+                        .event(Event.builder().id(3L).build())
+                        .defaultStaySec(300)
+                        .defaultMaxWaiting(100)
+                        .defaultCallCount(5)
+                        .defaultCallTtl(180)
+                        .defaultDeferLimit(2)
+                        .build()
+        ));
+
+        final WaitingExpectedTimeResDto result = waitingService.getExpectedWaitingTime(12L);
+
+        Assertions.assertThat(result.avgStayTime()).isEqualTo(5);
+        Assertions.assertThat(result.estimatedMinutes()).isEqualTo(20);
+    }
+
+    @Test
+    void getExpectedWaitingTime_success_includesFrontQueueAndInUseForNewVisitor() {
+        final Booth booth = createBooth(12L, "Goods Booth");
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, ACTIVE_WAITING_STATUSES)).thenReturn(9L);
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
+                BoothPolicy.builder()
+                        .id(1L)
+                        .boothId(12L)
+                        .stayTime(300)
+                        .build()
+        ));
+
+        final WaitingExpectedTimeResDto result = waitingService.getExpectedWaitingTime(12L);
+
+        Assertions.assertThat(result.currentRank()).isEqualTo(9);
+        Assertions.assertThat(result.avgStayTime()).isEqualTo(5);
+        Assertions.assertThat(result.estimatedMinutes()).isEqualTo(45);
     }
 
     @Test

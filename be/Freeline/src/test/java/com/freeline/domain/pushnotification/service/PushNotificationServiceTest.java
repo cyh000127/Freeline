@@ -86,6 +86,35 @@ class PushNotificationServiceTest {
     }
 
     @Test
+    void 같은_deviceId로_재등록하면_최신_visitor로_토큰_소유자가_갱신된다() {
+        final FcmToken existing = FcmToken.builder()
+                .id(1L)
+                .visitorId(21L)
+                .deviceId("android-1")
+                .fcmToken("old-token")
+                .platform(NotificationPlatform.ANDROID)
+                .build();
+
+        Mockito.when(visitorRepository.existsById(99L)).thenReturn(true);
+        Mockito.when(fcmTokenRepository.findByDeviceId("android-1")).thenReturn(Optional.of(existing));
+
+        final FcmTokenResDto result = pushNotificationService.upsertFcmToken(FcmTokenUpsertReqDto.builder()
+                .visitorId(99L)
+                .deviceId("android-1")
+                .fcmToken("new-token")
+                .platform(NotificationPlatform.IOS)
+                .build());
+
+        Assertions.assertThat(existing.getVisitorId()).isEqualTo(99L);
+        Assertions.assertThat(existing.getFcmToken()).isEqualTo("new-token");
+        Assertions.assertThat(existing.getPlatform()).isEqualTo(NotificationPlatform.IOS);
+        Assertions.assertThat(result.tokenId()).isEqualTo(1L);
+        Assertions.assertThat(result.visitorId()).isEqualTo(99L);
+        Assertions.assertThat(result.deviceId()).isEqualTo("android-1");
+        Mockito.verify(fcmTokenRepository, Mockito.never()).save(Mockito.any(FcmToken.class));
+    }
+
+    @Test
     void 푸시_알림_발송_성공() {
         final BoothWaiting waiting = BoothWaiting.builder()
                 .id(2045L)

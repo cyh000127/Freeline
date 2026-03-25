@@ -10,16 +10,18 @@ import org.springframework.stereotype.Component;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import com.freeline.common.error.ErrorCode;
 import com.freeline.common.event.waiting.model.WaitingEventMessage;
+import com.freeline.common.event.waiting.model.WaitingEventType;
 import com.freeline.common.util.TimeUtils;
-import com.freeline.domain.booth.entity.BoothPolicy;
 import com.freeline.domain.booth.entity.BoothWaiting;
 import com.freeline.domain.booth.entity.WaitingStatus;
-import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
 import com.freeline.domain.pushnotification.dto.message.WaitingFcmTaskMessage;
 import com.freeline.domain.pushnotification.dto.request.PushNotificationSendReqDto;
 import com.freeline.domain.pushnotification.entity.PushNotificationType;
+import com.freeline.domain.pushnotification.exception.PushNotificationException;
+import com.freeline.domain.waiting.service.WaitingPolicyResolver;
 
 @Slf4j
 @Component
@@ -29,7 +31,7 @@ public class WaitingFcmEventConsumer {
     private final PushNotificationService pushNotificationService;
     private final WaitingFcmDelayPublisher waitingFcmDelayPublisher;
     private final BoothWaitingRepository boothWaitingRepository;
-    private final BoothPolicyRepository boothPolicyRepository;
+    private final WaitingPolicyResolver waitingPolicyResolver;
 
     @RabbitListener(
             queues = "${app.rabbitmq.waiting.fcm-queue:waiting.fcm.queue}",
@@ -37,6 +39,15 @@ public class WaitingFcmEventConsumer {
     )
     public void consume(final WaitingEventMessage message) {
         if (!message.eventType().isFcmTarget() || message.waitingId() == null) {
+            return;
+        }
+
+        if (!pushNotificationService.isConfigured()) {
+            log.info(
+                    "[PushNotification] FCM consumer skipped because push sender is not configured {eventId: {}, eventType: {}}",
+                    message.eventId(),
+                    message.eventType()
+            );
             return;
         }
 
@@ -53,15 +64,20 @@ public class WaitingFcmEventConsumer {
     }
 
     private void handleCalled(final WaitingEventMessage message) {
-        pushNotificationService.sendNotification(
-                message.waitingId(),
-                PushNotificationSendReqDto.builder()
-                        .notificationType(PushNotificationType.FRONT_QUEUE_CALLED)
-                        .customMessage("")
-                        .build()
-        );
+        final BoothWaiting waiting = findWaitingOrSkip(message.waitingId(), message.eventId(), message.eventType());
+        if (waiting == null) {
+            return;
+        }
 
-        final BoothWaiting waiting = getWaiting(message.waitingId());
+        final NotificationDispatchResult dispatchResult = sendNotificationOrSkip(
+                message.waitingId(),
+                PushNotificationType.FRONT_QUEUE_CALLED,
+                message.eventId()
+        );
+        if (!shouldScheduleCalledReminder(dispatchResult)) {
+            return;
+        }
+
         final Duration reminderDelay = resolveCallReminderDelay(waiting);
         if (reminderDelay.isNegative() || reminderDelay.isZero()) {
             return;
@@ -69,11 +85,12 @@ public class WaitingFcmEventConsumer {
 
         waitingFcmDelayPublisher.publish(
                 WaitingFcmTaskMessage.builder()
-                        .eventId(UUID.randomUUID())
+                        .eventId(resolveTaskEventId(message))
                         .waitingId(waiting.getId())
                         .boothId(waiting.getBoothId())
                         .visitorId(waiting.getVisitorId())
                         .expectedStatus(WaitingStatus.CALLED.name())
+                        .validUntil(resolveCallExpiresAt(waiting))
                         .notificationType(PushNotificationType.QR_CHECK_REMINDER)
                         .build(),
                 reminderDelay
@@ -81,7 +98,11 @@ public class WaitingFcmEventConsumer {
     }
 
     private void handleEntered(final WaitingEventMessage message) {
-        final BoothWaiting waiting = getWaiting(message.waitingId());
+        final BoothWaiting waiting = findWaitingOrSkip(message.waitingId(), message.eventId(), message.eventType());
+        if (waiting == null) {
+            return;
+        }
+
         final Duration exitReminderDelay = resolveExitReminderDelay(waiting);
         if (exitReminderDelay.isNegative() || exitReminderDelay.isZero()) {
             return;
@@ -89,7 +110,7 @@ public class WaitingFcmEventConsumer {
 
         waitingFcmDelayPublisher.publish(
                 WaitingFcmTaskMessage.builder()
-                        .eventId(UUID.randomUUID())
+                        .eventId(resolveTaskEventId(message))
                         .waitingId(waiting.getId())
                         .boothId(waiting.getBoothId())
                         .visitorId(waiting.getVisitorId())
@@ -101,18 +122,75 @@ public class WaitingFcmEventConsumer {
     }
 
     private void handleExpired(final WaitingEventMessage message) {
-        pushNotificationService.sendNotification(
-                message.waitingId(),
-                PushNotificationSendReqDto.builder()
-                        .notificationType(PushNotificationType.WAITING_EXPIRED)
-                        .customMessage("")
-                        .build()
-        );
+        sendNotificationOrSkip(message.waitingId(), PushNotificationType.WAITING_EXPIRED, message.eventId());
     }
 
-    private BoothWaiting getWaiting(final Long waitingId) {
+    private BoothWaiting findWaitingOrSkip(
+            final Long waitingId,
+            final UUID eventId,
+            final WaitingEventType eventType
+    ) {
         return boothWaitingRepository.findById(waitingId)
-                .orElseThrow(() -> new IllegalStateException("FCM consumer waiting not found: " + waitingId));
+                .orElseGet(() -> {
+                    log.warn(
+                            "[PushNotification] FCM consumer skipped because waiting was not found {eventId: {}, eventType: {}, waitingId: {}}",
+                            eventId,
+                            eventType,
+                            waitingId
+                    );
+                    return null;
+                });
+    }
+
+    private NotificationDispatchResult sendNotificationOrSkip(
+            final Long waitingId,
+            final PushNotificationType notificationType,
+            final UUID eventId
+    ) {
+        try {
+            pushNotificationService.sendNotification(
+                    waitingId,
+                    PushNotificationSendReqDto.builder()
+                            .notificationType(notificationType)
+                            .customMessage("")
+                            .build()
+            );
+            return NotificationDispatchResult.SENT;
+        } catch (final PushNotificationException ex) {
+            final NotificationDispatchResult dispatchResult = resolveDispatchResult(ex.getErrorCode());
+            if (dispatchResult != null) {
+                log.warn(
+                        "[PushNotification] FCM consumer skipped {eventId: {}, waitingId: {}, notificationType: {}, reason: {}}",
+                        eventId,
+                        waitingId,
+                        notificationType,
+                        ex.getErrorCode()
+                );
+                return dispatchResult;
+            }
+
+            throw ex;
+        }
+    }
+
+    private NotificationDispatchResult resolveDispatchResult(final ErrorCode errorCode) {
+        if (errorCode == ErrorCode.PUSH_NOTIFICATION_TOKEN_NOT_FOUND) {
+            return NotificationDispatchResult.TOKEN_NOT_FOUND;
+        }
+
+        if (errorCode == ErrorCode.NOT_FOUND
+                || errorCode == ErrorCode.PUSH_NOTIFICATION_NOT_CONFIGURED
+                || errorCode == ErrorCode.PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH
+                || errorCode == ErrorCode.INVALID_INPUT) {
+            return NotificationDispatchResult.STOP_DELAYED_TASK;
+        }
+
+        return null;
+    }
+
+    private boolean shouldScheduleCalledReminder(final NotificationDispatchResult dispatchResult) {
+        return dispatchResult == NotificationDispatchResult.SENT
+                || dispatchResult == NotificationDispatchResult.TOKEN_NOT_FOUND;
     }
 
     private Duration resolveCallReminderDelay(final BoothWaiting waiting) {
@@ -139,10 +217,7 @@ public class WaitingFcmEventConsumer {
             return null;
         }
 
-        final int callValidTime = boothPolicyRepository.findByBoothId(waiting.getBoothId())
-                .map(BoothPolicy::getCallValidTime)
-                .filter(value -> value > 0)
-                .orElse(180);
+        final int callValidTime = waitingPolicyResolver.resolveCallValidTimeSeconds(waiting.getBoothId(), 180);
 
         return waiting.getCalledAt().plusSeconds(callValidTime);
     }
@@ -152,10 +227,7 @@ public class WaitingFcmEventConsumer {
             return Duration.ZERO;
         }
 
-        final int stayTimeSeconds = boothPolicyRepository.findByBoothId(waiting.getBoothId())
-                .map(BoothPolicy::getStayTime)
-                .filter(value -> value > 0)
-                .orElse(0);
+        final int stayTimeSeconds = waitingPolicyResolver.resolveStayTimeSeconds(waiting.getBoothId(), 0);
 
         if (stayTimeSeconds <= 0) {
             return Duration.ZERO;
@@ -163,5 +235,19 @@ public class WaitingFcmEventConsumer {
 
         final LocalDateTime reminderAt = waiting.getEnteredAt().plusSeconds(stayTimeSeconds);
         return Duration.between(TimeUtils.nowDateTime(), reminderAt);
+    }
+
+    private UUID resolveTaskEventId(final WaitingEventMessage message) {
+        if (message.eventId() != null) {
+            return message.eventId();
+        }
+
+        return UUID.randomUUID();
+    }
+
+    private enum NotificationDispatchResult {
+        SENT,
+        TOKEN_NOT_FOUND,
+        STOP_DELAYED_TASK
     }
 }

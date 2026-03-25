@@ -77,6 +77,8 @@ public enum ErrorCode {
     CANNOT_POSTPONE_LAST_IN_LINE(HttpStatus.BAD_REQUEST, "B-012", "대기열의 마지막 순서이므로 더 이상 미룰 수 없습니다."),
     CALL_CANDIDATE_NOT_FOUND(HttpStatus.NOT_FOUND, "B-013", "호출 가능한 대기자가 없습니다."),
     INVALID_STATUS_FOR_ADMIT(HttpStatus.BAD_REQUEST, "B-014", "도착 확인(REGISTERED)이 완료된 대기만 입장 처리할 수 있습니다."),
+    BOOTH_MAX_WAITING_EXCEEDED(HttpStatus.FORBIDDEN, "B-015", "부스의 최대 대기 가능 인원을 초과할 수 없습니다."),
+    FRONT_QUEUE_FULL(HttpStatus.CONFLICT, "B-016", "이미 호출 인원 수만큼 앞큐가 차 있습니다."),
 
     /**
      * File Error (F-xxx)
