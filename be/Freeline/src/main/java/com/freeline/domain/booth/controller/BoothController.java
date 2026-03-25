@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -22,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.util.ResponseUtils;
+import com.freeline.domain.auth.service.BoothAccessService;
 import com.freeline.domain.booth.dto.request.BoothCreateReqDto;
 import com.freeline.domain.booth.dto.request.BoothPolicyUpdateReqDto;
 import com.freeline.domain.booth.dto.request.BoothStatusUpdateReqDto;
@@ -47,6 +49,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class BoothController {
 
     private final BoothService boothService;
+    private final BoothAccessService boothAccessService;
 
     @Operation(summary = "부스 검색", description = "지도 매핑을 위해 부스 이름이나 관리자 정보로 업체를 검색합니다.")
     @GetMapping("/booths/events/{eventId}/search")
@@ -61,9 +64,11 @@ public class BoothController {
     @Operation(summary = "부스 이미지 업로드", description = "부스 이미지를 업로드하고 boothId와 매핑하여 저장합니다.")
     @PostMapping(value = "/booths/{boothId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BaseResponse<BoothImageUploadResDto>> uploadBoothImage(
+            final Authentication authentication,
             @PathVariable final Long boothId,
             @RequestPart("file") final MultipartFile file
     ) {
+        boothAccessService.validateBoothAccess(authentication, boothId);
         final BoothImageUploadResDto response = boothService.uploadBoothImage(boothId, file, false);
         return ResponseUtils.ok(response);
     }
@@ -71,10 +76,12 @@ public class BoothController {
     @Operation(summary = "부스 대표 이미지 업로드", description = "부스 대표 이미지를 업로드하고 boothId와 매핑하여 저장합니다.")
     @PostMapping(value = "/booths/{boothId}/image/representative", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BaseResponse<BoothImageUploadResDto>> uploadRepresentativeBoothImage(
+            final Authentication authentication,
             @PathVariable final Long boothId,
             @RequestPart("file") final MultipartFile file,
             @RequestParam(defaultValue = "true") final Boolean representative
     ) {
+        boothAccessService.validateBoothAccess(authentication, boothId);
         final BoothImageUploadResDto response = boothService.uploadBoothImage(boothId, file, Boolean.TRUE.equals(representative));
         return ResponseUtils.ok(response);
     }
@@ -129,8 +136,10 @@ public class BoothController {
     @Operation(summary = "부스 정책 조회", description = "특정 부스에 현재 적용 중인 대기열 운영 정책을 조회합니다.")
     @GetMapping("/{boothId}/policy")
     public ResponseEntity<BaseResponse<BoothPolicyResDto>> getBoothPolicy(
+            final Authentication authentication,
             @PathVariable final Long boothId
     ) {
+        boothAccessService.validateBoothAccess(authentication, boothId);
         final BoothPolicyResDto response = boothService.getBoothPolicy(boothId);
         return ResponseUtils.ok(response);
     }
@@ -138,9 +147,11 @@ public class BoothController {
     @Operation(summary = "부스 정책 설정", description = "특정 부스의 대기열 운영 정책을 설정하거나 수정합니다.")
     @PatchMapping("/booths/{boothId}/policy")
     public ResponseEntity<BaseResponse<BoothPolicyResDto>> upsertBoothPolicy(
+            final Authentication authentication,
             @PathVariable final Long boothId,
             @Valid @RequestBody final BoothPolicyUpdateReqDto request
     ) {
+        boothAccessService.validateBoothAccess(authentication, boothId);
         final BoothPolicyResDto response = boothService.upsertBoothPolicy(boothId, request);
         return ResponseUtils.ok(response);
     }
@@ -148,9 +159,11 @@ public class BoothController {
     @Operation(summary = "부스 운영 상태 변경", description = "특정 부스의 긴급 마감 여부를 변경합니다.")
     @PatchMapping("/booths/{boothId}/status")
     public ResponseEntity<BaseResponse<BoothStatusResDto>> updateBoothStatus(
+            final Authentication authentication,
             @PathVariable final Long boothId,
             @Valid @RequestBody final BoothStatusUpdateReqDto request
     ) {
+        boothAccessService.validateBoothAccess(authentication, boothId);
         final BoothStatusResDto response = boothService.updateBoothStatus(boothId, request);
         return ResponseUtils.ok(response);
     }
@@ -158,9 +171,11 @@ public class BoothController {
     @Operation(summary = "부스 정보 수정", description = "특정 부스의 이름, 위치, 운영 시간을 수정합니다.")
     @PatchMapping("/booths/{boothId}")
     public ResponseEntity<BaseResponse<BoothCreateResDto>> updateBooth(
+            final Authentication authentication,
             @PathVariable final Long boothId,
             @Valid @RequestBody final BoothUpdateReqDto request
     ) {
+        boothAccessService.validateBoothAccess(authentication, boothId);
         final BoothCreateResDto response = boothService.updateBooth(boothId, request);
         return ResponseUtils.ok(response);
     }
@@ -168,8 +183,10 @@ public class BoothController {
     @Operation(summary = "부스 삭제", description = "특정 부스를 삭제합니다.")
     @DeleteMapping("/booths/{boothId}")
     public ResponseEntity<BaseResponse<Void>> deleteBooth(
+            final Authentication authentication,
             @PathVariable final Long boothId
     ) {
+        boothAccessService.validateBoothAccess(authentication, boothId);
         boothService.deleteBooth(boothId);
         return ResponseUtils.ok(null);
     }

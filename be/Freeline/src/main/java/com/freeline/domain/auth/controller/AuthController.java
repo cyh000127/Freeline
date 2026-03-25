@@ -32,6 +32,7 @@ import com.freeline.domain.auth.dto.request.SignupReqDto;
 import com.freeline.domain.auth.dto.request.UpdateMyInfoReqDto;
 import com.freeline.domain.auth.dto.request.VisitorEnterReqDto;
 import com.freeline.domain.auth.dto.response.BoothAdminCreateResDto;
+import com.freeline.domain.auth.dto.response.BoothAdminMeResDto;
 import com.freeline.domain.auth.dto.response.BoothAdminResDto;
 import com.freeline.domain.auth.dto.response.CheckIdResDto;
 import com.freeline.domain.auth.dto.response.LoginResDto;
@@ -197,6 +198,14 @@ public class AuthController {
     public ResponseEntity<BaseResponse<MyInfoResDto>> me(final Authentication authentication) {
         Long userId = Long.valueOf(authentication.getName());
         return ResponseUtils.ok(authService.getMyInfo(userId));
+    }
+
+    @Operation(summary = "부스 관리자 내 정보 조회")
+    @GetMapping("/booth-admins/me")
+    @PreAuthorize("hasRole('BOOTH_ADMIN')")
+    public ResponseEntity<BaseResponse<BoothAdminMeResDto>> boothAdminMe(final Authentication authentication) {
+        Long boothAdminId = Long.valueOf(authentication.getName());
+        return ResponseUtils.ok(authService.getBoothAdminMyInfo(boothAdminId));
     }
 
     /**

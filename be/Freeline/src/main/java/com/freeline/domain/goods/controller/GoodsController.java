@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -20,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.util.ResponseUtils;
+import com.freeline.domain.auth.service.BoothAccessService;
 import com.freeline.domain.goods.dto.request.GoodsCreateReqDto;
 import com.freeline.domain.goods.dto.request.GoodsStatusUpdateReqDto;
 import com.freeline.domain.goods.dto.response.GoodsCreateResDto;
@@ -37,13 +39,16 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class GoodsController {
 
     private final GoodsService goodsService;
+    private final BoothAccessService boothAccessService;
 
     @Operation(summary = "굿즈 생성", description = "특정 부스에 새로운 굿즈를 등록합니다.")
     @PostMapping(value = "/booths/{boothId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BaseResponse<GoodsCreateResDto>> createGoods(
+            final Authentication authentication,
             @PathVariable final Long boothId,
             @Valid @ModelAttribute final GoodsCreateReqDto request
     ) {
+        boothAccessService.validateBoothAccess(authentication, boothId);
         final GoodsCreateResDto response = goodsService.createGoods(boothId, request);
         return ResponseUtils.created(response);
     }
@@ -60,9 +65,11 @@ public class GoodsController {
     @Operation(summary = "굿즈 상태 수정", description = "특정 굿즈의 품절 여부를 수정합니다.")
     @PatchMapping("/{goodsId}/status")
     public ResponseEntity<BaseResponse<GoodsStatusResDto>> updateGoodsStatus(
+            final Authentication authentication,
             @PathVariable final Long goodsId,
             @Valid @RequestBody final GoodsStatusUpdateReqDto request
     ) {
+        boothAccessService.validateGoodsAccess(authentication, goodsId);
         final GoodsStatusResDto response = goodsService.updateGoodsStatus(goodsId, request);
         return ResponseUtils.ok(response);
     }
@@ -70,8 +77,10 @@ public class GoodsController {
     @Operation(summary = "굿즈 삭제", description = "특정 굿즈를 삭제합니다.")
     @DeleteMapping("/{goodsId}")
     public ResponseEntity<BaseResponse<Void>> deleteGoods(
+            final Authentication authentication,
             @PathVariable final Long goodsId
     ) {
+        boothAccessService.validateGoodsAccess(authentication, goodsId);
         goodsService.deleteGoods(goodsId);
         return ResponseUtils.noContent();
     }

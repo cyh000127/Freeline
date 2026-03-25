@@ -122,6 +122,11 @@ services:
 
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
+
+      HDFS_WEBHDFS_URL: ${HDFS_WEBHDFS_URL:-http://172.26.15.39:9870}
+      HDFS_HIVE_URL: ${HDFS_HIVE_URL:-jdbc:hive2://172.26.15.39:10000/freeline}
+      HDFS_HIVE_USER: ${HDFS_HIVE_USER:-hive}
+      HDFS_HIVE_PASSWORD: ${HDFS_HIVE_PASSWORD:-hive}
     volumes:
       - freeline-action-logs:/app/logs/action
     networks:

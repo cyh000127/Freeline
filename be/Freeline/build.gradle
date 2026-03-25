@@ -50,10 +50,37 @@ dependencies {
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
     implementation('org.apache.hive:hive-jdbc:4.0.1') {
-        exclude group: 'org.slf4j', module: 'slf4j-log4j12'
-        exclude group: 'org.apache.logging.log4j', module: 'log4j-slf4j-impl'
-        exclude group: 'org.apache.logging.log4j', module: 'log4j-1.2-api'
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+        exclude group: 'ch.qos.logback'
+        exclude group: 'log4j'
     }
+    implementation('org.apache.hive:hive-common:4.0.1') {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+        exclude group: 'ch.qos.logback'
+        exclude group: 'log4j'
+    }
+    implementation('org.apache.hive:hive-service-rpc:4.0.1') {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+    }
+    implementation('org.apache.hive:hive-service:4.0.1') {
+        exclude group: 'org.slf4j'
+        exclude group: 'org.apache.logging.log4j'
+        exclude group: 'ch.qos.logback'
+        exclude group: 'log4j'
+        exclude group: 'org.eclipse.jetty'
+        exclude group: 'org.pac4j'
+        exclude group: 'org.apache.hive', module: 'hive-metastore'
+        exclude group: 'org.apache.hive', module: 'hive-llap-common'
+        exclude group: 'org.apache.hive', module: 'hive-llap-client'
+        exclude group: 'org.apache.hadoop'
+        exclude group: 'org.apache.curator'
+        exclude group: 'org.apache.zookeeper'
+        exclude group: 'io.dropwizard.metrics'
+    }
+    implementation 'org.apache.thrift:libthrift:0.20.0'
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
@@ -80,6 +107,10 @@ tasks.withType(Checkstyle).configureEach {
         xml.required = true
         html.required = true
     }
+}
+
+tasks.withType(Jar).configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 tasks.withType(JavaCompile).configureEach {

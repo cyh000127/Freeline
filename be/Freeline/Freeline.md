@@ -390,6 +390,9 @@ firebase:
 - payload 누락이나 잘못된 상태값처럼 재시도로 해결되지 않는 경우는 예외를 던지지 않고 warn 로그 후 skip 한다.
 - delayed FCM consumer는 stale 이벤트로 인해 `NOT_FOUND`, `PUSH_NOTIFICATION_TOKEN_NOT_FOUND`,
   `PUSH_NOTIFICATION_WAITING_STATUS_MISMATCH`, `INVALID_INPUT`이 발생하면 warn 후 skip 하고, 실제 인프라성 실패만 재시도/DLQ 대상으로 본다.
+- 부스 관리자 로그인/토큰 재발급 응답에는 `boothId`를 함께 포함하고, 부스 관리자 전용 내 정보 조회는 `/api/v1/auth/booth-admins/me`에서 제공한다.
+- `WaitingController`의 `/booths/me/**` 계열은 JWT subject를 boothId로 직접 쓰지 않고, boothAdminId를 기준으로 실제 boothId를 조회해 사용한다.
+- booth 경로를 직접 받는 수정/관리 API는 부스 관리자 권한일 때 요청 `boothId`가 본인 소속 부스와 일치하는지 검증하고, event admin만 예외적으로 다른 부스 경로에 접근할 수 있다.
 
 ## Secrets Rule
 

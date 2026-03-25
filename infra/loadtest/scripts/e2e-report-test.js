@@ -3,6 +3,7 @@
  *
  * 전체 흐름:
  *   setup()   → 관리자 로그인, 행사/부스 생성, 행사 OPEN
+ *              (또는 PRESET_EVENT_ID가 있으면 기존 행사 재사용)
  *   scenario  → VU마다 방문자 인증 → 부스 조회 → 대기 등록/취소 → 행동 로그 벌크 전송
  *   teardown()→ (비워둠 — 리포트 트리거는 e2e-report-verify.sh에서 수행)
  *
@@ -12,21 +13,24 @@
  *   ADMIN_PW        — 관리자 비밀번호
  *   VU_COUNT        — 동시 사용자 수 (기본: 50)
  *   ITERATIONS      — VU당 반복 횟수 (기본: 10)
+ *   PRESET_EVENT_ID — 사전 생성된 행사 ID (있으면 setup에서 행사 생성 건너뜀)
+ *   PRESET_BOOTH_IDS— 쉼표 구분 부스 ID 목록 (PRESET_EVENT_ID와 함께 사용)
  */
 
 import http from "k6/http";
 import { check, sleep, group } from "k6";
-import { SharedArray } from "k6/data";
 import { Counter, Trend } from "k6/metrics";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 const BASE_URL = __ENV.TARGET_URL || "https://j14a207.p.ssafy.io";
-const ADMIN_ID = __ENV.ADMIN_ID || "admin@freeline.com";
-const ADMIN_PW = __ENV.ADMIN_PW || "password123!";
+const ADMIN_ID = __ENV.ADMIN_ID || "kangseunghun9927@gmail.com";
+const ADMIN_PW = __ENV.ADMIN_PW || "jmh8EYG3pyd9ydt*vam";
 const VU_COUNT = parseInt(__ENV.VU_COUNT || "50", 10);
 const ITERATIONS = parseInt(__ENV.ITERATIONS || "10", 10);
 const BOOTH_COUNT = 10;
+const PRESET_EVENT_ID = __ENV.PRESET_EVENT_ID || "";
+const PRESET_BOOTH_IDS = __ENV.PRESET_BOOTH_IDS || "";
 
 // ─── Custom Metrics ──────────────────────────────────────────────────────────
 
@@ -92,10 +96,6 @@ function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function randomChoice(arr) {
-  return arr[randomInt(0, arr.length - 1)];
-}
-
 function generateSessionId() {
   return "sess_" + Math.random().toString(36).substring(2, 15);
 }
@@ -116,75 +116,93 @@ export function setup() {
   });
   check(loginRes, { "admin login": (r) => r.status === 200 });
   const loginData = extractData(loginRes);
+  if (!loginData || !loginData.accessToken) {
+    console.error(`[Setup] 관리자 로그인 실패: ${loginRes.status} ${loginRes.body}`);
+    return null;
+  }
   const adminToken = loginData.accessToken;
   console.log(`[Setup] 관리자 로그인 완료`);
 
-  // 2. 행사 생성
-  const today = new Date();
-  const startDate = today.toISOString().substring(0, 10);
-  const endDate = new Date(today.getTime() + 3 * 86400000)
-    .toISOString()
-    .substring(0, 10);
-
-  const eventRes = apiPost(
-    "/api/v1/events",
-    {
-      name: `[E2E Test] 리포트 테스트 행사 ${Date.now()}`,
-      description: "k6 E2E 리포트 파이프라인 테스트용 자동 생성 행사",
-      startDate: startDate,
-      endDate: endDate,
-      openTime: "09:00:00",
-      closeTime: "18:00:00",
-      locationAddress: "서울특별시 강남구 테헤란로 212",
-    },
-    adminToken
-  );
-  check(eventRes, {
-    "event created": (r) => r.status === 200 || r.status === 201,
-  });
-  const eventData = extractData(eventRes);
-  const eventId = eventData.eventId || eventData.id;
-  console.log(`[Setup] 행사 생성: eventId=${eventId}`);
-
-  // 3. 부스 10개 생성
-  const boothIds = [];
+  let eventId;
+  let boothIds = [];
   const boothNames = [
     "삼성전자", "LG전자", "현대자동차", "SK하이닉스", "네이버",
     "카카오", "쿠팡", "배달의민족", "토스", "당근마켓",
   ];
 
-  for (let i = 0; i < BOOTH_COUNT; i++) {
-    const boothRes = apiPost(
-      `/api/v1/booths/events/${eventId}`,
+  if (PRESET_EVENT_ID) {
+    // ── 사전 생성 모드: verify 스크립트가 이미 행사/부스/방문자를 만들어둠 ──
+    eventId = parseInt(PRESET_EVENT_ID, 10);
+    if (PRESET_BOOTH_IDS) {
+      boothIds = PRESET_BOOTH_IDS.split(",").map((id) => parseInt(id.trim(), 10));
+    }
+    console.log(`[Setup] 사전 생성 모드: eventId=${eventId}, boothIds=${boothIds}`);
+  } else {
+    // ── 자체 생성 모드: 행사/부스 직접 생성 ──
+    // 2. 행사 생성
+    const today = new Date();
+    const startDate = today.toISOString().substring(0, 10);
+    const endDate = new Date(today.getTime() + 3 * 86400000)
+      .toISOString()
+      .substring(0, 10);
+
+    const eventRes = apiPost(
+      "/api/v1/events",
       {
-        name: boothNames[i],
-        locationCode: `${String.fromCharCode(65 + i)}-01`,
+        name: `[E2E Test] 리포트 테스트 행사 ${Date.now()}`,
+        description: "k6 E2E 리포트 파이프라인 테스트용 자동 생성 행사",
+        startDate: startDate,
+        endDate: endDate,
         openTime: "09:00:00",
         closeTime: "18:00:00",
+        locationAddress: "서울특별시 강남구 테헤란로 212",
       },
       adminToken
     );
-    const boothData = extractData(boothRes);
-    if (boothData) {
-      const bid = boothData.boothId || boothData.id;
-      boothIds.push(bid);
+    check(eventRes, {
+      "event created": (r) => r.status === 200 || r.status === 201,
+    });
+    const eventData = extractData(eventRes);
+    if (!eventData) {
+      console.error(`[Setup] 행사 생성 실패: ${eventRes.status} ${eventRes.body}`);
+      return null;
     }
+    eventId = eventData.eventId || eventData.id;
+    console.log(`[Setup] 행사 생성: eventId=${eventId}`);
+
+    // 3. 부스 10개 생성
+    for (let i = 0; i < BOOTH_COUNT; i++) {
+      const boothRes = apiPost(
+        `/api/v1/booths/events/${eventId}`,
+        {
+          name: boothNames[i],
+          locationCode: `${String.fromCharCode(65 + i)}-01`,
+          openTime: "09:00:00",
+          closeTime: "18:00:00",
+        },
+        adminToken
+      );
+      const boothData = extractData(boothRes);
+      if (boothData) {
+        const bid = boothData.boothId || boothData.id;
+        boothIds.push(bid);
+      }
+    }
+    console.log(`[Setup] 부스 ${boothIds.length}개 생성: ${boothIds}`);
+
+    // 4. 행사 OPEN
+    const openRes = apiPatch(
+      `/api/v1/events/${eventId}`,
+      { status: "OPEN" },
+      adminToken
+    );
+    check(openRes, {
+      "event opened": (r) => r.status === 200,
+    });
+    console.log(`[Setup] 행사 OPEN 완료`);
   }
-  console.log(`[Setup] 부스 ${boothIds.length}개 생성: ${boothIds}`);
 
-  // 4. 행사 OPEN
-  const openRes = apiPatch(
-    `/api/v1/events/${eventId}`,
-    { status: "OPEN" },
-    adminToken
-  );
-  check(openRes, {
-    "event opened": (r) => r.status === 200,
-  });
-  console.log(`[Setup] 행사 OPEN 완료`);
-
-  // 5. 방문자 entry code 목록 (e2e-report-verify.sh 에서 psql로 사전 생성)
-  //    entry code 형식: E2E + 3자리 숫자 (E2E001 ~ E2E{VU_COUNT})
+  // 5. 방문자 entry code 목록
   const entryCodes = [];
   for (let i = 1; i <= VU_COUNT; i++) {
     entryCodes.push(`E2E${String(i).padStart(3, "0")}`);
@@ -204,6 +222,11 @@ export function setup() {
 // ─── Main Scenario ───────────────────────────────────────────────────────────
 
 export default function (data) {
+  if (!data) {
+    console.error("[Scenario] setup 실패로 종료");
+    return;
+  }
+
   const { eventId, boothIds, boothNames, entryCodes } = data;
   const vuId = __VU - 1; // 0-indexed
   const entryCode = entryCodes[vuId % entryCodes.length];
@@ -253,14 +276,12 @@ export default function (data) {
 
   group("booth_browsing", function () {
     for (const boothId of visitBooths) {
-      // booth_view 로그
       const idx = boothIds.indexOf(boothId);
       addLog("BOOTH_VIEW", "BOOTH", boothId, {
         boothName: boothNames[idx] || "Unknown",
       });
-      boothViewDuration.add(randomInt(3, 15)); // 체류 시간 시뮬레이션
+      boothViewDuration.add(randomInt(3, 15));
 
-      // page_view 로그
       addLog("PAGE_VIEW", "PAGE", `booth_detail_${boothId}`, {});
 
       sleep(randomInt(1, 2) * 0.5);
@@ -280,7 +301,8 @@ export default function (data) {
 
         if (waitRes.status === 200 || waitRes.status === 201) {
           const waitData = extractData(waitRes);
-          const wid = waitData.waitingId || waitData.id;
+          // WaitingCreateResDto uses snake_case (@JsonNaming)
+          const wid = waitData.waiting_id || waitData.waitingId || waitData.id;
           if (wid) waitingIds.push({ waitingId: wid, boothId: boothId });
           waitingsCreated.add(1);
 
@@ -341,12 +363,12 @@ export default function (data) {
 // ─── Teardown ────────────────────────────────────────────────────────────────
 
 export function teardown(data) {
+  if (!data) return;
   console.log(`=== [Teardown] 부하 생성 완료 ===`);
   console.log(`[Teardown] eventId: ${data.eventId}`);
   console.log(`[Teardown] 다음 단계: e2e-report-verify.sh 에서 CLOSED + 리포트 생성 실행`);
 
   // eventId를 파일로 출력 (셸 스크립트에서 참조용)
-  // k6는 파일 쓰기 불가이므로 console.log로 출력
   console.log(`EVENT_ID=${data.eventId}`);
   console.log(`ADMIN_TOKEN=${data.adminToken}`);
 }
