@@ -1,6 +1,7 @@
 package com.freeline.domain.waiting.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.util.ResponseUtils;
+import com.freeline.domain.auth.service.BoothAdminContextService;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
@@ -34,6 +36,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class WaitingController {
 
     private final WaitingService waitingService;
+    private final BoothAdminContextService boothAdminContextService;
 
     @Operation(summary = "대기 등록", description = "관람객이 특정 부스의 대기열에 등록합니다.")
     @PostMapping("/booths/{boothId}/waitings")
@@ -48,20 +51,22 @@ public class WaitingController {
 
     @Operation(summary = "다음 대기자 호출", description = "부스 관리자가 호출 가능한 다음 대기자를 앞큐로 이동시킵니다.")
     @PatchMapping("/booths/me/waitings/call")
+    @PreAuthorize("hasRole('BOOTH_ADMIN')")
     public ResponseEntity<BaseResponse<WaitingCallResDto>> callNextWaiting(
             final Authentication authentication
     ) {
-        final Long boothId = extractId(authentication);
+        final Long boothId = extractBoothId(authentication);
         final WaitingCallResDto response = waitingService.callNextWaiting(boothId);
         return ResponseUtils.ok(response);
     }
 
     @Operation(summary = "실시간 부스 대기열 현황 조회", description = "부스 관리자가 현재 부스의 활성 대기열 현황을 조회합니다.")
     @GetMapping("/booths/me/queue")
+    @PreAuthorize("hasRole('BOOTH_ADMIN')")
     public ResponseEntity<BaseResponse<WaitingDashboardResDto>> getBoothQueueDashboard(
             final Authentication authentication
     ) {
-        final Long boothId = extractId(authentication);
+        final Long boothId = extractBoothId(authentication);
         final WaitingDashboardResDto response = waitingService.getBoothQueueDashboard(boothId);
         return ResponseUtils.ok(response);
     }
@@ -79,11 +84,12 @@ public class WaitingController {
 
     @Operation(summary = "관리자 대기 취소", description = "부스 관리자가 대기 또는 노쇼 대상을 취소 처리합니다.")
     @DeleteMapping("/waitings/{waitingId}/admin")
+    @PreAuthorize("hasRole('BOOTH_ADMIN')")
     public ResponseEntity<BaseResponse<Void>> cancelWaitingByAdmin(
             @PathVariable final Long waitingId,
             final Authentication authentication
     ) {
-        final Long boothId = extractId(authentication);
+        final Long boothId = extractBoothId(authentication);
         waitingService.cancelWaitingByAdmin(waitingId, boothId);
         return ResponseUtils.ok(null);
     }
@@ -101,11 +107,12 @@ public class WaitingController {
 
     @Operation(summary = "체험 입장 처리", description = "부스 관리자가 도착 확인이 끝난 대기를 입장 처리합니다.")
     @PatchMapping("/waitings/{waitingId}/admit")
+    @PreAuthorize("hasRole('BOOTH_ADMIN')")
     public ResponseEntity<BaseResponse<WaitingAdmitResDto>> admitWaiting(
             @PathVariable final Long waitingId,
             final Authentication authentication
     ) {
-        final Long boothId = extractId(authentication);
+        final Long boothId = extractBoothId(authentication);
         final WaitingAdmitResDto response = waitingService.admitWaiting(waitingId, boothId);
         return ResponseUtils.ok(response);
     }
@@ -144,5 +151,9 @@ public class WaitingController {
 
     private Long extractId(final Authentication authentication) {
         return Long.valueOf(authentication.getName());
+    }
+
+    private Long extractBoothId(final Authentication authentication) {
+        return boothAdminContextService.resolveBoothId(extractId(authentication));
     }
 }
