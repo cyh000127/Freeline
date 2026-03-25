@@ -9,7 +9,6 @@ import lombok.experimental.UtilityClass;
 import com.freeline.common.event.waiting.model.WaitingEventSnapshot;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothWaiting;
-import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.boothmanager.dto.response.BoothManagerBoothResDto;
 import com.freeline.domain.boothmanager.dto.response.BoothManagerDashboardResDto;
 import com.freeline.domain.boothmanager.dto.response.BoothManagerSseEventResDto;
@@ -34,7 +33,7 @@ public class BoothManagerConverter {
                 .waitingNumber(waiting.getWaitingNumber())
                 .visitorName(waiting.getVisitor() != null ? waiting.getVisitor().getName() : null)
                 .status(waiting.getStatus().name())
-                .arrivalChecked(waiting.getStatus() == WaitingStatus.REGISTERED)
+                .arrivalChecked(waiting.getRegisteredAt() != null)
                 .calledAt(waiting.getCalledAt())
                 .registeredAt(waiting.getRegisteredAt())
                 .enteredAt(waiting.getEnteredAt())
