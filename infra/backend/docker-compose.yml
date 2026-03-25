@@ -58,19 +58,6 @@ services:
       timeout: 5s
       retries: 10
 
-  freeline-ai-vision:
-    build:
-      context: ../../ai/vision-server
-      dockerfile: Dockerfile
-    container_name: freeline-ai-vision
-    restart: always
-    ports:
-      - "8000:8000"
-    environment:
-      TZ: Asia/Seoul
-    networks:
-      - infra-public
-
   freeline-backend:
     image: freeline-backend:latest
     container_name: freeline-backend

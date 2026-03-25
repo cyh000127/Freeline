@@ -17,7 +17,7 @@ export const verifyEntryCode = async (
   payload: EntryCodeVerifyRequest,
 ): Promise<EntryCodeVerifyData> => {
   const response = await api.post<ApiResponse<EntryCodeVerifyData>>(
-    'visitors/entry-code/authenticate',
+    'auth/visitors/entry-code/authenticate',
     payload,
   );
 

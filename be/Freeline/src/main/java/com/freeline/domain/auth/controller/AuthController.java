@@ -27,6 +27,7 @@ import com.freeline.domain.auth.dto.request.BoothAdminEmailSendReqDto;
 import com.freeline.domain.auth.dto.request.BoothAdminInitialPasswordChangeReqDto;
 import com.freeline.domain.auth.dto.request.ChangePasswordReqDto;
 import com.freeline.domain.auth.dto.request.EmailVerifyReqDto;
+import com.freeline.domain.auth.dto.request.EntryCodeBulkCreateReqDto;
 import com.freeline.domain.auth.dto.request.LoginReqDto;
 import com.freeline.domain.auth.dto.request.RefreshTokenReqDto;
 import com.freeline.domain.auth.dto.request.SignupReqDto;
@@ -36,6 +37,7 @@ import com.freeline.domain.auth.dto.response.BoothAdminCreateResDto;
 import com.freeline.domain.auth.dto.response.BoothAdminListResDto;
 import com.freeline.domain.auth.dto.response.BoothAdminMeResDto;
 import com.freeline.domain.auth.dto.response.CheckIdResDto;
+import com.freeline.domain.auth.dto.response.EntryCodeBulkCreateResDto;
 import com.freeline.domain.auth.dto.response.LoginResDto;
 import com.freeline.domain.auth.dto.response.MyInfoResDto;
 import com.freeline.domain.auth.dto.response.SignupResDto;
@@ -79,7 +81,7 @@ public class AuthController {
     /**
      * 방문자 입장 (Entry Code 기반 인증)
      */
-    @Operation(summary = "방문자 입장 인증", description = "6자리 Entry Code를 사용하여 인증합니다.")
+    @Operation(summary = "방문자 입장 인증", description = "발급된 Entry Code를 사용하여 1회성 인증을 진행합니다.")
     @PostMapping("/visitors/entry-code/authenticate")
     public ResponseEntity<BaseResponse<LoginResDto>> authenticate(
             @Valid @RequestBody final VisitorEnterReqDto request
@@ -163,6 +165,16 @@ public class AuthController {
     ) {
         authService.changeBoothAdminInitialPassword(request);
         return ResponseUtils.ok(null);
+
+    @Operation(summary = "엔트리 코드 일괄 생성", description = "행사 관리자가 방문자용 일회성 엔트리 코드를 일괄 생성합니다.")
+    @PostMapping("/entry-codes/bulk")
+    @PreAuthorize("hasRole('EVENT_ADMIN')")
+    public ResponseEntity<BaseResponse<EntryCodeBulkCreateResDto>> createEntryCodesBulk(
+            final Authentication authentication,
+            @Valid @RequestBody final EntryCodeBulkCreateReqDto request
+    ) {
+        final Long userId = Long.parseLong(authentication.getName());
+        return ResponseUtils.created(authService.createEntryCodesBulk(userId, request));
     }
 
     /**

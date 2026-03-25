@@ -16,7 +16,7 @@ export const scanQr = async (
   accessToken: string,
   payload: QrScanRequest,
 ): Promise<QrScanData> => {
-  const response = await api.post<ApiResponse<QrScanData>>('', payload, {
+  const response = await api.post<ApiResponse<QrScanData>>('qr/scan', payload, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 

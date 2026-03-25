@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet, Text, View, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import BottomTabBar, { TabKey } from '@/components/navigation/BottomTabBar';
+import { TAB_ROUTES } from '@/constants/tabRoutes';
 import HomeBanner from '@/components/home/HomeBanner';
 // import PopularBoothCard from '@/components/home/PopularBoothCard';
 // import { useQRMock } from '@/app/contexts/QRMockContext';
@@ -8,15 +9,6 @@ import { useExperienceMock } from '@/mocks/useExperienceMock';
 import ExperienceCard from '@/components/home/ExperienceCard';
 import { useMemo, useState } from 'react';
 import ReservationCard from '@/components/reservation/ReservationCard';
-
-const TAB_ROUTES: Record<TabKey, '/home' | '/reservation' | '/map' | '/my' | '/search'> =
-  {
-    home: '/home',
-    reservation: '/reservation',
-    map: '/map',
-    my: '/my',
-    search: '/search',
-  };
 
 type HomeReservationItem = {
   // 임시 테스트용 예약현황 값
@@ -94,7 +86,10 @@ export default function HomeScreen() {
             <Text style={styles.brandText}>줄서잇</Text>
           </View>
 
-          <Pressable style={styles.bellButton}>
+          <Pressable
+            style={styles.iconButton}
+            onPress={() => router.push('/notifications')}
+          >
             <Image
               source={require('@/assets/icons/notifications.png')}
               style={styles.icon}
@@ -138,7 +133,7 @@ export default function HomeScreen() {
             )}
 
             {canAddReservation ? (
-              <Pressable style={styles.purpleButton} onPress={handleAddReservation}>
+              <Pressable style={styles.purpleButton} onPress={() => router.push('/maps')}>
                 <Text style={styles.btnText}>
                   {visibleReservations.length === 0 ? '예약하러 가기' : '예약 1개 추가'}
                 </Text>
@@ -342,7 +337,7 @@ const styles = StyleSheet.create({
     color: '#111111',
   },
 
-  bellButton: {
+  iconButton: {
     width: 40,
     height: 40,
     borderRadius: 20,

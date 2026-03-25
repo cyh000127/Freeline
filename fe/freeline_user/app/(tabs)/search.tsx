@@ -1,21 +1,14 @@
-import { View, Text } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import BottomTabBar from '@/components/navigation/BottomTabBar';
-
-const TAB_ROUTES = {
-  home: '/home',
-  reservation: '/reservation',
-  map: '/map',
-  my: '/my',
-  search: '/search',
-} as const;
+import { TAB_ROUTES } from '@/constants/tabRoutes';
 
 export default function Search() {
   const router = useRouter();
 
   return (
-    <View style={{ flex: 1 }}>
-      <View style={{ flex: 1 }}>
+    <View style={styles.screen}>
+      <View style={styles.screen}>
         <Text>search</Text>
       </View>
 
@@ -26,3 +19,10 @@ export default function Search() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: '#F0F2F5',
+  },
+});

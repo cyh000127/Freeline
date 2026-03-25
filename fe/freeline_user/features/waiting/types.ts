@@ -6,7 +6,7 @@ export type WaitingStatus =
   | 'ENTERED'
   | 'EXITED'
   | 'CANCELED'
-  | 'AUTO_CANCELED';
+  | 'EXPIRED';
 
 export interface WaitingItem {
   waiting_id: number;

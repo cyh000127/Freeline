@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
     height: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 3,
+    marginBottom: 1,
   },
   label: {
     fontSize: 11,

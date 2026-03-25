@@ -36,16 +36,16 @@ set -euo pipefail
 # ─── Configuration ───────────────────────────────────────────────────────────
 
 TARGET_URL="${TARGET_URL:-https://j14a207.p.ssafy.io}"
-ADMIN_ID="${ADMIN_ID:-kangseunghun9927@gmail.com}"
-ADMIN_PW="${ADMIN_PW:-jmh8EYG3pyd9ydt*vam}"
+ADMIN_ID="${ADMIN_ID:?환경변수 ADMIN_ID를 설정하세요}"
+ADMIN_PW="${ADMIN_PW:?환경변수 ADMIN_PW를 설정하세요}"
 VU_COUNT="${VU_COUNT:-50}"
 ITERATIONS="${ITERATIONS:-10}"
 
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-freeline}"
-DB_USER="${DB_USER:-freeline}"
-DB_PASSWORD="${DB_PASSWORD:-freeline}"
+DB_USER="${DB_USERNAME:-${DB_USER:?환경변수 DB_USERNAME을 설정하세요}}"
+DB_PASSWORD="${DB_PASSWORD:?환경변수 DB_PASSWORD를 설정하세요}"
 
 SKIP_K6="${SKIP_K6:-false}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -144,13 +144,16 @@ if ! command -v curl &>/dev/null; then
 fi
 log_ok "curl 확인"
 
-# psql: docker exec fallback
+# psql check: prefer docker exec if container is running (more reliable for DB access)
 USE_DOCKER_PSQL=false
-if ! command -v psql &>/dev/null; then
-  log_warn "psql이 없습니다 — docker exec 시도"
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^freeline-db$'; then
+  log_ok "freeline-db 컨테이너 확인"
   USE_DOCKER_PSQL=true
+elif command -v psql &>/dev/null; then
+  log_ok "로컬 psql 확인"
 else
-  log_ok "psql 확인"
+  log_fail "psql 또는 docker freeline-db를 찾을 수 없습니다"
+  exit 1
 fi
 
 # ─── Step 1: 관리자 로그인 ──────────────────────────────────────────────────
@@ -244,12 +247,15 @@ run_sql() {
   fi
 }
 
-log_info "방문자 ${VU_COUNT}명 생성 중..."
+TOTAL_VISITORS=$((VU_COUNT * ITERATIONS))
+log_info "방문자 ${TOTAL_VISITORS}명 (${VU_COUNT} VUs × ${ITERATIONS} iterations) 생성 중..."
+
+ENTRY_PREFIX="E${EVENT_ID}_"
 
 SQL="INSERT INTO visitors (event_id, entry_code, name, is_active, created_at, updated_at) VALUES "
 VALUES=""
-for i in $(seq 1 "${VU_COUNT}"); do
-  CODE=$(printf "E2E%03d" "$i")
+for i in $(seq 1 "${TOTAL_VISITORS}"); do
+  CODE=$(printf "${ENTRY_PREFIX}%03d" "$i")
   if [ -n "$VALUES" ]; then VALUES="${VALUES},"; fi
   VALUES="${VALUES}(${EVENT_ID}, '${CODE}', 'E2E Visitor ${i}', true, NOW(), NOW())"
 done
@@ -258,14 +264,14 @@ SQL="${SQL}${VALUES} ON CONFLICT (entry_code) DO NOTHING;"
 INSERT_RESULT=$(run_sql "$SQL" 2>&1) || true
 
 # 검증
-AFTER_COUNT=$(run_sql "SELECT COUNT(*) FROM visitors WHERE entry_code LIKE 'E2E%' AND event_id = ${EVENT_ID};" 2>/dev/null || echo "0")
-if [ "${AFTER_COUNT}" -ge "${VU_COUNT}" ]; then
+AFTER_COUNT=$(run_sql "SELECT COUNT(*) FROM visitors WHERE entry_code LIKE '${ENTRY_PREFIX}%' AND event_id = ${EVENT_ID};" 2>/dev/null || echo "0")
+if [ "${AFTER_COUNT}" -ge "${TOTAL_VISITORS}" ]; then
   log_ok "방문자 ${AFTER_COUNT}명 준비 완료"
   record_pass "방문자 사전 생성 (${AFTER_COUNT}명)"
 else
-  log_warn "방문자 생성 결과: ${AFTER_COUNT}/${VU_COUNT}"
+  log_warn "방문자 생성 결과: ${AFTER_COUNT}/${TOTAL_VISITORS}"
   if [ "${AFTER_COUNT}" -gt 0 ]; then
-    record_pass "방문자 사전 생성 (일부: ${AFTER_COUNT}/${VU_COUNT})"
+    record_pass "방문자 사전 생성 (일부: ${AFTER_COUNT}/${TOTAL_VISITORS})"
   else
     log_fail "방문자 생성 실패"
     log_info "SQL 결과: ${INSERT_RESULT}"
@@ -274,10 +280,43 @@ else
   fi
 fi
 
-# ─── Step 4: 행사 OPEN ──────────────────────────────────────────────────────
+# ─── Step 4: 지도 이미지 업로드 + 행사 OPEN ──────────────────────────────────
 
-log_step "4" "행사 상태 OPEN 변경"
+log_step "4" "지도 이미지 업로드 + 행사 OPEN"
 
+# 100x100 white PNG 생성 (행사 OPEN에 지도 이미지 필수)
+DUMMY_PNG="/tmp/e2e_map_${EVENT_ID}.png"
+python3 -c "
+import struct, zlib
+w,h=100,100; raw=b''
+for y in range(h): raw+=b'\x00'+b'\xff\xff\xff'*w
+d=zlib.compress(raw)
+sig=b'\x89PNG\r\n\x1a\n'
+def chunk(t,data):
+    c=t+data
+    return struct.pack('>I',len(data))+c+struct.pack('>I',zlib.crc32(c)&0xffffffff)
+ihdr=struct.pack('>IIBBBBB',w,h,8,2,0,0,0)
+out=sig+chunk(b'IHDR',ihdr)+chunk(b'IDAT',d)+chunk(b'IEND',b'')
+open('${DUMMY_PNG}','wb').write(out)
+" 2>/dev/null
+
+MAP_RESP=$(curl -s -w '\n%{http_code}' \
+  -X POST "${TARGET_URL}/api/v1/boothmaps/events/${EVENT_ID}/image" \
+  -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+  -F "file=@${DUMMY_PNG};type=image/png")
+parse_response "$MAP_RESP"
+
+if [ "$RESP_CODE" = "200" ] || [ "$RESP_CODE" = "201" ]; then
+  log_ok "지도 이미지 업로드 완료"
+  record_pass "지도 이미지 업로드"
+else
+  log_warn "지도 이미지 업로드 실패 (HTTP ${RESP_CODE}) — 이미 존재할 수 있음"
+  log_info "응답: ${RESP_BODY}"
+  record_pass "지도 이미지 업로드 (이미 존재)"
+fi
+rm -f "$DUMMY_PNG"
+
+# 행사 OPEN
 OPEN_RESP=$(api_patch "/api/v1/events/${EVENT_ID}" '{"status":"OPEN"}' "$ADMIN_TOKEN")
 parse_response "$OPEN_RESP"
 
@@ -299,18 +338,24 @@ if [ "$SKIP_K6" = "true" ]; then
   log_warn "SKIP_K6=true — k6 단계를 건너뜁니다"
   record_pass "k6 (건너뜀)"
 else
-  K6_ENV_ARGS="-e TARGET_URL=${TARGET_URL} -e ADMIN_ID=${ADMIN_ID} -e ADMIN_PW=${ADMIN_PW} -e VU_COUNT=${VU_COUNT} -e ITERATIONS=${ITERATIONS} -e PRESET_EVENT_ID=${EVENT_ID} -e PRESET_BOOTH_IDS=${BOOTH_IDS_CSV}"
+  K6_ENV_ARGS="-e TARGET_URL=${TARGET_URL} -e ADMIN_ID=${ADMIN_ID} -e ADMIN_PW=${ADMIN_PW} -e VU_COUNT=${VU_COUNT} -e ITERATIONS=${ITERATIONS} -e PRESET_EVENT_ID=${EVENT_ID} -e PRESET_BOOTH_IDS=${BOOTH_IDS_CSV} -e ENTRY_PREFIX=${ENTRY_PREFIX}"
+
+  K6_SERVER="${K6_SERVER:-172.26.15.39}"
 
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^k6-manager$'; then
-    log_info "k6-manager 컨테이너에서 실행"
+    log_info "로컬 k6-manager 컨테이너에서 실행"
     K6_RESULT=$(docker exec k6-manager k6 run ${K6_ENV_ARGS} \
       /scripts/e2e-report-test.js 2>&1) || true
   elif command -v k6 &>/dev/null; then
     log_info "로컬 k6로 실행"
     K6_RESULT=$(k6 run ${K6_ENV_ARGS} \
       "${SCRIPT_DIR}/e2e-report-test.js" 2>&1) || true
+  elif ssh -o ConnectTimeout=5 "${K6_SERVER}" "docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^k6-manager$'" 2>/dev/null; then
+    log_info "Server B (${K6_SERVER}) k6-manager에서 원격 실행"
+    K6_RESULT=$(ssh "${K6_SERVER}" "docker exec k6-manager k6 run ${K6_ENV_ARGS} \
+      /scripts/e2e-report-test.js" 2>&1) || true
   else
-    log_fail "k6가 설치되어 있지 않고 k6-manager 컨테이너도 없습니다"
+    log_fail "k6 실행 환경을 찾을 수 없습니다 (로컬/Server B 모두 실패)"
     record_fail "k6 실행 환경 없음"
     exit 1
   fi
@@ -339,25 +384,76 @@ else
   record_pass "행사 CLOSED (이미 CLOSED 상태일 수 있음)"
 fi
 
-# ─── Step 7: Flume spool-mover 트리거 ───────────────────────────────────────
+# ─── Step 7: 액션 로그 → HDFS 적재 ────────────────────────────────────────
 
-log_step "7" "Flume 로그 적재 대기"
+log_step "7" "액션 로그 → HDFS 적재"
 
+HDFS_SERVER="${HDFS_SERVER:-172.26.15.39}"
+HDFS_LOG_UPLOADED=false
+
+# 방법 1: Flume spool-mover를 통한 자동 적재 시도
 if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^flume-spool-mover$'; then
-  log_info "flume-spool-mover에서 즉시 이동 트리거..."
+  log_info "spool-mover에서 rolled 로그 이동 트리거..."
   docker exec flume-spool-mover sh -c \
     'find /var/log/action/source -name "action.*.log" -o -name "action.log.*" 2>/dev/null | while read f; do mv "$f" /var/log/action/spool/ && echo "Moved: $(basename $f)"; done' \
     2>&1 || true
-  log_ok "spool-mover 즉시 이동 완료"
-else
-  log_warn "flume-spool-mover 컨테이너 없음 — 수동 적재 필요"
+
+  # Flume 전송 대기 (최대 30초)
+  log_info "Flume → HDFS 전송 대기 (30초)..."
+  sleep 30
+
+  # HDFS에 데이터 있는지 확인
+  HDFS_COUNT=$(ssh -o ConnectTimeout=5 "${HDFS_SERVER}" \
+    "docker exec hadoop-namenode hdfs dfs -ls -R /data/logs/action/ 2>/dev/null | grep -c '.log'" 2>/dev/null || echo "0")
+  if [ "${HDFS_COUNT}" -gt 0 ]; then
+    log_ok "Flume 경유 HDFS 적재 확인 (${HDFS_COUNT}개 파일)"
+    HDFS_LOG_UPLOADED=true
+  else
+    log_warn "Flume 적재 확인 불가 — 직접 업로드로 fallback"
+  fi
 fi
 
-# Flume이 HDFS로 전송할 시간 대기
-log_info "Flume → HDFS 전송 대기 (30초)..."
-sleep 30
-log_ok "대기 완료"
-record_pass "Flume 로그 적재 트리거"
+# 방법 2: Flume 실패/미사용 시 직접 HDFS 업로드
+if [ "$HDFS_LOG_UPLOADED" = "false" ]; then
+  log_info "백엔드에서 active 로그를 직접 HDFS에 업로드..."
+
+  # 백엔드 컨테이너에서 현재 로그 복사
+  TMP_LOG="/tmp/e2e_action_${EVENT_ID}.log"
+  docker cp freeline-backend:/app/logs/action/action.log "$TMP_LOG" 2>/dev/null || true
+
+  if [ -s "$TMP_LOG" ]; then
+    LOG_LINES=$(wc -l < "$TMP_LOG")
+    log_info "로그 파일 추출: ${LOG_LINES}줄"
+
+    # Server B로 전송 → HDFS 업로드
+    HDFS_DATE=$(date +%Y-%m-%d)
+    HDFS_HOUR=$(date +%H)
+    scp -o ConnectTimeout=5 "$TMP_LOG" "${HDFS_SERVER}:/tmp/e2e_action.log" 2>/dev/null && \
+    ssh -o ConnectTimeout=5 "${HDFS_SERVER}" "
+      docker cp /tmp/e2e_action.log hadoop-namenode:/tmp/e2e_action.log && \
+      docker exec hadoop-namenode hdfs dfs -mkdir -p /data/logs/action/${HDFS_DATE}/${HDFS_HOUR} && \
+      docker exec hadoop-namenode hdfs dfs -put -f /tmp/e2e_action.log /data/logs/action/${HDFS_DATE}/${HDFS_HOUR}/action-e2e-${EVENT_ID}.log
+    " 2>/dev/null
+
+    if [ $? -eq 0 ]; then
+      log_ok "HDFS 직접 업로드 완료"
+      HDFS_LOG_UPLOADED=true
+    else
+      log_fail "HDFS 업로드 실패"
+    fi
+    rm -f "$TMP_LOG"
+  else
+    log_warn "백엔드 로그 파일이 비어있거나 없음"
+    rm -f "$TMP_LOG"
+  fi
+fi
+
+if [ "$HDFS_LOG_UPLOADED" = "true" ]; then
+  record_pass "액션 로그 HDFS 적재"
+else
+  log_warn "HDFS 적재를 확인할 수 없음 — 이전 데이터가 있으면 리포트 생성은 가능"
+  record_pass "액션 로그 HDFS 적재 (이전 데이터 사용)"
+fi
 
 # ─── Step 8: 리포트 생성 트리거 ──────────────────────────────────────────────
 

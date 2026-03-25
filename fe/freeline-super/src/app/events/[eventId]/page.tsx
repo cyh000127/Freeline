@@ -148,6 +148,21 @@ export default function EventDetailPage() {
             const res = await boothMapApi.uploadMapImage(eventId, file, true);
 
             if (res.data?.success && res.data?.data) {
+                // Get original image dimensions to maintain aspect ratio
+                const img = new Image();
+                img.onload = () => {
+                    const aspect = img.width / img.height;
+                    if (containerRef.current) {
+                        const containerWidth = containerRef.current.offsetWidth;
+                        const calculatedHeight = containerWidth / aspect;
+                        setContainerSize({
+                            width: containerWidth,
+                            height: calculatedHeight
+                        });
+                    }
+                };
+                img.src = res.data.data.imagePath;
+
                 setLayoutImageUrl(res.data.data.imagePath);
                 setEventMapId(res.data.data.eventMapId);
 
@@ -209,6 +224,18 @@ export default function EventDetailPage() {
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handleAddArea = () => {
+        const newArea = {
+            localId: `new-${Date.now()}`,
+            boothId: null,
+            xRatio: 0.45,
+            yRatio: 0.45,
+            widthRatio: 0.1,
+            heightRatio: 0.1,
+        };
+        setAreas(prev => [...prev, newArea]);
     };
 
     const handleOpenSearchModal = (localId: string) => {
@@ -297,6 +324,13 @@ export default function EventDetailPage() {
                   {layoutImageUrl && (
                       isEditMode ? (
                           <>
+                              <button
+                                  onClick={handleAddArea}
+                                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-100 text-blue-700 rounded-xl font-black text-[15px] hover:bg-blue-200 transition-all shadow-sm"
+                              >
+                                  <MapPin className="w-5 h-5"/>
+                                  영역 추가
+                              </button>
                               <button
                                   onClick={() => setIsEditMode(false)}
                                   className="flex items-center gap-2 px-5 py-2.5 bg-gray-200 text-gray-700 rounded-xl font-black text-[15px] hover:bg-gray-300 transition-all"
