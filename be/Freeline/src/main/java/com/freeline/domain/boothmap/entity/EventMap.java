@@ -37,8 +37,15 @@ public class EventMap extends BaseEntity {
     @Column(name = "is_visible", nullable = false)
     private boolean visible;
 
+    @Column(name = "mapping_snapshot", columnDefinition = "json")
+    private String mappingSnapshot;
+
     public void update(final String imagePath, final boolean visible) {
         this.imagePath = imagePath;
         this.visible = visible;
+    }
+
+    public void updateMappingSnapshot(final String mappingSnapshot) {
+        this.mappingSnapshot = mappingSnapshot;
     }
 }
