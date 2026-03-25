@@ -20,7 +20,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     # 컨테이너 시작 시 template에서 실제 conf 생성
-    command: /bin/sh -c "envsubst '$$SERVER_NAME $$BACKEND_HOST $$BACKEND_PORT $$FRONTEND_HOST $$FRONTEND_PORT $$BOOTH_HOST $$BOOTH_PORT $$SUPER_HOST $$SUPER_PORT $$JENKINS_HOST $$JENKINS_PORT $$INFISICAL_HOST $$INFISICAL_PORT $$GRAFANA_HOST $$GRAFANA_PORT $$PROMETHEUS_HOST $$PROMETHEUS_PORT' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+    command: /bin/sh -c "envsubst '$$SERVER_NAME $$BACKEND_HOST $$BACKEND_PORT $$FRONTEND_HOST $$FRONTEND_PORT $$BOOTH_HOST $$BOOTH_PORT $$SUPER_HOST $$SUPER_PORT $$JENKINS_HOST $$JENKINS_PORT $$INFISICAL_HOST $$INFISICAL_PORT $$GRAFANA_HOST $$GRAFANA_PORT $$PROMETHEUS_HOST $$PROMETHEUS_PORT $$RABBITMQ_HOST $$RABBITMQ_MGMT_PORT' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
 
   certbot:
     image: certbot/certbot
