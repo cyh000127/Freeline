@@ -646,7 +646,7 @@ class WaitingServiceTest {
         final Booth booth = createBooth(12L, "Goods Booth");
 
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
-        Mockito.when(boothWaitingRepository.countByBoothIdAndStatus(12L, WaitingStatus.WAITING)).thenReturn(7L);
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, ACTIVE_WAITING_STATUSES)).thenReturn(7L);
         Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
                 BoothPolicy.builder()
                         .id(1L)
@@ -668,7 +668,7 @@ class WaitingServiceTest {
         final Booth booth = createBooth(12L, "Goods Booth");
 
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
-        Mockito.when(boothWaitingRepository.countByBoothIdAndStatus(12L, WaitingStatus.WAITING)).thenReturn(4L);
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, ACTIVE_WAITING_STATUSES)).thenReturn(4L);
         Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.empty());
         Mockito.when(eventPolicyRepository.findByEvent_Id(3L)).thenReturn(Optional.of(
                 EventPolicy.builder()
@@ -686,6 +686,27 @@ class WaitingServiceTest {
 
         Assertions.assertThat(result.avgStayTime()).isEqualTo(5);
         Assertions.assertThat(result.estimatedMinutes()).isEqualTo(20);
+    }
+
+    @Test
+    void getExpectedWaitingTime_success_includesFrontQueueAndInUseForNewVisitor() {
+        final Booth booth = createBooth(12L, "Goods Booth");
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, ACTIVE_WAITING_STATUSES)).thenReturn(9L);
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
+                BoothPolicy.builder()
+                        .id(1L)
+                        .boothId(12L)
+                        .stayTime(300)
+                        .build()
+        ));
+
+        final WaitingExpectedTimeResDto result = waitingService.getExpectedWaitingTime(12L);
+
+        Assertions.assertThat(result.currentRank()).isEqualTo(9);
+        Assertions.assertThat(result.avgStayTime()).isEqualTo(5);
+        Assertions.assertThat(result.estimatedMinutes()).isEqualTo(45);
     }
 
     @Test

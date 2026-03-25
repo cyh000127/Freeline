@@ -333,7 +333,10 @@ public class WaitingService {
     public WaitingExpectedTimeResDto getExpectedWaitingTime(final Long boothId) {
         getBoothEntity(boothId);
 
-        final int currentRank = Math.toIntExact(boothWaitingRepository.countByBoothIdAndStatus(boothId, WaitingStatus.WAITING));
+        final int currentRank = Math.toIntExact(boothWaitingRepository.countByBoothIdAndStatusIn(
+                boothId,
+                ACTIVE_WAITING_STATUSES
+        ));
         final int stayTimeSeconds = waitingPolicyResolver.resolveStayTimeSeconds(boothId, DEFAULT_STAY_TIME_SECONDS);
         final int avgStayTimeMinutes = stayTimeSeconds > 0
                 ? Math.toIntExact(Math.ceilDiv((long) stayTimeSeconds, SECONDS_PER_MINUTE))

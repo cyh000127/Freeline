@@ -13,7 +13,7 @@ public record WaitingExpectedTimeResDto(
         @Schema(description = "부스 ID", example = "12")
         Long boothId,
 
-        @Schema(description = "현재 대기 팀 수", example = "7")
+        @Schema(description = "신규 방문자 기준 앞에 있는 활성 팀 수", example = "7")
         Integer currentRank,
 
         @Schema(description = "예상 대기 시간(분)", example = "70")
