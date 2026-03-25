@@ -7,7 +7,6 @@ WORKDIR /app
 # 파이썬 패키지를 설치할 때 필요한 추가 도구들을 리눅스에 먼저 설치합니다.
 # (OpenCV 등이 정상적으로 돌기 위해 필요한 라이브러리들입니다.)
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
