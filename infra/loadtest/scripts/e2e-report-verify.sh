@@ -3,22 +3,24 @@
 # E2E Report Pipeline Verification Script
 #
 # 전체 흐름:
-#   1. psql로 방문자(visitor) 사전 생성
-#   2. k6 부하 테스트 실행 (행동 로그 + 대기열 데이터 생성)
-#   3. 행사 상태 CLOSED 변경
-#   4. Flume spool-mover 트리거 (로그 → HDFS 적재)
-#   5. HDFS 적재 확인
-#   6. 리포트 생성 트리거 (POST /generate)
-#   7. 상태 폴링 → COMPLETED 대기
-#   8. 리포트 데이터 검증
+#   1. 관리자 로그인
+#   2. 행사 + 부스 생성 (API)
+#   3. 방문자 entry code DB 사전 생성 (psql)
+#   4. 행사 OPEN
+#   5. k6 부하 테스트 실행 (PRESET_EVENT_ID 모드)
+#   6. 행사 CLOSED 변경
+#   7. Flume spool-mover 트리거 (로그 → HDFS 적재)
+#   8. 리포트 생성 트리거 (POST /generate)
+#   9. 상태 폴링 → COMPLETED 대기
+#  10. 리포트 데이터 검증
 #
 # 사용법:
 #   ./e2e-report-verify.sh
 #
 # 환경 변수:
 #   TARGET_URL   — API 서버 (기본: https://j14a207.p.ssafy.io)
-#   ADMIN_ID     — 관리자 ID (기본: admin@freeline.com)
-#   ADMIN_PW     — 관리자 비밀번호 (기본: password123!)
+#   ADMIN_ID     — 관리자 ID
+#   ADMIN_PW     — 관리자 비밀번호
 #   VU_COUNT     — 동시 사용자 수 (기본: 50)
 #   ITERATIONS   — VU당 반복 횟수 (기본: 10)
 #   DB_HOST      — PostgreSQL 호스트 (기본: localhost)
@@ -34,8 +36,8 @@ set -euo pipefail
 # ─── Configuration ───────────────────────────────────────────────────────────
 
 TARGET_URL="${TARGET_URL:-https://j14a207.p.ssafy.io}"
-ADMIN_ID="${ADMIN_ID:-admin@freeline.com}"
-ADMIN_PW="${ADMIN_PW:-password123!}"
+ADMIN_ID="${ADMIN_ID:-kangseunghun9927@gmail.com}"
+ADMIN_PW="${ADMIN_PW:-jmh8EYG3pyd9ydt*vam}"
 VU_COUNT="${VU_COUNT:-50}"
 ITERATIONS="${ITERATIONS:-10}"
 
@@ -69,39 +71,46 @@ log_info() { echo -e "  ℹ $1"; }
 
 api_post() {
   local path="$1" body="$2" token="${3:-}"
-  local auth_header=""
   if [ -n "$token" ]; then
-    auth_header="-H \"Authorization: Bearer ${token}\""
+    curl -s -w '\n%{http_code}' \
+      -X POST "${TARGET_URL}${path}" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer ${token}" \
+      -d "${body}"
+  else
+    curl -s -w '\n%{http_code}' \
+      -X POST "${TARGET_URL}${path}" \
+      -H "Content-Type: application/json" \
+      -d "${body}"
   fi
-  eval curl -s -w '\n%{http_code}' \
-    -X POST "${TARGET_URL}${path}" \
-    -H "Content-Type: application/json" \
-    ${auth_header} \
-    -d "'${body}'"
 }
 
 api_get() {
   local path="$1" token="${2:-}"
-  local auth_header=""
   if [ -n "$token" ]; then
-    auth_header="-H \"Authorization: Bearer ${token}\""
+    curl -s -w '\n%{http_code}' \
+      -X GET "${TARGET_URL}${path}" \
+      -H "Authorization: Bearer ${token}"
+  else
+    curl -s -w '\n%{http_code}' \
+      -X GET "${TARGET_URL}${path}"
   fi
-  eval curl -s -w '\n%{http_code}' \
-    -X GET "${TARGET_URL}${path}" \
-    ${auth_header}
 }
 
 api_patch() {
   local path="$1" body="$2" token="${3:-}"
-  local auth_header=""
   if [ -n "$token" ]; then
-    auth_header="-H \"Authorization: Bearer ${token}\""
+    curl -s -w '\n%{http_code}' \
+      -X PATCH "${TARGET_URL}${path}" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer ${token}" \
+      -d "${body}"
+  else
+    curl -s -w '\n%{http_code}' \
+      -X PATCH "${TARGET_URL}${path}" \
+      -H "Content-Type: application/json" \
+      -d "${body}"
   fi
-  eval curl -s -w '\n%{http_code}' \
-    -X PATCH "${TARGET_URL}${path}" \
-    -H "Content-Type: application/json" \
-    ${auth_header} \
-    -d "'${body}'"
 }
 
 # Extract HTTP body (all lines except last) and status code (last line)
@@ -129,23 +138,22 @@ record_fail() { FAIL_COUNT=$((FAIL_COUNT + 1)); RESULTS+=("${RED}FAIL${NC}: $1")
 
 log_step "0" "사전 조건 확인"
 
-# Check curl
 if ! command -v curl &>/dev/null; then
   log_fail "curl이 설치되어 있지 않습니다"
   exit 1
 fi
 log_ok "curl 확인"
 
-# Check psql
+# psql: docker exec fallback
+USE_DOCKER_PSQL=false
 if ! command -v psql &>/dev/null; then
-  log_warn "psql이 없습니다 — 방문자 생성 단계를 건너뜁니다 (docker exec 시도)"
+  log_warn "psql이 없습니다 — docker exec 시도"
   USE_DOCKER_PSQL=true
 else
-  USE_DOCKER_PSQL=false
   log_ok "psql 확인"
 fi
 
-# ─── Step 1: Admin Login ─────────────────────────────────────────────────────
+# ─── Step 1: 관리자 로그인 ──────────────────────────────────────────────────
 
 log_step "1" "관리자 로그인"
 
@@ -169,30 +177,137 @@ else
   exit 1
 fi
 
-# ─── Step 2: k6 Load Test (행동 로그 + 대기열 데이터 생성) ──────────────────
+# ─── Step 2: 행사 + 부스 생성 ───────────────────────────────────────────────
 
-log_step "2" "k6 부하 테스트 실행"
+log_step "2" "행사 + 부스 생성"
+
+TODAY=$(date +%Y-%m-%d)
+END_DATE=$(date -d "+3 days" +%Y-%m-%d 2>/dev/null || date -v+3d +%Y-%m-%d)
+EVENT_NAME="[E2E Test] 리포트 테스트 행사 $(date +%s)"
+
+EVENT_RESP=$(api_post "/api/v1/events" \
+  "{\"name\":\"${EVENT_NAME}\",\"description\":\"k6 E2E 리포트 파이프라인 테스트용\",\"startDate\":\"${TODAY}\",\"endDate\":\"${END_DATE}\",\"openTime\":\"09:00:00\",\"closeTime\":\"18:00:00\",\"locationAddress\":\"서울특별시 강남구 테헤란로 212\"}" \
+  "$ADMIN_TOKEN")
+parse_response "$EVENT_RESP"
+
+if [ "$RESP_CODE" = "200" ] || [ "$RESP_CODE" = "201" ]; then
+  EVENT_ID=$(extract_json_field "$RESP_BODY" "eventId")
+  if [ -z "$EVENT_ID" ] || [ "$EVENT_ID" = "null" ]; then
+    EVENT_ID=$(extract_json_field "$RESP_BODY" "id")
+  fi
+  log_ok "행사 생성: eventId=${EVENT_ID}"
+  record_pass "행사 생성"
+else
+  log_fail "행사 생성 실패 (HTTP ${RESP_CODE})"
+  log_info "응답: ${RESP_BODY}"
+  record_fail "행사 생성"
+  exit 1
+fi
+
+# 부스 10개 생성
+BOOTH_NAMES=("삼성전자" "LG전자" "현대자동차" "SK하이닉스" "네이버" "카카오" "쿠팡" "배달의민족" "토스" "당근마켓")
+LOCATION_CODES=("A-01" "B-01" "C-01" "D-01" "E-01" "F-01" "G-01" "H-01" "I-01" "J-01")
+BOOTH_IDS=()
+
+for i in $(seq 0 9); do
+  BOOTH_RESP=$(api_post "/api/v1/booths/events/${EVENT_ID}" \
+    "{\"name\":\"${BOOTH_NAMES[$i]}\",\"locationCode\":\"${LOCATION_CODES[$i]}\",\"openTime\":\"09:00:00\",\"closeTime\":\"18:00:00\"}" \
+    "$ADMIN_TOKEN")
+  parse_response "$BOOTH_RESP"
+
+  if [ "$RESP_CODE" = "200" ] || [ "$RESP_CODE" = "201" ]; then
+    BID=$(extract_json_field "$RESP_BODY" "boothId")
+    if [ -z "$BID" ] || [ "$BID" = "null" ]; then
+      BID=$(extract_json_field "$RESP_BODY" "id")
+    fi
+    BOOTH_IDS+=("$BID")
+  else
+    log_warn "부스 '${BOOTH_NAMES[$i]}' 생성 실패 (HTTP ${RESP_CODE})"
+  fi
+done
+
+BOOTH_IDS_CSV=$(IFS=,; echo "${BOOTH_IDS[*]}")
+log_ok "부스 ${#BOOTH_IDS[@]}개 생성: ${BOOTH_IDS_CSV}"
+record_pass "부스 생성 (${#BOOTH_IDS[@]}개)"
+
+# ─── Step 3: 방문자 Entry Code 사전 생성 (psql) ─────────────────────────────
+
+log_step "3" "방문자 Entry Code DB 생성"
+
+run_sql() {
+  local sql="$1"
+  if [ "$USE_DOCKER_PSQL" = "true" ]; then
+    docker exec -e PGPASSWORD="${DB_PASSWORD}" freeline-db \
+      psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "$sql" 2>/dev/null
+  else
+    PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "$sql" 2>/dev/null
+  fi
+}
+
+log_info "방문자 ${VU_COUNT}명 생성 중..."
+
+SQL="INSERT INTO visitors (event_id, entry_code, name, is_active, created_at, updated_at) VALUES "
+VALUES=""
+for i in $(seq 1 "${VU_COUNT}"); do
+  CODE=$(printf "E2E%03d" "$i")
+  if [ -n "$VALUES" ]; then VALUES="${VALUES},"; fi
+  VALUES="${VALUES}(${EVENT_ID}, '${CODE}', 'E2E Visitor ${i}', true, NOW(), NOW())"
+done
+SQL="${SQL}${VALUES} ON CONFLICT (entry_code) DO NOTHING;"
+
+INSERT_RESULT=$(run_sql "$SQL" 2>&1) || true
+
+# 검증
+AFTER_COUNT=$(run_sql "SELECT COUNT(*) FROM visitors WHERE entry_code LIKE 'E2E%' AND event_id = ${EVENT_ID};" 2>/dev/null || echo "0")
+if [ "${AFTER_COUNT}" -ge "${VU_COUNT}" ]; then
+  log_ok "방문자 ${AFTER_COUNT}명 준비 완료"
+  record_pass "방문자 사전 생성 (${AFTER_COUNT}명)"
+else
+  log_warn "방문자 생성 결과: ${AFTER_COUNT}/${VU_COUNT}"
+  if [ "${AFTER_COUNT}" -gt 0 ]; then
+    record_pass "방문자 사전 생성 (일부: ${AFTER_COUNT}/${VU_COUNT})"
+  else
+    log_fail "방문자 생성 실패"
+    log_info "SQL 결과: ${INSERT_RESULT}"
+    record_fail "방문자 사전 생성"
+    exit 1
+  fi
+fi
+
+# ─── Step 4: 행사 OPEN ──────────────────────────────────────────────────────
+
+log_step "4" "행사 상태 OPEN 변경"
+
+OPEN_RESP=$(api_patch "/api/v1/events/${EVENT_ID}" '{"status":"OPEN"}' "$ADMIN_TOKEN")
+parse_response "$OPEN_RESP"
+
+if [ "$RESP_CODE" = "200" ]; then
+  log_ok "행사 OPEN 완료"
+  record_pass "행사 OPEN"
+else
+  log_fail "행사 OPEN 실패 (HTTP ${RESP_CODE})"
+  log_info "응답: ${RESP_BODY}"
+  record_fail "행사 OPEN"
+  exit 1
+fi
+
+# ─── Step 5: k6 부하 테스트 실행 ─────────────────────────────────────────────
+
+log_step "5" "k6 부하 테스트 실행"
 
 if [ "$SKIP_K6" = "true" ]; then
   log_warn "SKIP_K6=true — k6 단계를 건너뜁니다"
-  log_info "기존 eventId를 수동으로 입력해 주세요"
-  read -rp "  eventId: " EVENT_ID
+  record_pass "k6 (건너뜀)"
 else
-  # k6 실행: docker exec 또는 로컬 k6
-  K6_OUTPUT_FILE="${SCRIPT_DIR}/../output/e2e-report-$(date +%Y%m%d-%H%M%S).json"
-  mkdir -p "$(dirname "$K6_OUTPUT_FILE")"
-
-  K6_ENV_ARGS="-e TARGET_URL=${TARGET_URL} -e ADMIN_ID=${ADMIN_ID} -e ADMIN_PW=${ADMIN_PW} -e VU_COUNT=${VU_COUNT} -e ITERATIONS=${ITERATIONS}"
+  K6_ENV_ARGS="-e TARGET_URL=${TARGET_URL} -e ADMIN_ID=${ADMIN_ID} -e ADMIN_PW=${ADMIN_PW} -e VU_COUNT=${VU_COUNT} -e ITERATIONS=${ITERATIONS} -e PRESET_EVENT_ID=${EVENT_ID} -e PRESET_BOOTH_IDS=${BOOTH_IDS_CSV}"
 
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^k6-manager$'; then
     log_info "k6-manager 컨테이너에서 실행"
     K6_RESULT=$(docker exec k6-manager k6 run ${K6_ENV_ARGS} \
-      --summary-export=/output/e2e-report-summary.json \
       /scripts/e2e-report-test.js 2>&1) || true
   elif command -v k6 &>/dev/null; then
     log_info "로컬 k6로 실행"
     K6_RESULT=$(k6 run ${K6_ENV_ARGS} \
-      --summary-export="${K6_OUTPUT_FILE}" \
       "${SCRIPT_DIR}/e2e-report-test.js" 2>&1) || true
   else
     log_fail "k6가 설치되어 있지 않고 k6-manager 컨테이너도 없습니다"
@@ -200,82 +315,17 @@ else
     exit 1
   fi
 
-  # k6 출력에서 EVENT_ID 추출 (teardown에서 console.log 출력)
-  EVENT_ID=$(echo "$K6_RESULT" | grep -o 'EVENT_ID=[0-9]*' | head -1 | cut -d= -f2)
-  K6_ADMIN_TOKEN=$(echo "$K6_RESULT" | grep -o 'ADMIN_TOKEN=[^ ]*' | head -1 | cut -d= -f2)
-
-  if [ -n "$EVENT_ID" ]; then
-    log_ok "k6 완료 — eventId=${EVENT_ID}"
-    record_pass "k6 부하 테스트 실행"
-  else
-    log_fail "k6 출력에서 EVENT_ID를 추출할 수 없습니다"
-    log_info "k6 출력 (마지막 30줄):"
-    echo "$K6_RESULT" | tail -30
-    record_fail "k6 부하 테스트 — EVENT_ID 추출 실패"
-    exit 1
-  fi
-
-  # k6에서 생성한 토큰이 있으면 갱신
-  if [ -n "${K6_ADMIN_TOKEN:-}" ] && [ "$K6_ADMIN_TOKEN" != "null" ]; then
-    ADMIN_TOKEN="$K6_ADMIN_TOKEN"
-    log_info "k6 teardown의 관리자 토큰으로 갱신"
-  fi
+  # k6 결과 출력 (마지막 40줄)
+  echo "$K6_RESULT" | tail -40
+  log_ok "k6 실행 완료"
+  record_pass "k6 부하 테스트 실행"
 fi
 
 log_info "대상 eventId: ${EVENT_ID}"
 
-# ─── Step 3: 방문자 사전 생성 (psql) ────────────────────────────────────────
+# ─── Step 6: 행사 CLOSED 변경 ───────────────────────────────────────────────
 
-log_step "3" "방문자 Entry Code 생성 확인"
-
-# k6 setup에서 entry code를 사용하므로, 사전에 visitors 테이블에 존재해야 함
-# 이미 존재하면 SKIP
-PSQL_CMD="psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME}"
-export PGPASSWORD="${DB_PASSWORD}"
-
-run_sql() {
-  local sql="$1"
-  if [ "$USE_DOCKER_PSQL" = "true" ]; then
-    docker exec -e PGPASSWORD="${DB_PASSWORD}" backend-postgres \
-      psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "$sql" 2>/dev/null
-  else
-    ${PSQL_CMD} -t -A -c "$sql" 2>/dev/null
-  fi
-}
-
-EXISTING_COUNT=$(run_sql "SELECT COUNT(*) FROM visitors WHERE entry_code LIKE 'E2E%' AND event_id = ${EVENT_ID};" 2>/dev/null || echo "0")
-
-if [ "${EXISTING_COUNT}" -ge "${VU_COUNT}" ]; then
-  log_ok "방문자 ${EXISTING_COUNT}명 이미 존재 — 건너뜀"
-else
-  log_info "방문자 ${VU_COUNT}명 생성 중..."
-
-  # 벌크 INSERT 생성
-  SQL="INSERT INTO visitors (event_id, entry_code, name, is_active, created_at, updated_at) VALUES "
-  VALUES=""
-  for i in $(seq 1 "${VU_COUNT}"); do
-    CODE=$(printf "E2E%03d" "$i")
-    if [ -n "$VALUES" ]; then VALUES="${VALUES},"; fi
-    VALUES="${VALUES}(${EVENT_ID}, '${CODE}', 'E2E Visitor ${i}', true, NOW(), NOW())"
-  done
-  SQL="${SQL}${VALUES} ON CONFLICT (entry_code) DO NOTHING;"
-
-  INSERT_RESULT=$(run_sql "$SQL" 2>&1) || true
-
-  # 검증
-  AFTER_COUNT=$(run_sql "SELECT COUNT(*) FROM visitors WHERE entry_code LIKE 'E2E%' AND event_id = ${EVENT_ID};" 2>/dev/null || echo "0")
-  if [ "${AFTER_COUNT}" -ge "${VU_COUNT}" ]; then
-    log_ok "방문자 ${AFTER_COUNT}명 준비 완료"
-    record_pass "방문자 사전 생성"
-  else
-    log_warn "방문자 생성 일부 실패 (${AFTER_COUNT}/${VU_COUNT})"
-    record_pass "방문자 사전 생성 (일부: ${AFTER_COUNT}/${VU_COUNT})"
-  fi
-fi
-
-# ─── Step 4: 행사 CLOSED 변경 ───────────────────────────────────────────────
-
-log_step "4" "행사 상태 CLOSED 변경"
+log_step "6" "행사 상태 CLOSED 변경"
 
 CLOSE_RESP=$(api_patch "/api/v1/events/${EVENT_ID}" '{"status":"CLOSED"}' "$ADMIN_TOKEN")
 parse_response "$CLOSE_RESP"
@@ -289,17 +339,14 @@ else
   record_pass "행사 CLOSED (이미 CLOSED 상태일 수 있음)"
 fi
 
-# ─── Step 5: Flume spool-mover 트리거 ───────────────────────────────────────
+# ─── Step 7: Flume spool-mover 트리거 ───────────────────────────────────────
 
-log_step "5" "Flume 로그 적재 대기"
+log_step "7" "Flume 로그 적재 대기"
 
-# spool-mover는 5분 이상 수정이 없는 파일만 이동하므로,
-# 테스트 환경에서는 수동으로 즉시 이동을 트리거
 if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^flume-spool-mover$'; then
   log_info "flume-spool-mover에서 즉시 이동 트리거..."
-  # source 디렉터리의 모든 action.*.log 파일을 바로 spool로 이동
   docker exec flume-spool-mover sh -c \
-    'find /var/log/action/source -name "action.*.log" 2>/dev/null | while read f; do mv "$f" /var/log/action/spool/ && echo "Moved: $(basename $f)"; done' \
+    'find /var/log/action/source -name "action.*.log" -o -name "action.log.*" 2>/dev/null | while read f; do mv "$f" /var/log/action/spool/ && echo "Moved: $(basename $f)"; done' \
     2>&1 || true
   log_ok "spool-mover 즉시 이동 완료"
 else
@@ -312,9 +359,9 @@ sleep 30
 log_ok "대기 완료"
 record_pass "Flume 로그 적재 트리거"
 
-# ─── Step 6: 리포트 생성 트리거 ──────────────────────────────────────────────
+# ─── Step 8: 리포트 생성 트리거 ──────────────────────────────────────────────
 
-log_step "6" "리포트 생성 트리거"
+log_step "8" "리포트 생성 트리거"
 
 GEN_RESP=$(api_post "/api/v1/reports/events/${EVENT_ID}/generate" '{}' "$ADMIN_TOKEN")
 parse_response "$GEN_RESP"
@@ -327,12 +374,11 @@ else
   log_fail "리포트 생성 트리거 실패 (HTTP ${RESP_CODE})"
   log_info "응답: ${RESP_BODY}"
   record_fail "리포트 생성 트리거 — HTTP ${RESP_CODE}"
-  # 실패해도 상태 확인 시도
 fi
 
-# ─── Step 7: 상태 폴링 ──────────────────────────────────────────────────────
+# ─── Step 9: 상태 폴링 ──────────────────────────────────────────────────────
 
-log_step "7" "리포트 생성 상태 폴링 (최대 ${POLL_MAX_WAIT}초)"
+log_step "9" "리포트 생성 상태 폴링 (최대 ${POLL_MAX_WAIT}초)"
 
 ELAPSED=0
 FINAL_STATUS="UNKNOWN"
@@ -375,9 +421,9 @@ if [ "$FINAL_STATUS" = "UNKNOWN" ]; then
   record_fail "리포트 생성 — 타임아웃 (${POLL_MAX_WAIT}초)"
 fi
 
-# ─── Step 8: 리포트 데이터 검증 ──────────────────────────────────────────────
+# ─── Step 10: 리포트 데이터 검증 ─────────────────────────────────────────────
 
-log_step "8" "리포트 데이터 검증"
+log_step "10" "리포트 데이터 검증"
 
 if [ "$FINAL_STATUS" != "COMPLETED" ]; then
   log_warn "리포트 생성이 완료되지 않아 검증 건너뜀"

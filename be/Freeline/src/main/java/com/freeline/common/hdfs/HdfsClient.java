@@ -69,13 +69,17 @@ public class HdfsClient {
             HttpURLConnection conn = openConnection(uri, "PUT");
             conn.setInstanceFollowRedirects(false);
             int status = conn.getResponseCode();
-            if (status != HttpURLConnection.HTTP_MOVED_TEMP) {
+            // WebHDFS returns 307 TEMPORARY_REDIRECT for CREATE
+            if (status != 307) {
                 conn.disconnect();
                 throw new HdfsException(
                         "Expected 307 redirect for CREATE, got HTTP " + status);
             }
             String location = conn.getHeaderField("Location");
             conn.disconnect();
+            // Rewrite datanode hostname to match the webhdfs host
+            // (needed when backend runs outside the Docker network)
+            location = rewriteDatanodeHost(location);
             return URI.create(location);
         } catch (IOException e) {
             throw new HdfsException("HDFS CREATE initiate failed for " + path, e);
@@ -99,6 +103,14 @@ public class HdfsClient {
         } catch (IOException e) {
             throw new HdfsException("HDFS write to datanode failed", e);
         }
+    }
+
+    private String rewriteDatanodeHost(String location) {
+        URI namenodeUri = URI.create(webhdfsUrl);
+        String namenodeHost = namenodeUri.getHost();
+        // Replace datanode hostname with the namenode host IP
+        // e.g., http://datanode:9864/... → http://172.26.15.39:9864/...
+        return location.replaceFirst("://[^:/]+:", "://" + namenodeHost + ":");
     }
 
     private HttpURLConnection openConnection(URI uri, String method)
