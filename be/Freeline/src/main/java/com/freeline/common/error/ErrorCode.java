@@ -46,6 +46,9 @@ public enum ErrorCode {
     VISITOR_NOT_FOUND(HttpStatus.NOT_FOUND, "U-011", "방문자 정보를 찾을 수 없습니다."),
     EMAIL_ALREADY_SENT(HttpStatus.CONFLICT, "U-012", "이미 인증 코드가 발송되었습니다."),
 
+    PASSWORD_CHANGE_REQUIRED(HttpStatus.FORBIDDEN, "U-013", "최초 로그인 후 비밀번호 변경이 필요합니다."),
+    PASSWORD_CHANGE_NOT_REQUIRED(HttpStatus.BAD_REQUEST, "U-014", "이미 비밀번호 변경이 완료된 계정입니다."),
+
     /**
      * Event Error (E-xxx)
      */

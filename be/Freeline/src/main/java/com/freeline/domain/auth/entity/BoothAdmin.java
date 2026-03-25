@@ -74,16 +74,16 @@ public class BoothAdmin extends BaseEntity {
     @JoinColumn(name = "booth_id", insertable = false, updatable = false)
     private Booth booth;
 
-    public void changePassword(@Nonnull final String password) {
-        this.password = password;
-        this.passwordChanged = true;
-        this.status = BoothAdminStatus.COMPLETED;
+    public void setTemporaryPassword(@Nonnull final String encodedPassword) {
+        this.password = encodedPassword;
+        this.passwordChanged = false;
+        this.status = BoothAdminStatus.MAILED;
     }
 
-    public void markAsMailed() {
-        if (this.status == BoothAdminStatus.CREATED) {
-            this.status = BoothAdminStatus.MAILED;
-        }
+    public void completePasswordChange(@Nonnull final String encodedPassword) {
+        this.password = encodedPassword;
+        this.passwordChanged = true;
+        this.status = BoothAdminStatus.COMPLETED;
     }
 
     public void recordLogin() {
