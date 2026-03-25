@@ -10,7 +10,7 @@ type ReservationStatus =
   | 'ENTERED'
   | 'EXITED'
   | 'CANCELED'
-  | 'AUTO_CANCELED';
+  | 'EXPIRED';
 
 type ExpandableReservationItem = {
   waitingId: string;
@@ -59,7 +59,7 @@ function getStatusUI(status: ReservationStatus) {
         label: '예약 취소' as const,
         tone: 'gray' as const,
       };
-    case 'AUTO_CANCELED':
+    case 'EXPIRED':
       return {
         label: '자동 취소' as const,
         tone: 'red' as const,

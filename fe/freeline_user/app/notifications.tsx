@@ -6,11 +6,13 @@ import { useRouter } from 'expo-router';
 import { useNotificationLive } from '@/features/notification/notification-live.context';
 import NotificationItem from '@/components/notification/NotificationItem';
 
+/*
 import {
   getNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
 } from '@/features/notification/notification.api';
+*/
 
 import type { NotificationItem as ApiNotification } from '@/features/notification/types';
 
@@ -43,6 +45,7 @@ export default function NotificationsScreen() {
   const hasUnread = items.some((item) => !item.isRead);
 
   const fetchNotifications = useCallback(async () => {
+    /*
     try {
       setLoading(true);
       const data = await getNotifications();
@@ -52,6 +55,8 @@ export default function NotificationsScreen() {
     } finally {
       setLoading(false);
     }
+    */
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -59,6 +64,7 @@ export default function NotificationsScreen() {
   }, [fetchNotifications, refreshKey]);
 
   const handlePressItem = async (notificationId: number) => {
+    /*
     try {
       await markNotificationAsRead(notificationId);
 
@@ -70,15 +76,18 @@ export default function NotificationsScreen() {
     } catch (e) {
       console.error('읽음 처리 실패:', e);
     }
+    */
   };
 
   const handleMarkAllRead = async () => {
+    /*
     try {
       await markAllNotificationsAsRead();
       setItems((prev) => prev.map((item) => ({ ...item, isRead: true })));
     } catch (e) {
       console.error('전체 읽음 실패:', e);
     }
+    */
   };
 
   return (
