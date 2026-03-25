@@ -152,6 +152,7 @@ class WaitingRabbitMqFlowTest {
         Mockito.verify(boothManagerSseService).publishQueueUpdated(calledCaptor.capture());
         Assertions.assertThat(calledCaptor.getValue().eventType()).isEqualTo("WAITING_CALLED");
         Assertions.assertThat(calledCaptor.getValue().operation()).isEqualTo("UPSERT");
+        Assertions.assertThat(calledCaptor.getValue().previousSection()).isEqualTo("NONE");
         Assertions.assertThat(calledCaptor.getValue().section()).isEqualTo("FRONT_QUEUE");
         Assertions.assertThat(calledCaptor.getValue().item()).isNotNull();
         Assertions.assertThat(calledCaptor.getValue().item().waitingNumber()).isEqualTo(7);
@@ -391,6 +392,38 @@ class WaitingRabbitMqFlowTest {
         Assertions.assertThat(canceledCaptor.getValue().operation()).isEqualTo("REMOVE");
         Assertions.assertThat(canceledCaptor.getValue().previousSection()).isEqualTo("FRONT_QUEUE");
         Assertions.assertThat(canceledCaptor.getValue().section()).isEqualTo("NONE");
+        Mockito.verifyNoInteractions(pushNotificationService, waitingFcmDelayPublisher, boothWaitingRepository);
+    }
+
+    @Test
+    void WAITING_CANCELED_대기상태는_SSE를_발행하지_않는다() {
+        final WaitingEventPublishListener publishListener = new WaitingEventPublishListener(waitingEventPublisher);
+        final BoothManagerWaitingEventConsumer sseConsumer = createSseConsumer();
+        final WaitingStatusChangeCommand command = new WaitingStatusChangeCommand(
+                WaitingEventType.WAITING_CANCELED,
+                307L,
+                12L,
+                29L,
+                WaitingStatus.WAITING.name(),
+                WaitingStatus.CANCELED.name(),
+                WaitingEventSnapshot.builder()
+                        .waitingId(307L)
+                        .waitingNumber(13)
+                        .visitorId(29L)
+                        .visitorName("윤프리라인")
+                        .status("CANCELED")
+                        .arrivalChecked(false)
+                        .build()
+        );
+
+        final WaitingEventMessage message = dispatch(command);
+
+        publishListener.handle(message);
+        Mockito.verifyNoInteractions(waitingEventPublisher);
+
+        sseConsumer.consume(message);
+
+        Mockito.verifyNoInteractions(boothManagerSseService);
         Mockito.verifyNoInteractions(pushNotificationService, waitingFcmDelayPublisher, boothWaitingRepository);
     }
 

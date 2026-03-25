@@ -43,6 +43,10 @@ public class BoothManagerWaitingEventConsumer {
             return;
         }
 
+        if (!shouldPublishQueueUpdate(message.previousStatus(), waitingStatus)) {
+            return;
+        }
+
         boothManagerSseService.publishQueueUpdated(toQueueUpdatedPayload(message, waitingStatus));
     }
 
@@ -66,6 +70,8 @@ public class BoothManagerWaitingEventConsumer {
     ) {
         final WaitingEventSnapshot snapshot = message.snapshot();
         final BoothManagerWaitingItemResDto item = BoothManagerConverter.toWaitingItemResDto(snapshot);
+        final String previousSection = resolveSection(message.previousStatus());
+        final String currentSection = resolveSection(waitingStatus);
 
         return BoothManagerConverter.toSseEventResDto(
                 message.eventId(),
@@ -74,24 +80,44 @@ public class BoothManagerWaitingEventConsumer {
                 message.waitingId(),
                 message.previousStatus(),
                 waitingStatus.name(),
-                resolveOperation(message.eventType().name()),
-                resolvePreviousSection(message.previousStatus()),
-                resolveSection(waitingStatus),
+                resolveOperation(previousSection, currentSection),
+                previousSection,
+                currentSection,
                 item,
                 message.occurredAt()
         );
     }
 
-    private String resolveOperation(final String eventType) {
-        return switch (eventType) {
-            case "WAITING_ENTERED" -> "MOVE";
-            case "WAITING_EXITED", "WAITING_EXPIRED", "WAITING_CANCELED" -> "REMOVE";
-            default -> "UPSERT";
-        };
+    private boolean shouldPublishQueueUpdate(
+            final String previousStatus,
+            final WaitingStatus currentStatus
+    ) {
+        return !"NONE".equals(resolveSection(previousStatus))
+                || !"NONE".equals(resolveSection(currentStatus));
     }
 
-    private String resolvePreviousSection(final String previousStatus) {
-        return switch (previousStatus) {
+    private String resolveOperation(final String previousSection, final String currentSection) {
+        if ("NONE".equals(previousSection) && !"NONE".equals(currentSection)) {
+            return "UPSERT";
+        }
+
+        if (!"NONE".equals(previousSection) && "NONE".equals(currentSection)) {
+            return "REMOVE";
+        }
+
+        if (!previousSection.equals(currentSection)) {
+            return "MOVE";
+        }
+
+        return "UPSERT";
+    }
+
+    private String resolveSection(final String status) {
+        if (status == null) {
+            return "NONE";
+        }
+
+        return switch (status) {
             case "CALLED", "REGISTERED" -> "FRONT_QUEUE";
             case "ENTERED" -> "IN_USE";
             default -> "NONE";
@@ -99,10 +125,6 @@ public class BoothManagerWaitingEventConsumer {
     }
 
     private String resolveSection(final WaitingStatus currentStatus) {
-        return switch (currentStatus) {
-            case CALLED, REGISTERED -> "FRONT_QUEUE";
-            case ENTERED, EXITED -> "IN_USE";
-            default -> "NONE";
-        };
+        return resolveSection(currentStatus.name());
     }
 }

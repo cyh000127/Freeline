@@ -17,12 +17,33 @@ public class WaitingEventPublishListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(final WaitingEventMessage message) {
-        if (message.eventType().isSseTarget()) {
+        if (shouldPublishSse(message)) {
             waitingEventPublisher.publish(WaitingEventChannel.SSE, message);
         }
 
         if (message.eventType().isFcmTarget()) {
             waitingEventPublisher.publish(WaitingEventChannel.FCM, message);
         }
+    }
+
+    private boolean shouldPublishSse(final WaitingEventMessage message) {
+        if (!message.eventType().isSseTarget()) {
+            return false;
+        }
+
+        return !"NONE".equals(resolveSection(message.previousStatus()))
+                || !"NONE".equals(resolveSection(message.currentStatus()));
+    }
+
+    private String resolveSection(final String status) {
+        if (status == null) {
+            return "NONE";
+        }
+
+        return switch (status) {
+            case "CALLED", "REGISTERED" -> "FRONT_QUEUE";
+            case "ENTERED" -> "IN_USE";
+            default -> "NONE";
+        };
     }
 }
