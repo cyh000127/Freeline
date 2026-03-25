@@ -568,6 +568,28 @@ class WaitingServiceTest {
     }
 
     @Test
+    void exitWaitingByAdmin_success() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.ENTERED, 4, 0, null);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+
+        final WaitingExitResDto result = waitingService.exitWaitingByAdmin(301L, 12L);
+
+        Assertions.assertThat(waiting.getStatus()).isEqualTo(WaitingStatus.EXITED);
+        Assertions.assertThat(waiting.getExitedAt()).isNotNull();
+        Assertions.assertThat(result.status()).isEqualTo("EXITED");
+    }
+
+    @Test
+    void exitWaitingByAdmin_fail_whenWaitingBelongsToAnotherBooth() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.ENTERED, 4, 0, null);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+
+        Assertions.assertThatThrownBy(() -> waitingService.exitWaitingByAdmin(301L, 99L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.ACCESS_DENIED.getMessage());
+    }
+
+    @Test
     void getMyWaitings_success() {
         final Booth goodsBooth = createBooth(12L, "Goods Booth");
         final Booth foodBooth = createBooth(14L, "Food Booth");

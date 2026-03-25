@@ -20,6 +20,7 @@ import com.freeline.domain.boothmanager.dto.response.BoothManagerSummaryResDto;
 import com.freeline.domain.boothmanager.dto.response.BoothManagerWaitingItemResDto;
 import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
+import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 import com.freeline.domain.waiting.service.WaitingService;
 
 @Service
@@ -93,6 +94,10 @@ public class BoothManagerService {
 
     public WaitingAdmitResDto admitWaiting(final Long boothId, final Long waitingId) {
         return waitingService.admitWaiting(waitingId, boothId);
+    }
+
+    public WaitingExitResDto exitWaiting(final Long boothId, final Long waitingId) {
+        return waitingService.exitWaitingByAdmin(waitingId, boothId);
     }
 
     public void cancelWaiting(final Long boothId, final Long waitingId) {
