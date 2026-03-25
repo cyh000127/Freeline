@@ -21,9 +21,9 @@ import {
   Users,
 } from "lucide-react";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
 interface BoothRow {
   id: string;
+  adminId?: number;
   boothName: string;
   locationCode: string;
   openTime: string;
@@ -108,24 +108,39 @@ export default function EventBoothsPage() {
   const [isParsing, setIsParsing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isSendingMail, setIsSendingMail] = useState(false);
 
-  // ── File handling ─────────────────────────────────────────────────────────
   const fetchBooths = useCallback(async () => {
     try {
-      const res = await eventApi.getBooths(eventId);
-      if (res.data?.success && Array.isArray(res.data.data)) {
-        const existingRows: BoothRow[] = res.data.data.map((b: any) => ({
-          id: b.boothId.toString(),
-          boothName: b.boothName || "",
-          locationCode: b.locationCode || "",
-          openTime: b.openTime || "",
-          closeTime: b.closeTime || "",
-          adminName: b.adminName || "",
-          adminEmail: b.adminEmail || "",
-          adminCompany: b.adminCompany || "",
-          selected: true,
-          status: "registered" as const,
-        }));
+      const [adminsRes, detailsRes] = await Promise.all([
+        eventApi.getBooths(eventId),
+        eventApi.getBoothDetails(eventId),
+      ]);
+
+      const detailsMap = new Map();
+      if (detailsRes.data?.success && Array.isArray(detailsRes.data.data)) {
+        detailsRes.data.data.forEach((d: any) => {
+          if (d.boothId) detailsMap.set(d.boothId.toString(), d);
+        });
+      }
+
+      if (adminsRes.data?.success && Array.isArray(adminsRes.data.data)) {
+        const existingRows: BoothRow[] = adminsRes.data.data.map((b: any) => {
+          const detail = b.boothId ? detailsMap.get(b.boothId.toString()) : null;
+          return {
+            id: b.boothId ? b.boothId.toString() : crypto.randomUUID(),
+            adminId: b.adminId,
+            boothName: b.boothName || "",
+            locationCode: detail?.locationCode || "-",
+            openTime: detail?.openTime || "-",
+            closeTime: detail?.closeTime || "-",
+            adminName: b.name || "",
+            adminEmail: b.email || "",
+            adminCompany: b.company || "-",
+            selected: false,
+            status: "registered" as const,
+          };
+        });
         setRows(existingRows);
       }
     } catch {
@@ -191,6 +206,15 @@ export default function EventBoothsPage() {
   };
 
   // ── Row actions ───────────────────────────────────────────────────────────
+  const toggleAll = () => {
+    const allSelected = rows.every((r) => r.selected);
+    setRows((prev) => prev.map((r) => ({ ...r, selected: !allSelected })));
+  };
+
+  const toggleRow = (id: string) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, selected: !r.selected } : r)));
+  };
+
   const deleteRow = (id: string) => {
     setRows((p) => p.filter((r) => r.id !== id));
     if (rows.length <= 1) {
@@ -211,7 +235,7 @@ export default function EventBoothsPage() {
     try {
       const res = await eventApi.onboardBooths(eventId, selectedFile);
       if (res.data?.success || res.status === 201) {
-        alert("부스 및 관리자 정보가 성공적으로 등록되었습니다.\n다음 단계인 ID/PW 생성을 진행할 수 있습니다.");
+        alert("계정이 성공적으로 일괄 생성되었습니다.\n이제 '이메일 일괄 전송'을 통해 계정 정보를 발송할 수 있습니다.");
         await fetchBooths();
         setSelectedFile(null);
         setFileName("");
@@ -223,7 +247,33 @@ export default function EventBoothsPage() {
     }
   };
 
+  const handleSendMail = async () => {
+    const selected = rows.filter((r) => r.selected && r.status === "registered" && r.adminId);
+    if (selected.length === 0) {
+      alert("이메일을 발송할 관리자(등록완료 상태)를 선택해주세요.");
+      return;
+    }
+    if (!confirm(`선택한 ${selected.length}명의 최고 관리자에게 로그인 정보를 전송하시겠습니까?`)) return;
+
+    setIsSendingMail(true);
+    try {
+      const adminIds = selected.map((r) => r.adminId!);
+      const res = await eventApi.sendLoginInfo({ boothAdminIds: adminIds });
+      if (res.data?.success) {
+        alert("성공적으로 이메일 전송을 요청했습니다.");
+        // optionally refresh UI or clear selection
+        setRows((prev) => prev.map((r) => selected.some((s) => s.id === r.id) ? { ...r, selected: false } : r));
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || err.message || "이메일 전송에 실패했습니다.");
+    } finally {
+      setIsSendingMail(false);
+    }
+  };
+
   const selectedEventId = eventId;
+  const allSelected = rows.length > 0 && rows.every((r) => r.selected);
+  const selectedRows = rows.filter((r) => r.selected);
 
   const statusBadge = (s: BoothRow["status"]) => {
     const map = {
@@ -377,6 +427,15 @@ export default function EventBoothsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-[#F8F9FA] text-gray-500 text-xs font-bold border-b border-gray-100">
+                      <th className="w-12 px-4 py-3 text-center">
+                        <button onClick={toggleAll} className="flex items-center justify-center">
+                          {allSelected ? (
+                            <CheckSquare className="w-4 h-4 text-[#2D2A4A]" />
+                          ) : (
+                            <Square className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
+                      </th>
                       <th className="px-4 py-3 text-left">부스명</th>
                       <th className="px-4 py-3 text-left">위치 코드</th>
                       <th className="px-4 py-3 text-left">운영시간</th>
@@ -393,6 +452,15 @@ export default function EventBoothsPage() {
                         key={row.id}
                         className={`transition-colors ${row.selected ? "bg-indigo-50/40" : "bg-white"} hover:bg-gray-50`}
                       >
+                        <td className="px-4 py-3 text-center">
+                          <button onClick={() => toggleRow(row.id)} className="flex items-center justify-center">
+                            {row.selected ? (
+                              <CheckSquare className="w-4 h-4 text-[#2D2A4A]" />
+                            ) : (
+                              <Square className="w-4 h-4 text-gray-300" />
+                            )}
+                          </button>
+                        </td>
                         <td className="px-4 py-3 font-bold text-gray-800">{row.boothName}</td>
                         <td className="px-4 py-2 text-gray-500 text-xs">{row.locationCode}</td>
                         <td className="px-4 py-2 text-gray-400 text-[10px]">
@@ -422,7 +490,7 @@ export default function EventBoothsPage() {
               {/* Action bar */}
               <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-[#F8F9FA]">
                 <p className="text-[11px] text-gray-400 font-medium">
-                  <span className="text-[#2D2A4A] font-bold uppercase tracking-widest mr-1">Phase 1:</span> CSV 파일을 업로드하여 정보를 일괄 등록합니다.
+                  <span className="text-[#2D2A4A] font-bold uppercase tracking-widest mr-1">안내:</span> CSV 파일을 업로드하여 정보를 일괄 등록하고 로그인 정보를 발송하세요.
                 </p>
                 <div className="flex items-center gap-4">
                   <button
@@ -430,26 +498,19 @@ export default function EventBoothsPage() {
                     disabled={isCreating || rows.length === 0}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2D2A4A] text-white text-xs font-bold hover:bg-[#3A375C] disabled:opacity-50 transition-all shadow-md active:scale-95 group"
                   >
-                    {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />}
-                    테이블 일괄 등록 (Step 1)
+                    {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />}
+                    일괄 등록 및 ID/PW 생성
                   </button>
 
                   <div className="h-4 w-[1px] bg-gray-300" />
 
                   <button
-                    disabled
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 text-gray-400 text-xs font-bold cursor-not-allowed"
+                    onClick={handleSendMail}
+                    disabled={isSendingMail || selectedRows.length === 0}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#C4FF00] text-[#2D2A4A] text-xs font-bold hover:bg-[#bcfd00] disabled:opacity-50 transition-all shadow-md active:scale-95"
                   >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    ID/PW 일괄 생성 (대기)
-                  </button>
-
-                  <button
-                    disabled
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 text-gray-400 text-xs font-bold cursor-not-allowed"
-                  >
-                    <Mail className="w-3.5 h-3.5" />
-                    이메일 일괄 전송 (대기)
+                    {isSendingMail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                    이메일 일괄 전송
                   </button>
                 </div>
               </div>
