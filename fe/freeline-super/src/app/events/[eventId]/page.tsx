@@ -211,6 +211,19 @@ export default function EventDetailPage() {
     }
   };
 
+    const handleAddArea = () => {
+        const newArea = {
+            localId: `new-${Date.now()}`,
+            boothId: null,
+            xRatio: 0.45,
+            yRatio: 0.45,
+            widthRatio: 0.1,
+            heightRatio: 0.1,
+        };
+        setAreas(prev => [...prev, newArea]);
+    };
+
+
   const handleOpenSearchModal = (localId: string) => {
     setActiveLocalId(localId);
     setIsSearchModalOpen(true);
@@ -293,6 +306,43 @@ export default function EventDetailPage() {
               <div className="w-4 h-4 rounded-full bg-[#EF4444]" />
               <span className="text-[13px] font-bold text-gray-600">혼잡 (1m²당 8명 이상)</span>
             </div>
+              <div className="ml-auto flex gap-3">
+                  {layoutImageUrl && (
+                      isEditMode ? (
+                          <>
+                              <button
+                                  onClick={handleAddArea}
+                                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-100 text-blue-700 rounded-xl font-black text-[15px] hover:bg-blue-200 transition-all shadow-sm"
+                              >
+                                  <MapPin className="w-5 h-5"/>
+                                  영역 추가
+                              </button>
+                              <button
+                                  onClick={() => setIsEditMode(false)}
+                                  className="flex items-center gap-2 px-5 py-2.5 bg-gray-200 text-gray-700 rounded-xl font-black text-[15px] hover:bg-gray-300 transition-all"
+                              >
+                                  <X className="w-5 h-5"/>
+                                  취소
+                              </button>
+                              <button
+                                  onClick={handleSaveMap}
+                                  disabled={isSaving}
+                                  className="flex items-center gap-2 px-5 py-2.5 bg-[#2D2A4A] text-white rounded-xl font-black text-[15px] hover:scale-105 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                              >
+                                  {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
+                                  저장하기
+                              </button>
+                          </>
+                      ) : (
+                          <button
+                              onClick={() => setIsEditMode(true)}
+                              className="flex items-center gap-2 px-5 py-2.5 bg-[#DBFC53] text-[#2D2A4A] rounded-xl font-black text-[15px] hover:scale-105 transition-all shadow-md shadow-[#DBFC53]/30 active:scale-95"
+                          >
+                              <Edit3 className="w-5 h-5"/>
+                              지도 편집
+                          </button>
+                      )
+                  )}
             <div className="ml-auto flex gap-3">
               {layoutImageUrl && (
                 isEditMode ? (
@@ -391,6 +441,7 @@ export default function EventDetailPage() {
               </div>
             )}
           </div>
+        </div>
         </div>
       </main>
 
