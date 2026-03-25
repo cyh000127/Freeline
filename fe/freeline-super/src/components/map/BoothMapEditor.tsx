@@ -133,7 +133,7 @@ export function BoothMapEditor({
                     {/* Edit Mode Controls */}
                     {isEditMode && (
                         <div
-                            className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                            className="flex gap-2 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                             <button
                                 type="button"
                                 onClick={(e) => {
