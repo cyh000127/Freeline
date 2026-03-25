@@ -1,5 +1,6 @@
 // import { AppState } from 'react-native';
-import { saveFcmToken, subscribeNotifications } from './notification.api';
+import { saveFcmToken } from './notification.api';
+// import { subscribeNotifications } from './notification.api';
 
 let currentSubscription: { close: () => void } | null = null;
 
@@ -17,6 +18,7 @@ export async function registerPushToken(params: {
   });
 }
 
+/*
 export function connectNotificationSse(params: {
   accessToken: string;
   lastEventId?: string;
@@ -46,3 +48,4 @@ export function disconnectNotificationSse() {
   currentSubscription?.close();
   currentSubscription = null;
 }
+*/
