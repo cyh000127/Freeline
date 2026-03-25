@@ -54,6 +54,7 @@ import com.freeline.domain.booth.repository.BoothImageRepository;
 import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.event.entity.EventPolicy;
 import com.freeline.domain.event.exception.EventException;
 import com.freeline.domain.event.repository.EventPolicyRepository;
 import com.freeline.domain.event.repository.EventRepository;
@@ -166,6 +167,7 @@ public class BoothService {
         final Booth booth = getBoothEntity(boothId);
         final long waitingCount = boothWaitingRepository.countByBoothIdAndStatus(boothId, WaitingStatus.WAITING);
         final Optional<BoothPolicy> boothPolicy = boothPolicyRepository.findByBoothId(boothId);
+        final Optional<EventPolicy> eventPolicy = resolveEventPolicy(booth);
         final List<BoothImage> boothImages = boothImageRepository.findAllByBoothIdOrderByIdAsc(boothId);
         final List<BoothGoodsResDto> goods = boothGoodsRepository.findAllByBoothIdOrderByIdAsc(boothId)
                 .stream()
@@ -183,8 +185,8 @@ public class BoothService {
         return BoothConverter.toBoothResDto(
                 booth,
                 waitingCount,
-                boothPolicy.map(BoothPolicy::getCallCount).orElse(0),
-                boothPolicy.map(BoothPolicy::getCallValidTime).orElse(0),
+                resolveCallCount(boothPolicy, eventPolicy),
+                resolveCallValidSeconds(boothPolicy, eventPolicy),
                 representativeImageUrl,
                 boothImageUrls,
                 goods
@@ -193,14 +195,14 @@ public class BoothService {
 
     @Transactional(readOnly = true)
     public BoothQueueResDto getBoothQueue(final Long boothId) {
-        getBoothEntity(boothId);
+        final Booth booth = getBoothEntity(boothId);
 
         final long backQueueCount = boothWaitingRepository.countByBoothIdAndStatus(boothId, WaitingStatus.WAITING);
         final long frontQueueCount = boothWaitingRepository.countByBoothIdAndStatusIn(boothId, FRONT_QUEUE_STATUSES);
-        final int frontQueueLimit = boothPolicyRepository.findByBoothId(boothId)
-                .map(BoothPolicy::getCallCount)
-                .filter(count -> count > 0)
-                .orElse(5);
+        final int frontQueueLimit = resolveCallCount(
+                boothPolicyRepository.findByBoothId(boothId),
+                resolveEventPolicy(booth)
+        );
 
         final List<BoothQueueEntryResDto> frontQueue = boothWaitingRepository
                 .findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(boothId, FRONT_QUEUE_STATUSES)
@@ -320,6 +322,32 @@ public class BoothService {
         if (!eventRepository.existsById(eventId)) {
             throw new EventException(ErrorCode.EVENT_NOT_FOUND);
         }
+    }
+
+    private Optional<EventPolicy> resolveEventPolicy(final Booth booth) {
+        return eventPolicyRepository.findByEvent_Id(booth.getEventId());
+    }
+
+    private int resolveCallCount(
+            final Optional<BoothPolicy> boothPolicy,
+            final Optional<EventPolicy> eventPolicy
+    ) {
+        return boothPolicy.map(BoothPolicy::getCallCount)
+                .filter(count -> count > 0)
+                .or(() -> eventPolicy.map(EventPolicy::getDefaultCallCount)
+                        .filter(count -> count > 0))
+                .orElse(0);
+    }
+
+    private int resolveCallValidSeconds(
+            final Optional<BoothPolicy> boothPolicy,
+            final Optional<EventPolicy> eventPolicy
+    ) {
+        return boothPolicy.map(BoothPolicy::getCallValidTime)
+                .filter(seconds -> seconds > 0)
+                .or(() -> eventPolicy.map(EventPolicy::getDefaultCallTtl)
+                        .filter(seconds -> seconds > 0))
+                .orElse(0);
     }
 
     private void validateOperatingHours(final LocalTime openTime, final LocalTime closeTime) {
