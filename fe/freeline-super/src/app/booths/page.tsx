@@ -26,41 +26,21 @@ import { api } from "@/lib/api";
 import { authApi } from "@/lib/api/auth";
 import { eventApi, Event } from "@/lib/api/event";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// Types
 interface BoothRow {
   id: string; // internal row id
   boothName: string;
-  email: string;
-  loginId: string;
-  password: string;
+  locationCode: string;
+  openTime: string;
+  closeTime: string;
+  adminName: string;
+  adminEmail: string;
+  adminCompany: string;
   selected: boolean;
-  status: "pending" | "created" | "sent" | "error";
-  boothAdminId?: number;
+  status: "pending" | "registered" | "error";
 }
 
-// ─── Helper: generate random credentials ─────────────────────────────────────
-const CHARS_ALPHA_NUM = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-const CHARS_SPECIAL = "!@#$%^&*";
-
-function genLoginId(): string {
-  const suffix = Array.from({ length: 6 }, () =>
-    CHARS_ALPHA_NUM[Math.floor(Math.random() * CHARS_ALPHA_NUM.length)]
-  ).join("");
-  return `booth_${suffix}`;
-}
-
-function genPassword(): string {
-  const pool = CHARS_ALPHA_NUM + CHARS_SPECIAL;
-  const base = Array.from({ length: 10 }, () =>
-    pool[Math.floor(Math.random() * pool.length)]
-  );
-  // ensure at least one special character
-  base[Math.floor(Math.random() * 10)] =
-    CHARS_SPECIAL[Math.floor(Math.random() * CHARS_SPECIAL.length)];
-  return base.join("");
-}
-
-// ─── Helper: parse CSV/XLSX buffer → BoothRow[] ──────────────────────────────
+// ??? Helper: parse CSV/XLSX buffer ? BoothRow[] ??????????????????????????????
 function parseFile(file: File): Promise<BoothRow[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -75,17 +55,19 @@ function parseFile(file: File): Promise<BoothRow[]> {
 
         const rows: BoothRow[] = json
           .filter((r) => {
-            const name = r["부스명"] || r["name"] || r["booth_name"] || r["부스 명"] || "";
-            const email = r["이메일"] || r["email"] || r["Email"] || "";
-            return name.trim() && email.trim();
+            const name = r["부스 이름"] || r["부스명"] || r["boothName"] || r["name"] || "";
+            const email = r["관리자 이메일"] || r["이메일"] || r["adminEmail"] || r["email"] || "";
+            return name.toString().trim() && email.toString().trim();
           })
           .map((r) => ({
             id: crypto.randomUUID(),
-            boothName:
-              (r["부스명"] || r["name"] || r["booth_name"] || r["부스 명"] || "").trim(),
-            email: (r["이메일"] || r["email"] || r["Email"] || "").trim(),
-            loginId: genLoginId(),
-            password: genPassword(),
+            boothName: (r["부스 이름"] || r["boothName"] || r["부스명"] || r["name"] || "").toString().trim(),
+            locationCode: (r["부스 위치 코드"] || r["locationCode"] || r["부스 위치"] || r["location"] || "").toString().trim(),
+            openTime: (r["운영 시작 시간"] || r["openTime"] || "").toString().trim(),
+            closeTime: (r["운영 종료 시간"] || r["closeTime"] || "").toString().trim(),
+            adminName: (r["부스 관리자 이름"] || r["adminName"] || "").toString().trim(),
+            adminEmail: (r["부스 관리자 이메일"] || r["adminEmail"] || r["이메일"] || r["email"] || "").toString().trim(),
+            adminCompany: (r["부스 관리자 소속/회사명"] || r["adminCompany"] || r["소속"] || "").toString().trim(),
             selected: true,
             status: "pending" as const,
           }));
@@ -116,17 +98,14 @@ export default function BoothManagementPage() {
 
   // File + rows
   const [rows, setRows] = useState<BoothRow[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Visibility
-  const [showPasswords, setShowPasswords] = useState(false);
-
   // Loading states
   const [isCreating, setIsCreating] = useState(false);
-  const [isSending, setIsSending] = useState(false);
 
   // ── Auth check ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -149,6 +128,38 @@ export default function BoothManagementPage() {
     };
     fetchUser();
   }, [router]);
+
+  // ── Fetch booths ────────────────────────────────────────────────────────
+  const fetchBooths = useCallback(async (id: number | string) => {
+    try {
+      const res = await eventApi.getBooths(id);
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        const mapped: BoothRow[] = res.data.data.map((b: any) => ({
+          id: b.boothId.toString(),
+          boothName: b.boothName || "",
+          locationCode: b.locationCode || "",
+          openTime: b.openTime || "",
+          closeTime: b.closeTime || "",
+          adminName: b.adminName || "",
+          adminEmail: b.adminEmail || "",
+          adminCompany: b.adminCompany || "",
+          selected: true,
+          status: "registered" as const,
+        }));
+        setRows(mapped);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedEventId) {
+      fetchBooths(selectedEventId);
+    } else {
+      setRows([]);
+    }
+  }, [selectedEventId, fetchBooths]);
 
   // ── Fetch events ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -209,12 +220,13 @@ export default function BoothManagementPage() {
       alert("CSV 또는 XLSX 파일만 업로드 가능합니다.");
       return;
     }
+    setSelectedFile(file);
     setFileName(file.name);
     setIsParsing(true);
     try {
       const parsed = await parseFile(file);
       if (parsed.length === 0) {
-        alert("파일에서 데이터를 찾을 수 없습니다.\n컬럼명: 부스명(name), 이메일(email)을 확인해주세요.");
+        alert("파일에서 데이터를 찾을 수 없습니다.\n필수 컬럼: 부스 이름, 관리자 이메일을 확인해 주세요.");
       }
       setRows(parsed);
     } catch {
@@ -249,77 +261,31 @@ export default function BoothManagementPage() {
 
   const deleteRow = (id: string) => {
     setRows((prev) => prev.filter((r) => r.id !== id));
-  };
-
-  const regenCredentials = (id: string) => {
-    setRows((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, loginId: genLoginId(), password: genPassword() } : r))
-    );
-  };
-
-  const regenAll = () => {
-    setRows((prev) => prev.map((r) => ({ ...r, loginId: genLoginId(), password: genPassword() })));
-  };
-
-  // ── API actions ───────────────────────────────────────────────────────────
-  const handleCreate = async () => {
-    if (!selectedEventId) { alert("행사를 먼저 선택해주세요."); return; }
-    if (rows.length === 0) { alert("업로드된 데이터가 없습니다."); return; }
-
-    setIsCreating(true);
-    try {
-      const payload = {
-        eventId: selectedEventId,
-        booths: rows.map((r) => ({
-          boothName: r.boothName,
-          loginId: r.loginId,
-          password: r.password,
-          email: r.email,
-        })),
-      };
-      const res = await authApi.bulkCreateBoothAdmins(payload);
-      const created = res.data?.data;
-
-      // Map back boothAdminIds if returned
-      if (Array.isArray(created)) {
-        setRows((prev) =>
-          prev.map((r, i) => ({
-            ...r,
-            status: "created" as const,
-            boothAdminId: created[i]?.boothAdminId ?? created[i]?.id,
-          }))
-        );
-      } else {
-        setRows((prev) => prev.map((r) => ({ ...r, status: "created" as const })));
-      }
-      alert(`${rows.length}개 부스 관리자 계정이 성공적으로 생성되었습니다.`);
-    } catch (err: any) {
-      alert(err.response?.data?.message || "계정 생성에 실패했습니다.");
-    } finally {
-      setIsCreating(false);
+    if (rows.length <= 1) {
+      setSelectedFile(null);
+      setFileName("");
     }
   };
 
-  const handleSend = async (targetRows: BoothRow[]) => {
+  // ── API actions ───────────────────────────────────────────────────────────
+  // API actions
+  const handleOnboarding = async () => {
     if (!selectedEventId) { alert("행사를 먼저 선택해주세요."); return; }
-    if (targetRows.length === 0) { alert("선택된 부스가 없습니다."); return; }
+    if (!selectedFile) { alert("업로드할 파일을 선택해주세요."); return; }
 
-    setIsSending(true);
+    setIsCreating(true);
     try {
-      const ids = targetRows.map((r) => r.boothAdminId).filter(Boolean) as number[];
-      const payload: Record<string, any> = { eventId: selectedEventId };
-      if (ids.length > 0) payload.boothAdminIds = ids;
-
-      await authApi.bulkSendBoothAdminLogins(payload);
-      const sentIds = new Set(targetRows.map((r) => r.id));
-      setRows((prev) =>
-        prev.map((r) => (sentIds.has(r.id) ? { ...r, status: "sent" as const } : r))
-      );
-      alert(`${targetRows.length}개 부스에 로그인 정보가 이메일로 전송되었습니다.`);
+      const res = await eventApi.onboardBooths(selectedEventId, selectedFile);
+      if (res.data?.success || res.status === 201) {
+        alert("부스 및 관리자 정보가 성공적으로 등록되었습니다.\n다음 단계인 ID/PW 생성을 진행할 수 있습니다.");
+        await fetchBooths(selectedEventId);
+        setSelectedFile(null);
+        setFileName("");
+      }
     } catch (err: any) {
-      alert(err.response?.data?.message || "이메일 전송에 실패했습니다.");
+      alert(err.response?.data?.message || err.message || "테이블 등록에 실패했습니다.");
     } finally {
-      setIsSending(false);
+      setIsCreating(false);
     }
   };
 
@@ -329,10 +295,8 @@ export default function BoothManagementPage() {
 
   const statusBadge = (status: BoothRow["status"]) => {
     switch (status) {
-      case "created":
-        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700">계정생성</span>;
-      case "sent":
-        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-700">전송완료</span>;
+      case "registered":
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-700">등록완료</span>;
       case "error":
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-700">오류</span>;
       default:
@@ -388,9 +352,9 @@ export default function BoothManagementPage() {
               <div className="p-2 bg-[#2D2A4A] rounded-xl">
                 <Users className="w-5 h-5 text-[#C4FF00]" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">부스 관리자 계정 관리</h1>
+              <h1 className="text-2xl font-bold text-gray-900">부스 관리자 계정 생성</h1>
             </div>
-            <p className="mt-1 ml-12 text-sm text-gray-500">CSV/XLSX 파일로 부스 목록을 불러와 계정을 생성하고 이메일로 전송하세요</p>
+            <p className="mt-1 ml-12 text-sm text-gray-500">CSV/XLSX 파일로 부스 및 관리자 정보를 일괄 등록하고 계정을 생성하세요</p>
           </div>
           <div className="text-right">
             <span className="text-sm font-bold text-gray-700">{userName}님, 환영합니다.</span>
@@ -438,7 +402,42 @@ export default function BoothManagementPage() {
           <div className="flex items-center gap-2 mb-4">
             <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#2D2A4A] text-white text-xs font-black">2</span>
             <h2 className="text-base font-bold text-gray-900">파일 업로드</h2>
-            <span className="ml-auto text-xs text-red-500 font-medium">필수 컬럼: 부스명 (name), 이메일 (email)</span>
+          </div>
+
+          {/* Example Template Table */}
+          <div className="mb-5 overflow-x-auto">
+            <p className="text-[11px] font-bold text-gray-400 mb-2 ml-1 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+              업로드 양식 예시 (CSV/XLSX)
+            </p>
+            <table className="w-full text-[11px] border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+              <thead>
+                <tr className="bg-gray-50 text-gray-500 font-bold border-b border-gray-100">
+                  <th className="px-4 py-3 text-left border-r border-gray-100 whitespace-nowrap">부스 이름</th>
+                  <th className="px-4 py-3 text-left border-r border-gray-100 whitespace-nowrap">부스 위치 코드</th>
+                  <th className="px-4 py-3 text-left border-r border-gray-100 whitespace-nowrap">운영 시작</th>
+                  <th className="px-4 py-3 text-left border-r border-gray-100 whitespace-nowrap">운영 종료</th>
+                  <th className="px-4 py-3 text-left border-r border-gray-100 whitespace-nowrap">관리자 이름</th>
+                  <th className="px-4 py-3 text-left border-r border-gray-100 whitespace-nowrap">관리자 이메일</th>
+                  <th className="px-4 py-3 text-left whitespace-nowrap">소속/회사명</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-400 bg-white">
+                <tr>
+                  <td className="px-4 py-3 border-r border-gray-100 font-medium">A-01 부스</td>
+                  <td className="px-4 py-3 border-r border-gray-100">A-01</td>
+                  <td className="px-4 py-3 border-r border-gray-100">10:00:00</td>
+                  <td className="px-4 py-3 border-r border-gray-100">18:00:00</td>
+                  <td className="px-4 py-3 border-r border-gray-100">홍길동</td>
+                  <td className="px-4 py-3 border-r border-gray-100 text-[#2D2A4A]/60">booth@test.com</td>
+                  <td className="px-4 py-3">줄서잇 컴퍼니</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="mt-2.5 text-[11px] text-gray-400 flex items-center gap-1">
+              <span className="text-red-400 font-bold">*</span>
+              부스 이름과 관리자 이메일은 필수 항목입니다. (헤더 명칭이 달라도 의미가 유사하면 자동으로 인식됩니다.)
+            </p>
           </div>
           <div
             className={`relative flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-2xl p-10 cursor-pointer transition-all ${isDragging
@@ -487,20 +486,9 @@ export default function BoothManagementPage() {
                 <span className="text-xs text-gray-400">/ 선택 {selectedRows.length}개</span>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowPasswords((p) => !p)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
-                >
-                  {showPasswords ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  {showPasswords ? "비밀번호 숨기기" : "비밀번호 보기"}
-                </button>
-                <button
-                  onClick={regenAll}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  전체 재생성
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 font-medium">관리자 정보 포함</span>
+                </div>
               </div>
             </div>
 
@@ -519,9 +507,11 @@ export default function BoothManagementPage() {
                       </button>
                     </th>
                     <th className="px-4 py-3 text-left">부스명</th>
+                    <th className="px-4 py-3 text-left">위치 코드</th>
+                    <th className="px-4 py-3 text-left">운영시간</th>
+                    <th className="px-4 py-3 text-left">관리자</th>
                     <th className="px-4 py-3 text-left">이메일</th>
-                    <th className="px-4 py-3 text-left">아이디 (자동생성)</th>
-                    <th className="px-4 py-3 text-left">비밀번호</th>
+                    <th className="px-4 py-3 text-left">소속</th>
                     <th className="px-4 py-3 text-center">상태</th>
                     <th className="px-4 py-3 text-center">작업</th>
                   </tr>
@@ -539,27 +529,16 @@ export default function BoothManagementPage() {
                         </button>
                       </td>
                       <td className="px-4 py-3 font-semibold text-gray-900">{row.boothName}</td>
-                      <td className="px-4 py-3 text-gray-600">{row.email}</td>
-                      <td className="px-4 py-3">
-                        <code className="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono text-[#2D2A4A]">
-                          {row.loginId}
-                        </code>
+                      <td className="px-4 py-3 text-gray-600">{row.locationCode}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">
+                        {row.openTime} ~ {row.closeTime}
                       </td>
-                      <td className="px-4 py-3">
-                        <code className="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono text-gray-600">
-                          {showPasswords ? row.password : "•".repeat(row.password.length)}
-                        </code>
-                      </td>
+                      <td className="px-4 py-3 text-gray-600 text-xs">{row.adminName}</td>
+                      <td className="px-4 py-3 text-gray-600 text-xs">{row.adminEmail}</td>
+                      <td className="px-4 py-3 text-gray-600 text-[10px]">{row.adminCompany}</td>
                       <td className="px-4 py-3 text-center">{statusBadge(row.status)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
-                          <button
-                            title="자격정보 재생성"
-                            onClick={() => regenCredentials(row.id)}
-                            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#2D2A4A] transition-colors"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                          </button>
                           <button
                             title="행 삭제"
                             onClick={() => deleteRow(row.id)}
@@ -577,38 +556,35 @@ export default function BoothManagementPage() {
 
             {/* Action buttons bar */}
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-[#F8F9FA]">
-              <p className="text-xs text-gray-500">
-                계정을 먼저 생성한 뒤 이메일을 전송하세요.
+              <p className="text-xs text-gray-500 font-medium">
+                <span className="text-[#2D2A4A] font-bold">Step 1:</span> CSV 파일을 업로드하여 부스 및 관리자 정보를 테이블에 일괄 등록합니다.
               </p>
               <div className="flex items-center gap-3">
-                {/* 계정 일괄 생성 */}
                 <button
-                  onClick={handleCreate}
+                  onClick={handleOnboarding}
                   disabled={isCreating || rows.length === 0}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2D2A4A] text-white text-sm font-bold hover:bg-[#3A375C] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#2D2A4A] text-white text-sm font-bold hover:bg-[#3A375C] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md group"
                 >
-                  {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
-                  계정 일괄 생성
+                  {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />}
+                  테이블 일괄 등록 (Onboarding)
                 </button>
 
-                {/* 선택 이메일 전송 */}
+                <div className="h-4 w-[1px] bg-gray-300 mx-2" />
+
                 <button
-                  onClick={() => handleSend(selectedRows)}
-                  disabled={isSending || selectedRows.length === 0}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                  disabled
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gray-100 text-gray-400 text-sm font-bold cursor-not-allowed transition-all"
                 >
-                  {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                  선택 전송 ({selectedRows.length})
+                  <RefreshCw className="w-4 h-4" />
+                  ID/PW 일괄 생성 (대기)
                 </button>
 
-                {/* 전체 이메일 전송 */}
                 <button
-                  onClick={() => handleSend(rows)}
-                  disabled={isSending || rows.length === 0}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#C4FF00] text-[#2D2A4A] text-sm font-bold hover:bg-[#bcfd00] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                  disabled
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gray-100 text-gray-400 text-sm font-bold cursor-not-allowed transition-all"
                 >
-                  {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MailCheck className="w-4 h-4" />}
-                  전체 전송
+                  <Mail className="w-4 h-4" />
+                  이메일 일괄 전송 (대기)
                 </button>
               </div>
             </div>
