@@ -23,6 +23,7 @@ import {
   postponeWaiting,
   exitWaiting,
 } from '@/features/waiting/waiting.api';
+import { useAuthSession } from '@/features/auth/auth-session.context';
 import type { WaitingItem, WaitingStatus } from '@/features/waiting/types';
 
 type ReservationStatus = WaitingStatus;
@@ -97,13 +98,15 @@ export default function ReservationScreen() {
   const [creating, setCreating] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
 
-  const accessToken = 'TEMPORARY_TOKEN';
+  const { accessToken } = useAuthSession();
 
   const handleTabPress = (tab: TabKey) => {
     router.replace(TAB_ROUTES[tab]);
   };
 
   const loadWaitings = async () => {
+    if (!accessToken) return;
+
     try {
       setLoading(true);
       setError(null);
@@ -120,6 +123,11 @@ export default function ReservationScreen() {
   };
 
   const handleAddReservation = async (boothId: number) => {
+    if (!accessToken) {
+      Alert.alert('오류', '로그인이 필요합니다.');
+      return;
+    }
+
     try {
       setCreating(true);
       await createWaiting(accessToken, boothId);
@@ -134,6 +142,7 @@ export default function ReservationScreen() {
   };
 
   const handleCancelReservation = async (waitingId: number) => {
+    if (!accessToken) return;
     try {
       setActionLoadingId(waitingId);
       await cancelWaiting(accessToken, waitingId);
@@ -148,6 +157,7 @@ export default function ReservationScreen() {
   };
 
   const handlePostponeReservation = async (waitingId: number) => {
+    if (!accessToken) return;
     try {
       setActionLoadingId(waitingId);
       await postponeWaiting(accessToken, waitingId);
@@ -161,6 +171,7 @@ export default function ReservationScreen() {
     }
   };
   const handleExitReservation = async (waitingId: number) => {
+    if (!accessToken) return;
     try {
       setActionLoadingId(waitingId);
       await exitWaiting(accessToken, waitingId);
@@ -179,52 +190,44 @@ export default function ReservationScreen() {
   }, []);
 
   const currentItems = useMemo<ReservationViewItem[]>(() => {
-    return waitings.map((item) => {
-      const status = item.status;
+    return waitings
+      .filter((item) => !isFinishedStatus(item.status))
+      .map((item) => {
+        const status = item.status;
 
-      return {
-        waitingId: String(item.waiting_id),
-        boothName: item.booth_name,
-        myRank: item.my_rank,
-        estimatedWaitText:
-          status === 'REGISTERED'
-            ? '도착 인증 완료'
-            : typeof item.my_rank === 'number'
-              ? '약 25분'
-              : undefined,
-        boothLocation: 'A-12',
-        reservedAt: undefined,
-        notice:
-          status === 'CALLED'
-            ? '지금 도착 인증이 가능합니다.'
-            : status === 'ENTERED'
-              ? '현재 체험이 진행 중입니다. 체험이 끝나면 이용 종료를 눌러 주세요.'
-              : '아직 도착 인증 가능 상태가 아닙니다.',
-        canPostpone: item.postpone_available,
-        status,
-      };
-    });
+        return {
+          waitingId: String(item.waiting_id),
+          boothName: item.booth_name,
+          myRank: item.my_rank,
+          estimatedWaitText:
+            status === 'REGISTERED' ? '도착 인증 완료' : undefined,
+          boothLocation: undefined,
+          reservedAt: undefined,
+          notice:
+            status === 'CALLED'
+              ? '지금 도착 인증이 가능합니다.'
+              : status === 'ENTERED'
+                ? '현재 체험이 진행 중입니다. 체험이 끝나면 이용 종료를 눌러 주세요.'
+                : '아직 도착 인증 가능 상태가 아닙니다.',
+          canPostpone: item.postpone_available,
+          status,
+        };
+      });
   }, [waitings]);
 
-  const finishedItems = useMemo<ReservationViewItem[]>(
-    () => [
-      {
-        waitingId: 'history-1',
-        boothName: 'LG CNS',
-        status: 'EXITED',
-        estimatedWaitText: '이용 종료',
-        reservedAt: '2026.03.05 15:10',
-      },
-      {
-        waitingId: 'history-2',
-        boothName: '한화',
-        status: 'EXPIRED',
-        estimatedWaitText: '자동 취소됨',
-        reservedAt: '2026.03.05 16:00',
-      },
-    ],
-    [],
-  );
+  const finishedItems = useMemo<ReservationViewItem[]>(() => {
+    return waitings
+      .filter((item) => isFinishedStatus(item.status))
+      .map((item) => {
+        return {
+          waitingId: String(item.waiting_id),
+          boothName: item.booth_name,
+          status: item.status,
+          estimatedWaitText: item.status === 'EXITED' ? '이용 종료' : item.status === 'CANCELED' ? '예약 취소됨' : '자동 취소됨',
+          reservedAt: undefined,
+        };
+      });
+  }, [waitings]);
 
   const mergedItems = useMemo(() => {
     if (filter === 'current') return currentItems;
