@@ -1,16 +1,19 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ReservationComplete() {
   const router = useRouter();
+  const { boothName } = useLocalSearchParams<{ boothName?: string }>();
 
   return (
     <View style={styles.screen}>
       {/* Top section */}
       <View style={styles.topArea}>
-        <Text style={styles.title}>예약이 완료되었습니다!</Text>
+        <Text style={styles.title}>
+          {boothName ? `'${boothName}' 예약이 완료되었습니다!` : '예약이 완료되었습니다!'}
+        </Text>
 
         <View style={styles.iconWrapper}>
           <Ionicons name="checkmark" size={32} color="#1BA672" />
