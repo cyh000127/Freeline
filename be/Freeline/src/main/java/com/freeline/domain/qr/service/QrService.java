@@ -14,13 +14,12 @@ import com.freeline.common.config.properties.QrProperties;
 import com.freeline.common.error.ErrorCode;
 import com.freeline.common.event.waiting.detector.WaitingStatusChangeCommand;
 import com.freeline.common.event.waiting.dispatcher.WaitingEventDispatcher;
+import com.freeline.common.event.waiting.model.WaitingEventType;
 import com.freeline.common.util.QrCodeUtil;
 import com.freeline.common.util.TimeUtils;
-import com.freeline.domain.booth.entity.BoothPolicy;
 import com.freeline.domain.booth.entity.BoothWaiting;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.exception.BoothException;
-import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
 import com.freeline.domain.qr.converter.QrConverter;
@@ -33,6 +32,8 @@ import com.freeline.domain.qr.entity.BoothQrStatus;
 import com.freeline.domain.qr.entity.QrPurpose;
 import com.freeline.domain.qr.exception.QrException;
 import com.freeline.domain.qr.repository.BoothQrRepository;
+import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
+import com.freeline.domain.waiting.service.WaitingPolicyResolver;
 import com.freeline.domain.waiting.service.WaitingStatusPersistenceService;
 
 @Slf4j
@@ -46,17 +47,17 @@ public class QrService {
     private static final QrPurpose BOOTH_QR_PURPOSE = QrPurpose.FRONT_QUEUE_ARRIVAL;
 
     private final BoothRepository boothRepository;
-    private final BoothPolicyRepository boothPolicyRepository;
     private final BoothWaitingRepository boothWaitingRepository;
     private final BoothQrRepository boothQrRepository;
     private final StringRedisTemplate stringRedisTemplate;
     private final QrProperties qrProperties;
     private final WaitingEventDispatcher waitingEventDispatcher;
     private final WaitingStatusPersistenceService waitingStatusPersistenceService;
+    private final WaitingEventSnapshotAssembler waitingEventSnapshotAssembler;
+    private final WaitingPolicyResolver waitingPolicyResolver;
 
     // TODO: visitor 인증이 붙으면 scanQr()에서 visitorId를 request body로 받지 않고 인증 정보에서 추출하도록 변경한다.
     // TODO: booth_qr 이력 정리 및 만료 QR 배치 정리 정책이 필요하면 별도 스케줄러로 분리한다.
-    // TODO: CALLED -> REGISTERED 로 바뀌는 시점에 BoothManagerSseService와 연결해 부스 관리자 화면에 도착 확인 이벤트를 전파한다.
 
     // 부스에 붙여둘 고정형 QR을 생성한다. 이미 활성 QR이 있으면 기존 QR을 그대로 돌려준다.
     public BoothQrResDto createBoothQr(final Long boothId) {
@@ -237,10 +238,7 @@ public class QrService {
             return null;
         }
 
-        final int callValidSeconds = boothPolicyRepository.findByBoothId(boothId)
-                .map(BoothPolicy::getCallValidTime)
-                .filter(value -> value > 0)
-                .orElse(180);
+        final int callValidSeconds = waitingPolicyResolver.resolveCallValidTimeSeconds(boothId, 180);
 
         return waiting.getCalledAt().plusSeconds(callValidSeconds);
     }
@@ -288,12 +286,13 @@ public class QrService {
     ) {
         waitingEventDispatcher.dispatch(
                 new WaitingStatusChangeCommand(
-                        com.freeline.common.event.waiting.model.WaitingEventType.WAITING_REGISTERED,
+                        WaitingEventType.WAITING_REGISTERED,
                         waiting.getId(),
                         waiting.getBoothId(),
                         waiting.getVisitorId(),
                         previousStatus,
-                        waiting.getStatus().name()
+                        waiting.getStatus().name(),
+                        waitingEventSnapshotAssembler.toSnapshot(waiting)
                 )
         );
     }

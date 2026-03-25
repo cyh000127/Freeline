@@ -1,5 +1,6 @@
 package com.freeline.domain.waiting.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -14,14 +15,13 @@ import com.freeline.common.event.waiting.dispatcher.WaitingEventDispatcher;
 import com.freeline.common.event.waiting.model.WaitingEventType;
 import com.freeline.common.util.TimeUtils;
 import com.freeline.domain.booth.entity.Booth;
-import com.freeline.domain.booth.entity.BoothPolicy;
 import com.freeline.domain.booth.entity.BoothWaiting;
 import com.freeline.domain.booth.entity.VisitorQueueStatus;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.exception.BoothException;
-import com.freeline.domain.booth.repository.BoothPolicyRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
 import com.freeline.domain.waiting.converter.WaitingConverter;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingResDto;
@@ -53,6 +53,12 @@ public class WaitingService {
             WaitingStatus.REGISTERED
     );
 
+    private static final List<WaitingStatus> BOOTH_WAITING_CAPACITY_STATUSES = List.of(
+            WaitingStatus.WAITING,
+            WaitingStatus.CALLED,
+            WaitingStatus.REGISTERED
+    );
+
     private static final List<WaitingStatus> OTHER_BOOTH_FRONT_QUEUE_STATUSES = List.of(
             WaitingStatus.CALLED,
             WaitingStatus.REGISTERED,
@@ -78,20 +84,24 @@ public class WaitingService {
     );
 
     private static final int MAX_ACTIVE_WAITING_COUNT = 3;
+    private static final int DEFAULT_CALL_COUNT = 1;
     private static final int DEFAULT_CALL_VALID_TIME_SECONDS = 180;
     private static final int DEFAULT_DEFER_LIMIT = 0;
+    private static final int DEFAULT_MAX_WAITING_COUNT = Integer.MAX_VALUE;
     private static final int DEFAULT_STAY_TIME_SECONDS = 0;
     private static final int SECONDS_PER_MINUTE = 60;
 
     private final BoothRepository boothRepository;
     private final BoothWaitingRepository boothWaitingRepository;
-    private final BoothPolicyRepository boothPolicyRepository;
     private final WaitingEventDispatcher waitingEventDispatcher;
+    private final WaitingEventSnapshotAssembler waitingEventSnapshotAssembler;
+    private final WaitingPolicyResolver waitingPolicyResolver;
 
     public WaitingCreateResDto createWaiting(final Long boothId, final Long visitorId) {
         getBoothEntity(boothId);
         validateDuplicateWaitingAtBooth(boothId, visitorId);
         validateActiveWaitingCount(visitorId);
+        validateBoothWaitingCapacity(boothId);
 
         final int nextWaitingNumber = boothWaitingRepository.findTopByBoothIdOrderByWaitingNumberDesc(boothId)
                 .map(BoothWaiting::getWaitingNumber)
@@ -122,8 +132,12 @@ public class WaitingService {
 
     public WaitingCallResDto callNextWaiting(final Long boothId) {
         getBoothEntity(boothId);
+        final int remainingCallSlots = resolveRemainingCallSlots(boothId);
+        if (remainingCallSlots <= 0) {
+            throw new WaitingException(ErrorCode.FRONT_QUEUE_FULL);
+        }
 
-        final BoothWaiting waiting = boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
+        final List<BoothWaiting> calledWaitings = boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
                         boothId,
                         List.of(WaitingStatus.WAITING)
                 )
@@ -133,26 +147,35 @@ public class WaitingService {
                         boothId,
                         OTHER_BOOTH_FRONT_QUEUE_STATUSES
                 ))
-                .findFirst()
-                .orElseThrow(() -> new WaitingException(ErrorCode.CALL_CANDIDATE_NOT_FOUND));
+                .limit(remainingCallSlots)
+                .toList();
+
+        if (calledWaitings.isEmpty()) {
+            throw new WaitingException(ErrorCode.CALL_CANDIDATE_NOT_FOUND);
+        }
 
         final int callValidTimeSeconds = resolveCallValidTimeSeconds(boothId);
-        final java.time.LocalDateTime calledAt = TimeUtils.nowDateTime();
-        final String previousStatus = waiting.getStatus().name();
-        waiting.updateStatus(WaitingStatus.CALLED);
-        waiting.updateCalledAt(calledAt);
-        waiting.updateCallExpiresAt(calledAt.plusSeconds(callValidTimeSeconds));
-        dispatchStatusChanged(waiting, previousStatus, WaitingEventType.WAITING_CALLED);
+        final LocalDateTime calledAt = TimeUtils.nowDateTime();
+        final LocalDateTime callExpiresAt = calledAt.plusSeconds(callValidTimeSeconds);
+
+        calledWaitings.forEach(waiting -> {
+            final String previousStatus = waiting.getStatus().name();
+            waiting.updateStatus(WaitingStatus.CALLED);
+            waiting.updateCalledAt(calledAt);
+            waiting.updateCallExpiresAt(callExpiresAt);
+            dispatchStatusChanged(waiting, previousStatus, WaitingEventType.WAITING_CALLED);
+        });
 
         log.info(
-                "[Waiting] call complete {waitingId: {}, boothId: {}, visitorId: {}, waitingNumber: {}}",
-                waiting.getId(),
+                "[Waiting] call complete {boothId: {}, callCount: {}, waitingIds: {}}",
                 boothId,
-                waiting.getVisitorId(),
-                waiting.getWaitingNumber()
+                calledWaitings.size(),
+                calledWaitings.stream()
+                        .map(BoothWaiting::getId)
+                        .toList()
         );
 
-        return WaitingConverter.toWaitingCallResDto(waiting);
+        return WaitingConverter.toWaitingCallResDto(calledWaitings);
     }
 
     public void cancelWaiting(final Long waitingId, final Long visitorId) {
@@ -216,8 +239,6 @@ public class WaitingService {
     public WaitingExitResDto exitWaiting(final Long waitingId, final Long visitorId) {
         final BoothWaiting waiting = getWaitingEntity(waitingId);
         validateWaitingOwner(waiting, visitorId);
-        // TODO: ENTERED -> EXITED 이후 BoothManagerSseService에 퇴장 이벤트를 보내 부스 관리자 화면을 갱신한다.
-
         if (waiting.getStatus() != WaitingStatus.ENTERED) {
             throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_EXIT);
         }
@@ -240,8 +261,6 @@ public class WaitingService {
     public WaitingAdmitResDto admitWaiting(final Long waitingId, final Long boothId) {
         final BoothWaiting waiting = getWaitingEntity(waitingId);
         validateWaitingBooth(waiting, boothId);
-        // TODO: REGISTERED -> ENTERED 이후 부스 관리자 전용 이벤트 타입으로 세분화할지 결정하고 SSE 브로드캐스트를 통합한다.
-
         if (waiting.getStatus() != WaitingStatus.REGISTERED) {
             throw new WaitingException(ErrorCode.INVALID_STATUS_FOR_ADMIT);
         }
@@ -277,8 +296,6 @@ public class WaitingService {
     public void cancelWaitingByAdmin(final Long waitingId, final Long boothId) {
         final BoothWaiting waiting = getWaitingEntity(waitingId);
         validateWaitingBooth(waiting, boothId);
-        // TODO: 관리자 취소 이후 BoothManagerSseService를 통해 프론트/이용중 목록과 요약 통계를 함께 갱신한다.
-
         if (ADMIN_CANCEL_BLOCKED_STATUSES.contains(waiting.getStatus())) {
             throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_CANCEL);
         }
@@ -316,11 +333,11 @@ public class WaitingService {
     public WaitingExpectedTimeResDto getExpectedWaitingTime(final Long boothId) {
         getBoothEntity(boothId);
 
-        final int currentRank = Math.toIntExact(boothWaitingRepository.countByBoothIdAndStatus(boothId, WaitingStatus.WAITING));
-        final int stayTimeSeconds = boothPolicyRepository.findByBoothId(boothId)
-                .map(BoothPolicy::getStayTime)
-                .filter(value -> value > 0)
-                .orElse(DEFAULT_STAY_TIME_SECONDS);
+        final int currentRank = Math.toIntExact(boothWaitingRepository.countByBoothIdAndStatusIn(
+                boothId,
+                ACTIVE_WAITING_STATUSES
+        ));
+        final int stayTimeSeconds = waitingPolicyResolver.resolveStayTimeSeconds(boothId, DEFAULT_STAY_TIME_SECONDS);
         final int avgStayTimeMinutes = stayTimeSeconds > 0
                 ? Math.toIntExact(Math.ceilDiv((long) stayTimeSeconds, SECONDS_PER_MINUTE))
                 : 0;
@@ -340,6 +357,17 @@ public class WaitingService {
         final long activeWaitingCount = boothWaitingRepository.countByVisitorIdAndStatusIn(visitorId, ACTIVE_WAITING_STATUSES);
         if (activeWaitingCount >= MAX_ACTIVE_WAITING_COUNT) {
             throw new WaitingException(ErrorCode.MAX_WAITING_EXCEEDED);
+        }
+    }
+
+    private void validateBoothWaitingCapacity(final Long boothId) {
+        final int maxWaitingCount = waitingPolicyResolver.resolveMaxWaitingCount(boothId, DEFAULT_MAX_WAITING_COUNT);
+        final long currentWaitingCount = boothWaitingRepository.countByBoothIdAndStatusIn(
+                boothId,
+                BOOTH_WAITING_CAPACITY_STATUSES
+        );
+        if (currentWaitingCount >= maxWaitingCount) {
+            throw new WaitingException(ErrorCode.BOOTH_MAX_WAITING_EXCEEDED);
         }
     }
 
@@ -415,17 +443,20 @@ public class WaitingService {
     }
 
     private int resolveDeferLimit(final Long boothId) {
-        return boothPolicyRepository.findByBoothId(boothId)
-                .map(BoothPolicy::getDeferLimit)
-                .filter(value -> value >= 0)
-                .orElse(DEFAULT_DEFER_LIMIT);
+        return waitingPolicyResolver.resolveDeferLimit(boothId, DEFAULT_DEFER_LIMIT);
     }
 
     private int resolveCallValidTimeSeconds(final Long boothId) {
-        return boothPolicyRepository.findByBoothId(boothId)
-                .map(BoothPolicy::getCallValidTime)
-                .filter(value -> value > 0)
-                .orElse(DEFAULT_CALL_VALID_TIME_SECONDS);
+        return waitingPolicyResolver.resolveCallValidTimeSeconds(boothId, DEFAULT_CALL_VALID_TIME_SECONDS);
+    }
+
+    private int resolveRemainingCallSlots(final Long boothId) {
+        final int callCount = waitingPolicyResolver.resolveCallCount(boothId, DEFAULT_CALL_COUNT);
+        final long currentFrontQueueCount = boothWaitingRepository.countByBoothIdAndStatusIn(
+                boothId,
+                FRONT_QUEUE_STATUSES
+        );
+        return Math.max(callCount - Math.toIntExact(currentFrontQueueCount), 0);
     }
 
     private void swapWaitingNumbers(final BoothWaiting source, final BoothWaiting target) {
@@ -446,7 +477,8 @@ public class WaitingService {
                         waiting.getBoothId(),
                         waiting.getVisitorId(),
                         previousStatus,
-                        waiting.getStatus().name()
+                        waiting.getStatus().name(),
+                        waitingEventSnapshotAssembler.toSnapshot(waiting)
                 )
         );
     }

@@ -11,8 +11,8 @@ public enum WaitingEventType {
     WAITING_REGISTERED("도착 확인", true, false),
     WAITING_ENTERED("입장 완료", true, true),
     WAITING_EXITED("이용 종료", true, false),
-    WAITING_EXPIRED("호출 만료", false, true),
-    WAITING_CANCELED("대기 취소", false, false),
+    WAITING_EXPIRED("호출 만료", true, true),
+    WAITING_CANCELED("대기 취소", true, false),
     WAITING_REORDERED("대기 순서 변경", false, false);
 
     private final String description;

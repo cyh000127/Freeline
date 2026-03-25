@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import com.freeline.common.config.properties.BoothManagerSseProperties;
 import com.freeline.common.util.TimeUtils;
-import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.boothmanager.converter.BoothManagerConverter;
 import com.freeline.domain.boothmanager.dto.response.BoothManagerSseEventResDto;
 
@@ -52,32 +51,12 @@ public class BoothManagerSseService {
         return emitter;
     }
 
-    public void publishQueueUpdated(
-            final Long boothId,
-            final Long waitingId,
-            final WaitingStatus changedStatus
-    ) {
-        publish(boothId, "QUEUE_UPDATED", waitingId, changedStatus);
-    }
-
-    public void publish(
-            final Long boothId,
-            final String eventType,
-            final Long waitingId,
-            final WaitingStatus changedStatus
-    ) {
-        final BoothManagerSseEventResDto payload = BoothManagerConverter.toSseEventResDto(
-                eventType,
-                boothId,
-                waitingId,
-                changedStatus,
-                TimeUtils.nowDateTime()
-        );
-        publishToRedis(boothId, payload);
+    public void publishQueueUpdated(final BoothManagerSseEventResDto payload) {
+        publishToRedis(payload.boothId(), payload);
     }
 
     public void broadcastFromRedis(final BoothManagerSseEventResDto payload) {
-        broadcast(payload.boothId(), payload.eventType(), payload);
+        broadcast(payload.boothId(), resolveEventName(payload), payload);
     }
 
     private void broadcast(
@@ -135,5 +114,9 @@ public class BoothManagerSseService {
         if (emitters.isEmpty()) {
             emittersByBoothId.remove(boothId);
         }
+    }
+
+    private String resolveEventName(final BoothManagerSseEventResDto payload) {
+        return "CONNECTED".equals(payload.eventType()) ? "CONNECTED" : "QUEUE_UPDATED";
     }
 }

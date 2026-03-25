@@ -12,6 +12,8 @@ import com.freeline.common.util.TimeUtils;
 @Component
 public class WaitingStatusChangeDetector {
 
+    private static final int CURRENT_SCHEMA_VERSION = 1;
+
     public Optional<WaitingEventMessage> detect(final WaitingStatusChangeCommand command) {
         validate(command);
 
@@ -21,6 +23,7 @@ public class WaitingStatusChangeDetector {
 
         return Optional.of(
                 WaitingEventMessage.builder()
+                        .schemaVersion(CURRENT_SCHEMA_VERSION)
                         .eventId(UUID.randomUUID())
                         .eventType(command.eventType())
                         .waitingId(command.waitingId())
@@ -29,6 +32,7 @@ public class WaitingStatusChangeDetector {
                         .previousStatus(command.previousStatus())
                         .currentStatus(command.currentStatus())
                         .occurredAt(TimeUtils.nowDateTime())
+                        .snapshot(command.snapshot())
                         .build()
         );
     }

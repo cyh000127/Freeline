@@ -22,6 +22,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import com.freeline.common.entity.BaseEntity;
+import com.freeline.common.util.TimeUtils;
 import com.freeline.domain.booth.entity.Booth;
 
 @Entity
@@ -87,7 +88,7 @@ public class BoothAdmin extends BaseEntity {
     }
 
     public void recordLogin() {
-        this.lastLoginAt = LocalDateTime.now();
+        this.lastLoginAt = TimeUtils.nowDateTime();
         if (this.status == BoothAdminStatus.CREATED || this.status == BoothAdminStatus.MAILED) {
             this.status = BoothAdminStatus.LOGGED_IN;
         }

@@ -30,6 +30,7 @@ class WaitingStatusChangeDetectorTest {
 
         Assertions.assertThat(result).isPresent();
         Assertions.assertThat(result.get().eventId()).isNotNull();
+        Assertions.assertThat(result.get().schemaVersion()).isEqualTo(1);
         Assertions.assertThat(result.get().eventType()).isEqualTo(WaitingEventType.WAITING_CALLED);
         Assertions.assertThat(result.get().waitingId()).isEqualTo(1L);
         Assertions.assertThat(result.get().boothId()).isEqualTo(2L);
@@ -37,6 +38,7 @@ class WaitingStatusChangeDetectorTest {
         Assertions.assertThat(result.get().previousStatus()).isEqualTo("WAITING");
         Assertions.assertThat(result.get().currentStatus()).isEqualTo("CALLED");
         Assertions.assertThat(result.get().occurredAt()).isNotNull();
+        Assertions.assertThat(result.get().snapshot()).isNull();
     }
 
     @Test
