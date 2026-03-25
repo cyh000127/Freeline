@@ -8,9 +8,9 @@ import { Label } from "@/components/ui/label";
 import { QRCodeSVG } from "qrcode.react";
 import { Printer, RefreshCw, Save, QrCode, Settings, Image as ImageIcon, UploadCloud } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { 
-  getBoothInfo, 
-  updateBooth, 
+import {
+  getBoothInfo,
+  updateBooth,
   BoothUpdateRequest,
   BoothPolicy,
   getBoothPolicy,
@@ -20,14 +20,14 @@ import {
   getBoothImages
 } from "@/lib/api/booth";
 import { getQR, generateQR, reissueQR, QRData } from "@/lib/api/qr";
-
-const DEFAULT_BOOTH_ID = 1; // In a real app, this would come from auth context/session
+import { useAuth } from "@/context/AuthContext";
 
 type TabType = 'info' | 'policy' | 'qr';
 
 export default function SettingsPage() {
+  const { user, isLoading: authLoading } = useAuth();
+  const boothId = user?.boothId || 0;
   const [activeTab, setActiveTab] = useState<TabType>('info');
-  const [boothId] = useState(DEFAULT_BOOTH_ID);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingPolicy, setIsSavingPolicy] = useState(false);
@@ -42,7 +42,7 @@ export default function SettingsPage() {
 
   const repImageInputRef = useRef<HTMLInputElement>(null);
   const logoImageInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Booth Info State
   const [boothInfo, setBoothInfo] = useState<BoothUpdateRequest>({
     name: "",
@@ -64,8 +64,10 @@ export default function SettingsPage() {
   const [qrData, setQrData] = useState<QRData | null>(null);
 
   useEffect(() => {
-    fetchInitialData();
-    
+    if (boothId) {
+      fetchInitialData();
+    }
+
     // Cleanup Object URLs to avoid memory leaks
     return () => {
       // Only cleanup local blobs, not backend URLs
@@ -75,6 +77,7 @@ export default function SettingsPage() {
   }, [boothId]);
 
   const fetchInitialData = async () => {
+    if (!boothId) return;
     setIsLoading(true);
     try {
       const [boothRes, qrRes, policyRes, imagesRes] = await Promise.all([
@@ -248,9 +251,9 @@ export default function SettingsPage() {
     if (!printWindow) return;
 
     const qrSvg = document.getElementById('qr-code-svg')?.outerHTML || '';
-    
+
     // Default or fetched images
-    const eventImageUrl = (boothInfo as any).eventImageUrl || repImagePreview || ''; 
+    const eventImageUrl = (boothInfo as any).eventImageUrl || repImagePreview || '';
     const logoUrl = (boothInfo as any).logoUrl || logoImagePreview || '';
 
     printWindow.document.write(`
@@ -281,9 +284,9 @@ export default function SettingsPage() {
               flex-direction: column;
               align-items: center;
               background-color: #1a1a1a;
-              ${eventImageUrl 
-                ? "background-image: url('" + eventImageUrl + "'); background-size: cover; background-position: center;" 
-                : "background-image: radial-gradient(#333 15%, transparent 16%); background-size: 20px 20px;"}
+              ${eventImageUrl
+        ? "background-image: url('" + eventImageUrl + "'); background-size: cover; background-position: center;"
+        : "background-image: radial-gradient(#333 15%, transparent 16%); background-size: 20px 20px;"}
             }
             .qr-box {
               background: #e5e7eb;
@@ -378,10 +381,28 @@ export default function SettingsPage() {
     printWindow.document.close();
   };
 
-  if (isLoading) {
+  if (authLoading || (isLoading && boothId)) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-lg font-medium text-gray-400">로딩 중...</div>
+      </div>
+    );
+  }
+
+  if (!boothId && !authLoading) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4">
+        <div className="text-lg font-medium text-red-400">부스 정보를 찾을 수 없습니다.</div>
+        <Button
+          onClick={() => {
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("boothId");
+            window.location.href = "/login";
+          }}
+          className="bg-[#2D2A4A] text-white"
+        >
+          다시 로그인하기
+        </Button>
       </div>
     );
   }
@@ -457,7 +478,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="locationCode">부스 위치 설명</Label>
+                  <Label htmlFor="locationCode">부스 위치</Label>
                   <Input
                     id="locationCode"
                     value={boothInfo.locationCode}
@@ -508,7 +529,7 @@ export default function SettingsPage() {
                 <ImageIcon className="h-5 w-5 text-[#2D2A4A]" />
                 <h2 className="text-xl font-bold text-gray-900">이미지 관리</h2>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
                 {/* Rep Image Box */}
                 <div className="space-y-4">
@@ -516,8 +537,8 @@ export default function SettingsPage() {
                     <Label className="text-base font-bold">대표 이미지 업로드</Label>
                     <p className="text-xs text-gray-400">부스 배경 등에 사용됩니다.</p>
                   </div>
-                  
-                  <div 
+
+                  <div
                     className="bg-[#F8F9FA] border-2 border-dashed border-gray-200 rounded-xl h-48 flex items-center justify-center cursor-pointer overflow-hidden hover:bg-gray-50 transition-colors relative"
                     onClick={() => repImageInputRef.current?.click()}
                   >
@@ -537,7 +558,7 @@ export default function SettingsPage() {
                     onChange={(e) => handleFileChange(e, true)}
                     className="hidden"
                   />
-                  <Button 
+                  <Button
                     variant="outline"
                     disabled={isUploadingRepImage || !repImageFile}
                     onClick={() => handleImageUploadSubmit(true)}
@@ -554,7 +575,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-gray-400">QR 출력물 등에 사용됩니다.</p>
                   </div>
 
-                  <div 
+                  <div
                     className="bg-[#F8F9FA] border-2 border-dashed border-gray-200 rounded-xl h-48 flex items-center justify-center cursor-pointer overflow-hidden hover:bg-gray-50 transition-colors relative"
                     onClick={() => logoImageInputRef.current?.click()}
                   >
@@ -574,7 +595,7 @@ export default function SettingsPage() {
                     onChange={(e) => handleFileChange(e, false)}
                     className="hidden"
                   />
-                  <Button 
+                  <Button
                     variant="outline"
                     disabled={isUploadingImage || !logoImageFile}
                     onClick={() => handleImageUploadSubmit(false)}
@@ -649,15 +670,15 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="callValidSeconds">호출 유효 시간(초)</Label>
-                    <Input
-                      id="callValidSeconds"
-                      type="number"
-                      value={policyInfo.callValidSeconds}
-                      onChange={(e) => setPolicyInfo({ ...policyInfo, callValidSeconds: parseInt(e.target.value) || 0 })}
-                      className="h-12 bg-[#F8F9FA] border-0 rounded-xl"
-                      required
-                    />
+                  <Label htmlFor="callValidSeconds">호출 유효 시간(초)</Label>
+                  <Input
+                    id="callValidSeconds"
+                    type="number"
+                    value={policyInfo.callValidSeconds}
+                    onChange={(e) => setPolicyInfo({ ...policyInfo, callValidSeconds: parseInt(e.target.value) || 0 })}
+                    className="h-12 bg-[#F8F9FA] border-0 rounded-xl"
+                    required
+                  />
                 </div>
 
                 <Button
@@ -692,7 +713,7 @@ export default function SettingsPage() {
                       includeMargin={false}
                     />
                   </div>
-                  
+
                   <div className="text-center space-y-1 mb-4">
                     <p className="font-bold text-gray-900 text-lg">상태: <span className="text-emerald-500">{qrData.status}</span></p>
                     <p className="text-xs text-gray-400">발급일: {new Date(qrData.issuedAt).toLocaleString()}</p>
