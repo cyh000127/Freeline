@@ -24,6 +24,7 @@ import com.freeline.common.response.BaseResponse;
 import com.freeline.common.util.ResponseUtils;
 import com.freeline.domain.auth.dto.request.BoothAdminBulkCreateReqDto;
 import com.freeline.domain.auth.dto.request.BoothAdminEmailSendReqDto;
+import com.freeline.domain.auth.dto.request.BoothAdminInitialPasswordChangeReqDto;
 import com.freeline.domain.auth.dto.request.ChangePasswordReqDto;
 import com.freeline.domain.auth.dto.request.EmailVerifyReqDto;
 import com.freeline.domain.auth.dto.request.EntryCodeBulkCreateReqDto;
@@ -154,6 +155,15 @@ public class AuthController {
     ) {
         Long userId = Long.parseLong(authentication.getName());
         authService.sendBoothAdminLoginsBulk(userId, request);
+        return ResponseUtils.ok(null);
+    }
+
+    @Operation(summary = "Initial booth admin password change")
+    @PatchMapping("/booth-admins/password/initial")
+    public ResponseEntity<BaseResponse<Void>> changeInitialBoothAdminPassword(
+            @Valid @RequestBody final BoothAdminInitialPasswordChangeReqDto request
+    ) {
+        authService.changeBoothAdminInitialPassword(request);
         return ResponseUtils.ok(null);
     }
 
