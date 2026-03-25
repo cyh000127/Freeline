@@ -1,18 +1,48 @@
-import { useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import RegisterScreenLayout from '@/components/register/RegisterScreenLayout';
 import RegisterCheckboxRow from '@/components/register/RegisterCheckboxRow';
+import { useAuthSession } from '@/features/auth/auth-session.context';
 
 export default function ConfirmScreen() {
   const router = useRouter();
-  const { nickname } = useLocalSearchParams<{ nickname?: string }>();
 
   const [requiredAgreed, setRequiredAgreed] = useState(false);
   const [marketingAgreed, setMarketingAgreed] = useState(false);
 
+  const { accessToken, nickname, completeRegistration, isHydrating } = useAuthSession();
+
+  useEffect(() => {
+    if (isHydrating) {
+      return;
+    }
+
+    if (!accessToken) {
+      router.replace('/register/ticket');
+      return;
+    }
+
+    if (!nickname) {
+      router.replace('/register/nickname');
+    }
+  }, [accessToken, nickname, isHydrating, router]);
+
   const displayNickname =
     typeof nickname === 'string' && nickname.trim().length > 0 ? nickname : '닉네임 없음';
+
+  const handleStart = () => {
+    if (!requiredAgreed) {
+      return;
+    }
+
+    completeRegistration({
+      requiredAgreed,
+      marketingAgreed,
+    });
+
+    router.replace('/home');
+  };
 
   return (
     <RegisterScreenLayout>
@@ -51,7 +81,7 @@ export default function ConfirmScreen() {
       <Pressable
         style={[styles.button, !requiredAgreed && styles.buttonDisabled]}
         disabled={!requiredAgreed}
-        onPress={() => router.replace('/home')}
+        onPress={handleStart}
       >
         <Text style={styles.buttonText}>이 정보로 시작하기</Text>
       </Pressable>

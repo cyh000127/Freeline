@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 60,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 6,
     borderRadius: 999,
     backgroundColor: 'rgba(160, 158, 171, 0.6)',
     flexDirection: 'row',

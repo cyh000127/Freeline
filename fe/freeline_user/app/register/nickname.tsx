@@ -1,23 +1,44 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import RegisterScreenLayout from '@/components/register/RegisterScreenLayout';
+import { useAuthSession } from '@/features/auth/auth-session.context';
 
 export default function NicknameScreen() {
   const router = useRouter();
-  const [nickname, setNickname] = useState('');
+  const { accessToken, nickname, setNickname, isHydrating } = useAuthSession();
 
-  const trimmed = useMemo(() => nickname.trim(), [nickname]);
+  useEffect(() => {
+    if (isHydrating) {
+      return;
+    }
+
+    if (!accessToken) {
+      router.replace('/register/ticket');
+    }
+  }, [accessToken, isHydrating, router]);
+  const [localNickname, setLocalNickname] = useState(nickname ?? '');
+
+  const trimmed = useMemo(() => localNickname.trim(), [localNickname]);
   const isValid = useMemo(() => /^[가-힣]{1,8}$/.test(trimmed), [trimmed]);
   const showError = trimmed.length > 0 && !isValid;
+
+  const handleSubmit = () => {
+    if (!isValid) {
+      return;
+    }
+
+    setNickname(trimmed);
+    router.push('/register/confirm');
+  };
 
   return (
     <RegisterScreenLayout>
       <Text style={styles.title}>닉네임을 설정해주세요.</Text>
 
       <TextInput
-        value={nickname}
-        onChangeText={setNickname}
+        value={localNickname}
+        onChangeText={setLocalNickname}
         placeholder=""
         placeholderTextColor="#B9BAC6"
         style={[styles.input, showError && styles.inputError]}
@@ -36,12 +57,7 @@ export default function NicknameScreen() {
       <Pressable
         style={[styles.button, !isValid && styles.buttonDisabled]}
         disabled={!isValid}
-        onPress={() =>
-          router.push({
-            pathname: '/register/confirm',
-            params: { nickname: trimmed },
-          })
-        }
+        onPress={handleSubmit}
       >
         <Text style={styles.buttonText}>확인</Text>
       </Pressable>
