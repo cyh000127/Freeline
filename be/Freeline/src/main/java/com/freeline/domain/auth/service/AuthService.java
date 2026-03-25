@@ -4,6 +4,7 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +24,7 @@ import com.freeline.common.security.JwtProvider;
 import com.freeline.domain.auth.converter.AuthConverter;
 import com.freeline.domain.auth.dto.request.BoothAdminBulkCreateReqDto;
 import com.freeline.domain.auth.dto.request.BoothAdminEmailSendReqDto;
+import com.freeline.domain.auth.dto.request.BoothAdminInitialPasswordChangeReqDto;
 import com.freeline.domain.auth.dto.request.ChangePasswordReqDto;
 import com.freeline.domain.auth.dto.request.EmailVerifyReqDto;
 import com.freeline.domain.auth.dto.request.EntryCodeBulkCreateReqDto;
@@ -181,6 +183,9 @@ public class AuthService {
             if (!boothAdmin.isActive()) {
                 throw new AuthException(ErrorCode.ACCESS_DENIED);
             }
+            if (!boothAdmin.isPasswordChanged()) {
+                throw new AuthException(ErrorCode.PASSWORD_CHANGE_REQUIRED);
+            }
             boothAdmin.recordLogin();
             return generateLoginResponse(
                     boothAdmin.getId(),
@@ -254,8 +259,25 @@ public class AuthService {
         if (!passwordEncoder.matches(req.currentPassword(), eventAdmin.getPassword())) {
             throw new AuthException(ErrorCode.PASSWORD_MISMATCH);
         }
-        eventAdmin.changePassword(java.util.Objects.requireNonNull(passwordEncoder.encode(req.newPassword())));
+        eventAdmin.changePassword(Objects.requireNonNull(passwordEncoder.encode(req.newPassword())));
         log.info("[Auth] Password changed for event admin: {}", eventAdmin.getEmail());
+    }
+
+    @Transactional
+    public void changeBoothAdminInitialPassword(final BoothAdminInitialPasswordChangeReqDto req) {
+        final BoothAdmin boothAdmin = boothAdminRepository.findByLoginId(req.loginId())
+                .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
+
+        validatePassword(req.oldPassword(), boothAdmin.getPassword());
+        if (!boothAdmin.isActive()) {
+            throw new AuthException(ErrorCode.ACCESS_DENIED);
+        }
+        if (boothAdmin.isPasswordChanged()) {
+            throw new AuthException(ErrorCode.PASSWORD_CHANGE_NOT_REQUIRED);
+        }
+
+        boothAdmin.completePasswordChange(Objects.requireNonNull(passwordEncoder.encode(req.newPassword())));
+        log.info("[Auth] Initial password change completed for booth admin: {}", boothAdmin.getLoginId());
     }
 
     /**
@@ -313,8 +335,7 @@ public class AuthService {
         }
         for (BoothAdmin admin : admins) {
             String rawPassword = createRandomPassword();
-            admin.changePassword(java.util.Objects.requireNonNull(passwordEncoder.encode(rawPassword)));
-            admin.markAsMailed();
+            admin.setTemporaryPassword(Objects.requireNonNull(passwordEncoder.encode(rawPassword)));
             sendLoginInfoEmail(admin.getEmail(), admin.getLoginId(), rawPassword);
         }
     }
@@ -515,6 +536,7 @@ public class AuthService {
             log.info("[Auth] Login info sent to: {}", email);
         } catch (Exception e) {
             log.error("[Auth] Failed to send login info to: {}", email, e);
+            throw new AuthException(ErrorCode.EMAIL_SEND_FAILED);
         }
     }
 }

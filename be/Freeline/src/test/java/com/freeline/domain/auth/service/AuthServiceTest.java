@@ -1,5 +1,6 @@
 package com.freeline.domain.auth.service;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -11,18 +12,24 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.freeline.common.config.properties.AuthProperties;
+import com.freeline.common.error.ErrorCode;
 import com.freeline.common.security.JwtProvider;
 import com.freeline.domain.auth.converter.AuthConverter;
+import com.freeline.domain.auth.dto.request.BoothAdminEmailSendReqDto;
+import com.freeline.domain.auth.dto.request.BoothAdminInitialPasswordChangeReqDto;
 import com.freeline.domain.auth.dto.request.LoginReqDto;
 import com.freeline.domain.auth.dto.response.BoothAdminMeResDto;
 import com.freeline.domain.auth.dto.response.LoginResDto;
 import com.freeline.domain.auth.entity.BoothAdmin;
+import com.freeline.domain.auth.entity.BoothAdminStatus;
 import com.freeline.domain.auth.entity.Role;
+import com.freeline.domain.auth.exception.AuthException;
 import com.freeline.domain.auth.repository.BoothAdminRepository;
 import com.freeline.domain.auth.repository.EventAdminRepository;
 import com.freeline.domain.booth.repository.BoothRepository;
@@ -89,11 +96,13 @@ class AuthServiceTest {
     }
 
     @Test
-    void 부스관리자_로그인시_boothId를_응답에_포함한다() {
+    void 비밀번호_변경을_완료한_부스관리자는_로그인_시_boothId를_응답에_포함한다() {
         final BoothAdmin boothAdmin = BoothAdmin.builder()
                 .id(11L)
                 .loginId("booth-admin-1")
                 .password("encoded-password")
+                .passwordChanged(true)
+                .status(BoothAdminStatus.COMPLETED)
                 .boothId(7L)
                 .active(true)
                 .build();
@@ -114,7 +123,31 @@ class AuthServiceTest {
     }
 
     @Test
-    void 리프레시시_boothAdmin이면_boothId를_응답에_포함한다() {
+    void 최초_로그인_부스관리자는_비밀번호_변경_예외를_받고_토큰이_발급되지_않는다() {
+        final BoothAdmin boothAdmin = BoothAdmin.builder()
+                .id(12L)
+                .loginId("booth-admin-first")
+                .password("encoded-password")
+                .boothId(9L)
+                .active(true)
+                .status(BoothAdminStatus.MAILED)
+                .build();
+
+        org.mockito.Mockito.when(boothAdminRepository.findByLoginId("booth-admin-first"))
+                .thenReturn(Optional.of(boothAdmin));
+        org.mockito.Mockito.when(passwordEncoder.matches("1234", "encoded-password")).thenReturn(true);
+
+        Assertions.assertThatThrownBy(() -> authService.login(new LoginReqDto("booth-admin-first", "1234")))
+                .isInstanceOf(AuthException.class)
+                .satisfies(exception -> Assertions.assertThat(((AuthException) exception).getErrorCode())
+                        .isEqualTo(ErrorCode.PASSWORD_CHANGE_REQUIRED));
+        Assertions.assertThat(boothAdmin.getLastLoginAt()).isNull();
+        org.mockito.Mockito.verify(jwtProvider, org.mockito.Mockito.never())
+                .createToken(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void 리프레시가_boothAdmin이면_boothId를_응답에_포함한다() {
         final Claims claims = org.mockito.Mockito.mock(Claims.class);
         final BoothAdmin boothAdmin = BoothAdmin.builder()
                 .id(11L)
@@ -139,7 +172,62 @@ class AuthServiceTest {
     }
 
     @Test
-    void 부스관리자_내정보조회시_boothId를_반환한다() {
+    void 최초_비밀번호_변경_API는_상태를_COMPLETED로_갱신한다() {
+        final BoothAdmin boothAdmin = BoothAdmin.builder()
+                .id(21L)
+                .loginId("booth-admin-init")
+                .password("encoded-temp")
+                .boothId(5L)
+                .active(true)
+                .status(BoothAdminStatus.MAILED)
+                .build();
+
+        org.mockito.Mockito.when(boothAdminRepository.findByLoginId("booth-admin-init"))
+                .thenReturn(Optional.of(boothAdmin));
+        org.mockito.Mockito.when(passwordEncoder.matches("temp-password", "encoded-temp")).thenReturn(true);
+        org.mockito.Mockito.when(passwordEncoder.encode("new-password")).thenReturn("encoded-new-password");
+
+        authService.changeBoothAdminInitialPassword(BoothAdminInitialPasswordChangeReqDto.builder()
+                .loginId("booth-admin-init")
+                .oldPassword("temp-password")
+                .newPassword("new-password")
+                .build());
+
+        Assertions.assertThat(boothAdmin.isPasswordChanged()).isTrue();
+        Assertions.assertThat(boothAdmin.getStatus()).isEqualTo(BoothAdminStatus.COMPLETED);
+        Assertions.assertThat(boothAdmin.getPassword()).isEqualTo("encoded-new-password");
+    }
+
+    @Test
+    void 부스관리자_로그인정보_메일_발송이_실패하면_AuthException을_던진다() {
+        final BoothAdmin boothAdmin = BoothAdmin.builder()
+                .id(31L)
+                .loginId("booth-admin-mail")
+                .password("encoded-password")
+                .email("booth-admin@test.com")
+                .boothId(6L)
+                .active(true)
+                .build();
+
+        org.mockito.Mockito.when(eventAdminRepository.existsById(1L)).thenReturn(true);
+        org.mockito.Mockito.when(boothAdminRepository.findAllById(List.of(31L))).thenReturn(List.of(boothAdmin));
+        org.mockito.Mockito.when(passwordEncoder.encode(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn("encoded-temp-password");
+        org.mockito.Mockito.doThrow(new RuntimeException("mail failed"))
+                .when(mailSender)
+                .send(org.mockito.ArgumentMatchers.any(SimpleMailMessage.class));
+
+        Assertions.assertThatThrownBy(() -> authService.sendBoothAdminLoginsBulk(
+                        1L,
+                        BoothAdminEmailSendReqDto.builder().boothAdminIds(List.of(31L)).build()
+                ))
+                .isInstanceOf(AuthException.class)
+                .satisfies(exception -> Assertions.assertThat(((AuthException) exception).getErrorCode())
+                        .isEqualTo(ErrorCode.EMAIL_SEND_FAILED));
+    }
+
+    @Test
+    void 부스관리자_내정보_조회시_boothId를_반환한다() {
         final BoothAdmin boothAdmin = BoothAdmin.builder()
                 .id(11L)
                 .loginId("booth-admin-1")
