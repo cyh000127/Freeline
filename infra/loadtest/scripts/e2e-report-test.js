@@ -24,13 +24,14 @@ import { Counter, Trend } from "k6/metrics";
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 const BASE_URL = __ENV.TARGET_URL || "https://j14a207.p.ssafy.io";
-const ADMIN_ID = __ENV.ADMIN_ID || "kangseunghun9927@gmail.com";
-const ADMIN_PW = __ENV.ADMIN_PW || "jmh8EYG3pyd9ydt*vam";
+const ADMIN_ID = __ENV.ADMIN_ID || "";
+const ADMIN_PW = __ENV.ADMIN_PW || "";
 const VU_COUNT = parseInt(__ENV.VU_COUNT || "50", 10);
 const ITERATIONS = parseInt(__ENV.ITERATIONS || "10", 10);
 const BOOTH_COUNT = 10;
 const PRESET_EVENT_ID = __ENV.PRESET_EVENT_ID || "";
 const PRESET_BOOTH_IDS = __ENV.PRESET_BOOTH_IDS || "";
+const ENTRY_PREFIX = __ENV.ENTRY_PREFIX || "E2E";
 
 // ─── Custom Metrics ──────────────────────────────────────────────────────────
 
@@ -205,7 +206,7 @@ export function setup() {
   // 5. 방문자 entry code 목록
   const entryCodes = [];
   for (let i = 1; i <= VU_COUNT; i++) {
-    entryCodes.push(`E2E${String(i).padStart(3, "0")}`);
+    entryCodes.push(`${ENTRY_PREFIX}${String(i).padStart(3, "0")}`);
   }
 
   console.log(`=== [Setup] 완료 — eventId=${eventId}, booths=${boothIds.length}, visitors=${entryCodes.length} ===`);

@@ -35,8 +35,8 @@ set -euo pipefail
 # ─── Configuration ───────────────────────────────────────────────────────────
 
 TARGET_URL="${TARGET_URL:-https://j14a207.p.ssafy.io}"
-ADMIN_ID="${ADMIN_ID:-kangseunghun9927@gmail.com}"
-ADMIN_PW="${ADMIN_PW:-jmh8EYG3pyd9ydt*vam}"
+ADMIN_ID="${ADMIN_ID:?환경변수 ADMIN_ID를 설정하세요}"
+ADMIN_PW="${ADMIN_PW:?환경변수 ADMIN_PW를 설정하세요}"
 VU_COUNT="${VU_COUNT:-30}"
 ITERATIONS="${ITERATIONS:-5}"
 EVENT_NAME="${EVENT_NAME:-2026 IT 채용 박람회}"
@@ -45,8 +45,8 @@ HDFS_SERVER="${HDFS_SERVER:-172.26.15.39}"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-freeline}"
-DB_USER="${DB_USER:-freeline_admin}"
-DB_PASSWORD="${DB_PASSWORD:-AtIDZFMV20ARA747nyOSBjtFNuIfMbIa}"
+DB_USER="${DB_USERNAME:-${DB_USER:?환경변수 DB_USERNAME을 설정하세요}}"
+DB_PASSWORD="${DB_PASSWORD:?환경변수 DB_PASSWORD를 설정하세요}"
 
 AUTO_CLOSE=false
 for arg in "$@"; do
