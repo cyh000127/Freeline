@@ -62,4 +62,16 @@ export const eventApi = {
     default_call_ttl: number;
     default_defer_limit: number;
   }) => api.put<ApiResponse<any>>(`/v1/events/${eventId}/policies`, payload),
+
+  // 특정 행사 부스 목록 조회
+  getBooths: (eventId: number | string) => api.get<ApiResponse<any>>(`/v1/events/${eventId}/booths`),
+
+  // 부스 및 부스 관리자 통합 CSV 일괄 등록
+  onboardBooths: (eventId: number | string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<ApiResponse<any>>(`/v1/events/${eventId}/booths/csv`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
