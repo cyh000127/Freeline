@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,6 +50,7 @@ public class EventController {
     private final EventService eventService;
 
     @Operation(summary = "행사 썸네일 업로드", description = "행사 썸네일 이미지를 업로드하고 eventId에 매핑하여 저장합니다.")
+    @PreAuthorize("hasRole('EVENT_ADMIN')")
     @PostMapping(value = "/{eventId}/thumbnail", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BaseResponse<EventUpdateResDto>> uploadThumbnail(
             final Authentication authentication,
@@ -61,6 +63,7 @@ public class EventController {
     }
 
     @Operation(summary = "행사 생성", description = "주최자가 신규 행사를 생성합니다.")
+    @PreAuthorize("hasRole('EVENT_ADMIN')")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<BaseResponse<EventResDto>> createEventJson(
             final Authentication authentication,
@@ -72,6 +75,7 @@ public class EventController {
     }
 
     @Operation(summary = "행사 생성", description = "주최자가 신규 행사를 생성합니다. multipart/form-data 요청 시 썸네일 파일 업로드를 함께 처리합니다.")
+    @PreAuthorize("hasRole('EVENT_ADMIN')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BaseResponse<EventResDto>> createEventMultipart(
             final Authentication authentication,
@@ -83,6 +87,7 @@ public class EventController {
     }
 
     @Operation(summary = "전체 행사 목록 조회", description = "최신 생성일 기준으로 전체 행사 목록을 조회합니다.")
+    @PreAuthorize("hasRole('EVENT_ADMIN')")
     @GetMapping
     public ResponseEntity<PageResponse<EventListResDto>> getEvents(
             final Authentication authentication,
@@ -90,24 +95,24 @@ public class EventController {
             @RequestParam(defaultValue = "0") final int page,
             @RequestParam(defaultValue = "10") final int size
     ) {
-        final Long eventAdminId = extractId(authentication);
-        final Page<EventListResDto> response = eventService.getEvents(eventAdminId, status, page, size);
+        final Page<EventListResDto> response = eventService.getEvents(extractId(authentication), status, page, size);
         return ResponseUtils.page(response);
     }
 
     @Operation(summary = "행사 상세 조회", description = "주최자가 본인이 관리하는 행사 상세 정보를 조회합니다.")
+    @PreAuthorize("hasRole('EVENT_ADMIN')")
     @GetMapping("/{eventId}")
     public ResponseEntity<BaseResponse<EventDetailResDto>> getEventDetail(
             final Authentication authentication,
             @PathVariable final Long eventId,
             @RequestParam(required = false, defaultValue = "false") final Boolean includeBooths
     ) {
-        final Long eventAdminId = extractId(authentication);
-        final EventDetailResDto response = eventService.getEventDetail(eventAdminId, eventId, includeBooths);
+        final EventDetailResDto response = eventService.getEventDetail(extractId(authentication), eventId, includeBooths);
         return ResponseUtils.ok(response);
     }
 
     @Operation(summary = "행사 운영 대시보드 조회", description = "실시간 행사 운영 현황 대시보드를 조회합니다.")
+    @PreAuthorize("hasRole('EVENT_ADMIN')")
     @GetMapping("/{eventId}/dashboard")
     public ResponseEntity<BaseResponse<EventDashboardResDto>> getEventDashboard(
             final Authentication authentication,
@@ -119,6 +124,7 @@ public class EventController {
     }
 
     @Operation(summary = "행사 수정", description = "행사 정보와 상태를 부분 수정합니다.")
+    @PreAuthorize("hasRole('EVENT_ADMIN')")
     @PatchMapping("/{eventId}")
     public ResponseEntity<BaseResponse<EventUpdateResDto>> updateEvent(
             final Authentication authentication,
@@ -132,6 +138,7 @@ public class EventController {
     }
 
     @Operation(summary = "행사 운영 정책 설정 및 수정", description = "행사의 대기열 운영 기본 정책을 생성하거나 수정합니다.")
+    @PreAuthorize("hasRole('EVENT_ADMIN')")
     @PutMapping("/{eventId}/policies")
     public ResponseEntity<BaseResponse<EventPolicyResDto>> upsertEventPolicy(
             final Authentication authentication,
@@ -144,6 +151,7 @@ public class EventController {
     }
 
     @Operation(summary = "행사 삭제", description = "행사를 삭제합니다.")
+    @PreAuthorize("hasRole('EVENT_ADMIN')")
     @DeleteMapping("/{eventId}")
     public ResponseEntity<BaseResponse<EventDeleteResDto>> deleteEvent(
             final Authentication authentication,
