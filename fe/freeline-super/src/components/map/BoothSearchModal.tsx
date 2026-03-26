@@ -78,11 +78,11 @@ export function BoothSearchModal({
                     const admin = admins.find((a: any) => a.boothId === d.boothId);
                     return {
                         boothId: d.boothId,
-                        boothName: d.name,
-                        locationCode: d.locationCode,
-                        adminName: admin ? admin.name : "",
-                        company: admin ? admin.company : "",
-                        contact: admin ? admin.email : "",
+                        boothName: d.name || "",
+                        locationCode: d.locationCode || "",
+                        adminName: admin?.name || "",
+                        company: admin?.company || "",
+                        contact: admin?.email || "",
                     };
                 });
 
@@ -123,8 +123,8 @@ export function BoothSearchModal({
             setFilteredBooths(allBooths.filter(b => !alreadyMappedBoothIds.includes(b.boothId) || b.boothId === currentBoothId));
         } else {
             const filtered = allBooths.filter(b =>
-                (b.boothName.toLowerCase().includes(val.toLowerCase()) ||
-                    b.company.toLowerCase().includes(val.toLowerCase())) &&
+                (b.boothName?.toLowerCase().includes(val.toLowerCase()) ||
+                    b.company?.toLowerCase().includes(val.toLowerCase())) &&
                 (!alreadyMappedBoothIds.includes(b.boothId) || b.boothId === currentBoothId)
             );
             setFilteredBooths(filtered);
