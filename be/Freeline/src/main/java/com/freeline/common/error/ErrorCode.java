@@ -80,6 +80,7 @@ public enum ErrorCode {
     INVALID_STATUS_FOR_ADMIT(HttpStatus.BAD_REQUEST, "B-014", "도착 확인(REGISTERED)이 완료된 대기만 입장 처리할 수 있습니다."),
     BOOTH_MAX_WAITING_EXCEEDED(HttpStatus.FORBIDDEN, "B-015", "부스의 최대 대기 가능 인원을 초과할 수 없습니다."),
     FRONT_QUEUE_FULL(HttpStatus.CONFLICT, "B-016", "이미 호출 인원 수만큼 앞큐가 차 있습니다."),
+    BOOTH_NAME_DUPLICATE(HttpStatus.CONFLICT, "B-017", "동일 행사 내 중복된 부스 이름은 등록할 수 없습니다."),
 
     /**
      * File Error (F-xxx)

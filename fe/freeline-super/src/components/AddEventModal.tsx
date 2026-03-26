@@ -438,22 +438,6 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1.5 col-span-2">
-                <label className="text-[13px] font-bold text-gray-700">기본 미루기 제한</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    name="default_defer_limit"
-                    value={formData.default_defer_limit}
-                    onChange={handleNumberChange}
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={5}
-                    className="w-full bg-white border border-gray-200 rounded-xl p-3 pr-10 text-[14px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-gray-400 pointer-events-none">회</span>
-                </div>
-              </div>
             </div>
           </div>
 

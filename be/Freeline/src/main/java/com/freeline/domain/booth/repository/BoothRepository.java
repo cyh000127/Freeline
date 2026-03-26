@@ -15,6 +15,41 @@ public interface BoothRepository extends JpaRepository<Booth, Long> {
     long countByIdInAndEventId(final List<Long> boothIds, final Long eventId);
 
     @Query("""
+            SELECT COUNT(b) > 0
+            FROM Booth b
+            WHERE b.eventId = :eventId
+            AND LOWER(TRIM(b.name)) = :normalizedName
+            """)
+    boolean existsByEventIdAndNormalizedName(
+            @Param("eventId") final Long eventId,
+            @Param("normalizedName") final String normalizedName
+    );
+
+    @Query("""
+            SELECT COUNT(b) > 0
+            FROM Booth b
+            WHERE b.eventId = :eventId
+            AND b.id <> :boothId
+            AND LOWER(TRIM(b.name)) = :normalizedName
+            """)
+    boolean existsByEventIdAndNormalizedNameAndIdNot(
+            @Param("eventId") final Long eventId,
+            @Param("boothId") final Long boothId,
+            @Param("normalizedName") final String normalizedName
+    );
+
+    @Query("""
+            SELECT LOWER(TRIM(b.name))
+            FROM Booth b
+            WHERE b.eventId = :eventId
+            AND LOWER(TRIM(b.name)) IN :normalizedNames
+            """)
+    List<String> findDuplicatedNormalizedNames(
+            @Param("eventId") final Long eventId,
+            @Param("normalizedNames") final List<String> normalizedNames
+    );
+
+    @Query("""
             SELECT b.id, b.name, ba.name, ba.company
             FROM Booth b
             LEFT JOIN BoothAdmin ba ON b.id = ba.boothId

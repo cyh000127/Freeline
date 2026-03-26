@@ -158,15 +158,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handlePostpone = async (waitingId: number) => {
-    try {
-      await waitingApi.postponeWaiting(waitingId);
-      fetchData(false);
-    } catch (error: any) {
-      alert(error.response?.data?.message || "미루기 처리에 실패했습니다.");
-    }
-  };
-
   const calculatedCount = {
     waiting: fullQueue.filter(w => w.status === 'REGISTERED' || w.status === 'WAITING' || w.status === 'CALLED').length,
     inUse: fullQueue.filter(w => w.status === 'ENTERED').length,
@@ -388,22 +379,13 @@ export default function DashboardPage() {
                       >
                         입장 처리
                       </button>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button 
-                          onClick={() => handlePostpone(waiting.waitingId)}
-                          className="h-12 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 font-black text-gray-600 transition-all text-xs"
-                          title="미루기"
-                        >
-                          미루기
-                        </button>
-                        <button 
-                          onClick={() => handleCancel(waiting.waitingId)}
-                          className="h-12 flex items-center justify-center rounded-xl bg-rose-50 hover:bg-rose-100 font-black text-rose-500 transition-all text-xs"
-                          title="취소"
-                        >
-                          취소
-                        </button>
-                      </div>
+                      <button 
+                        onClick={() => handleCancel(waiting.waitingId)}
+                        className="h-12 flex items-center justify-center rounded-xl bg-rose-50 hover:bg-rose-100 font-black text-rose-500 transition-all text-xs"
+                        title="취소"
+                      >
+                        취소
+                      </button>
                     </>
                   )}
                   {activeTab === 'ENTERED' && (

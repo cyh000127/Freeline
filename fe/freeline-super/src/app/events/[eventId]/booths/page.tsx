@@ -35,6 +35,8 @@ interface BoothRow {
   status: "pending" | "registered" | "error";
 }
 
+const normalizeBoothName = (name: string) => name.trim().toLowerCase();
+
 function parseFile(file: File): Promise<BoothRow[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -168,13 +170,12 @@ export default function EventBoothsPage() {
     if (eventId) load();
   }, [eventId, fetchBooths]);
 
-  const handleFile = useCallback(async (file: File) => {
+  const handleFile = async (file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (!["csv", "xlsx", "xls"].includes(ext || "")) {
       alert("CSV 또는 XLSX 파일만 업로드 가능합니다.");
       return;
     }
-    setFileName(file.name);
     setIsParsing(true);
     try {
       const parsed = await parseFile(file);
@@ -183,6 +184,26 @@ export default function EventBoothsPage() {
           "데이터를 찾을 수 없습니다.\n필수 컬럼: 부스 이름, 관리자 이메일을 확인해 주세요."
         );
       }
+
+      const seenBoothNames = new Set(rows.map((row) => normalizeBoothName(row.boothName)));
+      const duplicateBoothNames = new Set<string>();
+
+      for (const row of parsed) {
+        const normalizedName = normalizeBoothName(row.boothName);
+        if (seenBoothNames.has(normalizedName)) {
+          duplicateBoothNames.add(row.boothName.trim());
+          continue;
+        }
+        seenBoothNames.add(normalizedName);
+      }
+
+      if (duplicateBoothNames.size > 0) {
+        const duplicateList = Array.from(duplicateBoothNames).join(", ");
+        alert(`동일 이벤트 내 중복 부스명은 등록할 수 없습니다.\n중복 이름: ${duplicateList}`);
+        return;
+      }
+
+      setFileName(file.name);
       setSelectedFile(file);
       setRows((prev) => [...prev, ...parsed]);
     } catch {
@@ -190,7 +211,7 @@ export default function EventBoothsPage() {
     } finally {
       setIsParsing(false);
     }
-  }, []);
+  };
 
   const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -414,7 +435,7 @@ export default function EventBoothsPage() {
                   <p className="text-sm font-bold text-gray-700">
                     {fileName ? `📄 ${fileName} (업로드됨)` : "파일을 드래그하거나 클릭하여 업로드"}
                   </p>
-                  <p className="text-xs text-gray-400">CSV, XLSX, XLS · 여러 번 업로드 시 행이 추가됩니다</p>
+                  <p className="text-xs text-gray-400">CSV, XLSX, XLS · 중복 부스명은 자동으로 차단됩니다</p>
                   <div className="flex items-center gap-2 px-4 py-2 bg-[#2D2A4A] text-white text-xs font-bold rounded-xl">
                     <Upload className="w-3.5 h-3.5" />
                     파일 선택

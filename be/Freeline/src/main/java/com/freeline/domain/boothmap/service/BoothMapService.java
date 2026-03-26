@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -83,9 +84,12 @@ public class BoothMapService {
                         .yRatio(item.yRatio())
                         .widthRatio(item.widthRatio())
                         .heightRatio(item.heightRatio())
-                        .build())
-                .toList();
+                        .build());
+            }
+        }
 
+        areasToDelete.addAll(existingAreaMap.values());
+        boothMapAreaRepository.deleteAll(areasToDelete);
         boothMapAreaRepository.saveAll(newAreas);
         eventMap.updateMappingSnapshot(null);
 
@@ -108,6 +112,12 @@ public class BoothMapService {
         getAuthorizedEvent(eventAdminId, eventId);
         final EventMap eventMap = getEventMap(eventId, request.eventMapId());
 
+        try {
+            objectMapper.readTree(request.mappingSnapshot());
+        } catch (Exception e) {
+            throw new EventException(ErrorCode.JSON_PARSING_ERROR);
+        }
+
         eventMap.updateMappingSnapshot(request.mappingSnapshot());
         log.info("[BoothMap] mapping snapshot updated {eventId: {}, eventMapId: {}}", eventId, eventMap.getId());
     }
@@ -129,12 +139,25 @@ public class BoothMapService {
                 .map(area -> toBoothMapAreaResDto(area, boothsById.get(area.getBoothId())))
                 .toList();
 
+        List<BoothAreaDraftDto> drafts = Collections.emptyList();
+        if (booths.isEmpty() && eventMap.getMappingSnapshot() != null && !eventMap.getMappingSnapshot().isBlank()) {
+            try {
+                drafts = objectMapper.readValue(
+                        eventMap.getMappingSnapshot(),
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, BoothAreaDraftDto.class)
+                );
+            } catch (Exception e) {
+                log.warn("[BoothMap] 스냅샷 파싱 실패 {eventMapId: {}}", eventMap.getId(), e);
+            }
+        }
+
         return BoothMapResDto.builder()
                 .eventId(eventId)
                 .eventMapId(eventMap.getId())
                 .mapImageUrl(eventMap.getImagePath())
                 .mappingSnapshot(eventMap.getMappingSnapshot())
                 .booths(booths)
+                .drafts(drafts)
                 .build();
     }
 
@@ -274,6 +297,26 @@ public class BoothMapService {
         final long matchedCount = boothRepository.countByIdInAndEventId(boothIds, eventId);
         if (matchedCount != boothIds.size()) {
             throw new BoothException(ErrorCode.BOOTH_EVENT_MISMATCH);
+        }
+    }
+
+    private void validateEventOwnership(final Long eventId) {
+        validateEventExists(eventId);
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new EventException(ErrorCode.EVENT_NOT_FOUND));
+
+        org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null || auth.getName().equals("anonymousUser")) {
+            throw new EventException(ErrorCode.ACCESS_DENIED);
+        }
+
+        try {
+            Long currentUserId = Long.parseLong(auth.getName());
+            if (!event.getEventAdminId().equals(currentUserId)) {
+                throw new EventException(ErrorCode.ACCESS_DENIED);
+            }
+        } catch (NumberFormatException e) {
+            throw new EventException(ErrorCode.ACCESS_DENIED);
         }
     }
 }
