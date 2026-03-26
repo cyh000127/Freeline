@@ -6,7 +6,7 @@ const EAS_PROJECT_ID = process.env.EAS_PROJECT_ID ?? '';
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Freeline',
-  slug: 'freeline-user',
+  slug: 'freeline',
   scheme: 'freeline',
   ios: {
     ...config.ios,
