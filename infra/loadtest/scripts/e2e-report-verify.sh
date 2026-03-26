@@ -522,19 +522,19 @@ else
     log_ok "리포트 조회 성공"
 
     # summary 검증
-    TOTAL_VISITORS=$(extract_json_field "$RESP_BODY" "totalVisitors")
-    TOTAL_REGISTRATIONS=$(extract_json_field "$RESP_BODY" "totalRegistrations")
+    REPORT_TOTAL_VISITORS=$(extract_json_field "$RESP_BODY" "totalVisitors")
+    REPORT_TOTAL_REGISTRATIONS=$(extract_json_field "$RESP_BODY" "totalRegistrations")
 
-    if [ -n "$TOTAL_VISITORS" ] && [ "$TOTAL_VISITORS" != "null" ] && [ "$TOTAL_VISITORS" != "0" ]; then
-      log_ok "summary.totalVisitors = ${TOTAL_VISITORS}"
+    if [ -n "$REPORT_TOTAL_VISITORS" ] && [ "$REPORT_TOTAL_VISITORS" != "null" ] && [ "$REPORT_TOTAL_VISITORS" != "0" ]; then
+      log_ok "summary.totalVisitors = ${REPORT_TOTAL_VISITORS}"
       record_pass "총 방문자 수 검증"
     else
-      log_warn "summary.totalVisitors가 비어있거나 0 (${TOTAL_VISITORS})"
+      log_warn "summary.totalVisitors가 비어있거나 0 (${REPORT_TOTAL_VISITORS})"
       record_fail "총 방문자 수 = 0 또는 없음"
     fi
 
-    if [ -n "$TOTAL_REGISTRATIONS" ] && [ "$TOTAL_REGISTRATIONS" != "null" ]; then
-      log_ok "summary.totalRegistrations = ${TOTAL_REGISTRATIONS}"
+    if [ -n "$REPORT_TOTAL_REGISTRATIONS" ] && [ "$REPORT_TOTAL_REGISTRATIONS" != "null" ]; then
+      log_ok "summary.totalRegistrations = ${REPORT_TOTAL_REGISTRATIONS}"
       record_pass "총 등록 수 검증"
     else
       log_warn "summary.totalRegistrations 없음"
