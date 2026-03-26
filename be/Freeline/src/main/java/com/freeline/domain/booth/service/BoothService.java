@@ -65,6 +65,9 @@ import com.freeline.domain.event.repository.EventRepository;
 @RequiredArgsConstructor
 public class BoothService {
 
+    private static final int DEFAULT_CALL_COUNT = 1;
+    private static final int DEFAULT_CALL_VALID_SECONDS = 180;
+
     private static final String BOOTH_DIRECTORY = "booth";
     private static final DateTimeFormatter CSV_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final int CSV_COLUMN_COUNT = 7;
@@ -336,7 +339,7 @@ public class BoothService {
                 .filter(count -> count > 0)
                 .or(() -> eventPolicy.map(EventPolicy::getDefaultCallCount)
                         .filter(count -> count > 0))
-                .orElse(0);
+                .orElse(DEFAULT_CALL_COUNT);
     }
 
     private int resolveCallValidSeconds(
@@ -347,7 +350,7 @@ public class BoothService {
                 .filter(seconds -> seconds > 0)
                 .or(() -> eventPolicy.map(EventPolicy::getDefaultCallTtl)
                         .filter(seconds -> seconds > 0))
-                .orElse(0);
+                .orElse(DEFAULT_CALL_VALID_SECONDS);
     }
 
     private void validateOperatingHours(final LocalTime openTime, final LocalTime closeTime) {

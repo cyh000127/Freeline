@@ -72,6 +72,7 @@ public class WaitingService {
     );
 
     private static final List<WaitingStatus> CANCEL_BLOCKED_STATUSES = List.of(
+            WaitingStatus.ENTERED,
             WaitingStatus.EXITED,
             WaitingStatus.EXPIRED,
             WaitingStatus.CANCELED

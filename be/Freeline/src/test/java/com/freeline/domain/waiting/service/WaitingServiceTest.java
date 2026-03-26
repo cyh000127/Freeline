@@ -407,6 +407,16 @@ class WaitingServiceTest {
     }
 
     @Test
+    void cancelWaiting_fail_whenStatusIsEntered() {
+        final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.ENTERED, 4, 0, null);
+        Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
+
+        Assertions.assertThatThrownBy(() -> waitingService.cancelWaiting(301L, 21L))
+                .isInstanceOf(WaitingException.class)
+                .hasMessage(ErrorCode.INVALID_WAITING_STATUS_FOR_CANCEL.getMessage());
+    }
+
+    @Test
     void cancelWaitingByAdmin_success() {
         final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.CALLED, 4, 0, null);
         Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
