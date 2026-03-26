@@ -3,6 +3,7 @@ package com.freeline.domain.report.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.util.ResponseUtils;
+import com.freeline.domain.auth.service.BoothAdminContextService;
+import com.freeline.domain.report.dto.response.BoothReportResponseDto;
 import com.freeline.domain.report.dto.response.ReportResponseDto;
 import com.freeline.domain.report.dto.response.ReportStatusResponseDto;
 import com.freeline.domain.report.service.ReportGenerationService;
@@ -31,6 +34,7 @@ public class ReportController {
 
     private final ReportQueryService reportQueryService;
     private final ReportGenerationService reportGenerationService;
+    private final BoothAdminContextService boothAdminContextService;
 
     @Operation(summary = "리포트 생성 트리거",
             description = "종료된 행사의 리포트 생성을 비동기로 시작합니다. DB 덤프 → Hive 분석 → PostgreSQL 적재 순서로 진행됩니다.")
@@ -120,6 +124,19 @@ public class ReportController {
         final Long eventAdminId = Long.valueOf(authentication.getName());
         final List<ReportResponseDto.ProblemSpotDto> response =
                 reportQueryService.getProblemSpots(eventAdminId, eventId);
+        return ResponseUtils.ok(response);
+    }
+
+    @Operation(summary = "부스 관리자 자기 부스 리포트 조회",
+            description = "부스 관리자가 자기 부스의 성과, 시간대별 유입량, 문제지점, 행사 요약 데이터를 조회합니다.")
+    @PreAuthorize("hasRole('BOOTH_ADMIN')")
+    @GetMapping("/booths/me")
+    public ResponseEntity<BaseResponse<BoothReportResponseDto>> getMyBoothReport(
+            final Authentication authentication
+    ) {
+        final Long boothAdminId = Long.valueOf(authentication.getName());
+        final Long boothId = boothAdminContextService.resolveBoothId(boothAdminId);
+        final BoothReportResponseDto response = reportQueryService.getBoothReport(boothId);
         return ResponseUtils.ok(response);
     }
 }
