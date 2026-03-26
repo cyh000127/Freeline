@@ -202,16 +202,45 @@ pipeline {
                             --projectId=$INFISICAL_PROJECT_ID \
                             --env=prod --path=/fe \
                             -- bash -c '
-                                npm ci
-                                npx eas-cli build -p android \
-                                    --profile production \
-                                    --non-interactive \
-                                    --wait \
-                                    --output ./build/freeline.apk
+                                set -euo pipefail
 
-                                # APK를 Nginx 서빙 디렉토리에 복사
-                                mkdir -p $APK_DIR
-                                cp ./build/freeline.apk $APK_DIR/freeline.apk
+                                : "${EXPO_TOKEN:?ERROR: EXPO_TOKEN is missing from Infisical /fe}"
+                                : "${EAS_PROJECT_ID:?ERROR: EAS_PROJECT_ID is missing from Infisical /fe}"
+                                command -v docker >/dev/null 2>&1 || { echo "ERROR: docker not found on Jenkins agent"; exit 1; }
+
+                                release_container=""
+                                publish_container=""
+                                cleanup() {
+                                    [ -n "$release_container" ] && docker rm -f "$release_container" >/dev/null 2>&1 || true
+                                    [ -n "$publish_container" ] && docker rm -f "$publish_container" >/dev/null 2>&1 || true
+                                }
+                                trap cleanup EXIT
+
+                                release_container="$(docker create \
+                                    -e EXPO_TOKEN \
+                                    -e EAS_PROJECT_ID \
+                                    -w /app \
+                                    node:20-bullseye \
+                                    bash -lc "
+                                        set -euo pipefail
+                                        npm ci
+                                        mkdir -p ./build
+                                        npx eas-cli build -p android \
+                                            --profile production \
+                                            --non-interactive \
+                                            --wait \
+                                            --output ./build/freeline.apk
+                                    ")"
+
+                                docker cp ./. "$release_container:/app"
+                                docker start -a "$release_container"
+
+                                mkdir -p ./build
+                                docker cp "$release_container:/app/build/freeline.apk" ./build/freeline.apk
+
+                                publish_container="$(docker create -v "$APK_DIR:/dest" alpine:3.20 sh -c "mkdir -p /dest && sleep 30")"
+                                docker start "$publish_container" >/dev/null
+                                docker cp ./build/freeline.apk "$publish_container:/dest/freeline.apk"
                                 echo "APK deployed: https://j14a207.p.ssafy.io/app/freeline.apk"
                             '
                     '''
