@@ -54,6 +54,12 @@ export function usePushRegistration(visitorId: number | null) {
         return;
       }
 
+      console.log('[Push] FCM token detected', {
+        visitorId: targetVisitorId,
+        platform: getPushPlatform(),
+        token: tokenValue,
+      });
+
       const deviceId = await getDeviceId();
       const payload: PushRegistrationPayload = {
         visitorId: targetVisitorId,
@@ -92,6 +98,12 @@ export function usePushRegistration(visitorId: number | null) {
       }
 
       const token = await Notifications.getDevicePushTokenAsync();
+      console.log('[Push] Initial FCM token fetched', {
+        visitorId: targetVisitorId,
+        platform: getPushPlatform(),
+        type: token.type,
+        token: token.data,
+      });
       await syncPushToken(token.data);
     }
 
@@ -100,6 +112,12 @@ export function usePushRegistration(visitorId: number | null) {
     });
 
     const subscription = Notifications.addPushTokenListener((token) => {
+      console.log('[Push] FCM token listener fired', {
+        visitorId: targetVisitorId,
+        platform: getPushPlatform(),
+        type: token.type,
+        token: token.data,
+      });
       void syncPushToken(token.data).catch((error) => {
         console.warn('푸시 토큰 갱신 실패', error);
       });
