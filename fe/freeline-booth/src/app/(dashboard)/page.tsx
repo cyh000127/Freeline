@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Card } from "@/components/ui/card";
-import { 
-  PauseCircle, 
-  XCircle, 
-  User, 
-  Clock, 
-  CheckCircle2, 
+import {
+  PauseCircle,
+  XCircle,
+  User,
+  Clock,
+  CheckCircle2,
   AlertCircle,
   Bell,
   LogOut,
@@ -82,7 +82,7 @@ export default function DashboardPage() {
       if (dashRes.success && dashRes.data) {
         setDashboardData(dashRes.data);
       }
-      
+
       if (queueRes.success && queueRes.data) {
         setFullQueue(queueRes.data.queueList || []);
       }
@@ -101,13 +101,13 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user?.boothId) {
       fetchData(true);
-      
+
       // Setup Polling every 10 seconds as a fallback/alternative for SSE
       const interval = setInterval(() => {
         console.log("[Polling] Refreshing data...");
         fetchData(false);
       }, 10000);
-      
+
       return () => clearInterval(interval);
     }
   }, [user?.boothId, fetchData]);
@@ -161,18 +161,6 @@ export default function DashboardPage() {
     }
   };
 
-<<<<<<< HEAD
-=======
-  const handlePostpone = async (waitingId: number) => {
-    try {
-      await waitingApi.postponeWaiting(waitingId);
-      fetchData(false);
-    } catch (error: any) {
-      showAlert(error.response?.data?.message || "미루기 처리에 실패했습니다.");
-    }
-  };
-
->>>>>>> 3371ea5 (fix: 행사관리자/부스관리자 모달 창 수정 및 티켓 생성 숫자 제한)
   const calculatedCount = {
     waiting: fullQueue.filter(w => w.status === 'REGISTERED' || w.status === 'WAITING' || w.status === 'CALLED').length,
     inUse: fullQueue.filter(w => w.status === 'ENTERED').length,
@@ -181,7 +169,7 @@ export default function DashboardPage() {
 
   const filteredQueue = fullQueue.filter(w => {
     if (activeTab === 'WAITING') return w.status === 'REGISTERED' || w.status === 'WAITING' || w.status === 'CALLED';
-    if (activeTab === 'ENTERED') return w.status === 'ENTERED' || w.status === 'EXITED'; 
+    if (activeTab === 'ENTERED') return w.status === 'ENTERED' || w.status === 'EXITED';
     if (activeTab === 'CANCELLED') return w.status === 'CANCELLED';
     return false;
   });
@@ -197,37 +185,37 @@ export default function DashboardPage() {
               <span className="px-2 py-1 bg-rose-500 text-white text-[10px] font-black rounded-lg animate-pulse">비상 마감</span>
             )}
             <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-100 rounded-lg">
-               {isConnected ? (
-                 <Wifi className="w-3 h-3 text-emerald-500" />
-               ) : (
-                 <WifiOff className="w-3 h-3 text-amber-500" />
-               )}
-               <span className={`text-[10px] font-black ${isConnected ? 'text-emerald-700' : 'text-amber-700'}`}>
-                 {isConnected ? '실시간 연결됨' : '자동 갱신 중'}
-               </span>
+              {isConnected ? (
+                <Wifi className="w-3 h-3 text-emerald-500" />
+              ) : (
+                <WifiOff className="w-3 h-3 text-amber-500" />
+              )}
+              <span className={`text-[10px] font-black ${isConnected ? 'text-emerald-700' : 'text-amber-700'}`}>
+                {isConnected ? '실시간 연결됨' : '자동 갱신 중'}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-full border border-emerald-100 w-fit">
             <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
             <span className="text-sm font-bold text-emerald-700">
-               {dashboardData?.booth?.boothName || "부스"} · {dashboardData?.booth?.locationCode || "위치 코드 없음"}
+              {dashboardData?.booth?.boothName || "부스"} · {dashboardData?.booth?.locationCode || "위치 코드 없음"}
             </span>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="grid grid-cols-2 gap-3 mr-4">
-             <div className="flex flex-col items-center justify-center px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">대기+입장</span>
-                <span className="text-xl font-black text-gray-900">{totalActive}</span>
-             </div>
-             <div className="flex flex-col items-center justify-center px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">부스 체험 중</span>
-                <span className="text-xl font-black text-gray-900">{calculatedCount.inUse}</span>
-             </div>
+            <div className="flex flex-col items-center justify-center px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm">
+              <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">대기+입장</span>
+              <span className="text-xl font-black text-gray-900">{totalActive}</span>
+            </div>
+            <div className="flex flex-col items-center justify-center px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm">
+              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">부스 체험 중</span>
+              <span className="text-xl font-black text-gray-900">{calculatedCount.inUse}</span>
+            </div>
           </div>
 
-          <button 
+          <button
             onClick={() => fetchData(true)}
             className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:bg-gray-50 transition-colors"
             title="새로고침"
@@ -239,7 +227,7 @@ export default function DashboardPage() {
             <PauseCircle className="h-6 w-6" />
             <span>운영중지</span>
           </button>
-          
+
           <button className="flex h-16 items-center justify-center gap-3 rounded-2xl bg-rose-500 px-6 font-black text-white shadow-lg shadow-rose-500/20 transition-all duration-300 hover:-translate-y-1 hover:bg-rose-600 active:translate-y-0">
             <XCircle className="h-6 w-6" />
             <span>운영종료</span>
@@ -252,40 +240,37 @@ export default function DashboardPage() {
         {/* Tabs and Call Next Button */}
         <div className="flex items-center justify-between mb-8">
           <div className="inline-flex h-14 items-center justify-center rounded-[20px] bg-white p-1.5 shadow-sm border border-gray-100">
-            <button 
+            <button
               onClick={() => setActiveTab('WAITING')}
-              className={`inline-flex h-full items-center justify-center rounded-[14px] px-8 text-sm font-black transition-all duration-300 ${
-                activeTab === 'WAITING' 
-                ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20" 
-                : "text-gray-400 hover:text-gray-900 hover:bg-gray-50"
-              }`}
+              className={`inline-flex h-full items-center justify-center rounded-[14px] px-8 text-sm font-black transition-all duration-300 ${activeTab === 'WAITING'
+                  ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20"
+                  : "text-gray-400 hover:text-gray-900 hover:bg-gray-50"
+                }`}
             >
               대기 {calculatedCount.waiting}
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('ENTERED')}
-              className={`inline-flex h-full items-center justify-center rounded-[14px] px-8 text-sm font-black transition-all duration-300 ${
-                activeTab === 'ENTERED' 
-                ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20" 
-                : "text-gray-400 hover:text-gray-900 hover:bg-gray-50"
-              }`}
+              className={`inline-flex h-full items-center justify-center rounded-[14px] px-8 text-sm font-black transition-all duration-300 ${activeTab === 'ENTERED'
+                  ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20"
+                  : "text-gray-400 hover:text-gray-900 hover:bg-gray-50"
+                }`}
             >
               입장 {calculatedCount.inUse}
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('CANCELLED')}
-              className={`inline-flex h-full items-center justify-center rounded-[14px] px-8 text-sm font-black transition-all duration-300 ${
-                activeTab === 'CANCELLED' 
-                ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20" 
-                : "text-gray-400 hover:text-gray-900 hover:bg-gray-50"
-              }`}
+              className={`inline-flex h-full items-center justify-center rounded-[14px] px-8 text-sm font-black transition-all duration-300 ${activeTab === 'CANCELLED'
+                  ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20"
+                  : "text-gray-400 hover:text-gray-900 hover:bg-gray-50"
+                }`}
             >
               취소
             </button>
           </div>
 
           {activeTab === 'WAITING' && (dashboardData?.summary?.waitingCount || fullQueue.length) > 0 && (
-            <button 
+            <button
               onClick={handleCall}
               className="group flex h-14 items-center gap-3 px-8 rounded-2xl bg-lime-400 hover:bg-lime-500 text-[#2D2A4A] font-black transition-all duration-300 hover:-translate-y-1 shadow-lg shadow-lime-400/20"
             >
@@ -319,12 +304,12 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-1.5 text-gray-400">
                         <Clock className="w-3 h-3" />
                         <span className="text-xs font-bold tracking-tight">
-                           {waiting.registeredAt ? new Date(waiting.registeredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-"}
+                          {waiting.registeredAt ? new Date(waiting.registeredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-"}
                         </span>
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex flex-col items-end gap-1">
                     {waiting.status === 'CALLED' && (
                       <div className="px-3 py-1 bg-amber-50 rounded-full border border-amber-100 flex items-center gap-1.5 animate-pulse">
@@ -363,20 +348,19 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex flex-col">
                     {waiting.status === 'ENTERED' && waiting.enteredAt && boothPolicy ? (
-                      <CountdownTimer 
-                        enteredAt={waiting.enteredAt} 
-                        staySeconds={boothPolicy.staySeconds} 
+                      <CountdownTimer
+                        enteredAt={waiting.enteredAt}
+                        staySeconds={boothPolicy.staySeconds}
                       />
                     ) : (
                       <>
                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">도착 인증</span>
-                        <span className={`text-xs font-black ${
-                          waiting.arrivalChecked ? 'text-emerald-500' : 'text-amber-500'
-                        }`}>
-                          {waiting.arrivalChecked 
-                            ? '도착 인증' 
-                            : waiting.status === 'CALLED' 
-                              ? '호출 완료' 
+                        <span className={`text-xs font-black ${waiting.arrivalChecked ? 'text-emerald-500' : 'text-amber-500'
+                          }`}>
+                          {waiting.arrivalChecked
+                            ? '도착 인증'
+                            : waiting.status === 'CALLED'
+                              ? '호출 완료'
                               : '도착 전'
                           }
                         </span>
@@ -388,13 +372,13 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-2 gap-3">
                   {activeTab === 'WAITING' && (
                     <>
-                      <button 
+                      <button
                         onClick={() => handleAdmit(waiting.waitingId)}
                         className="h-12 flex items-center justify-center gap-2 rounded-xl bg-lime-400 hover:bg-lime-500 font-black text-[#2D2A4A] transition-all text-sm"
                       >
                         입장 처리
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleCancel(waiting.waitingId)}
                         className="h-12 flex items-center justify-center rounded-xl bg-rose-50 hover:bg-rose-100 font-black text-rose-500 transition-all text-xs"
                         title="취소"
@@ -404,7 +388,7 @@ export default function DashboardPage() {
                     </>
                   )}
                   {activeTab === 'ENTERED' && (
-                    <button 
+                    <button
                       onClick={() => handleExit(waiting.waitingId)}
                       className="col-span-2 h-12 flex items-center justify-center gap-2 rounded-xl bg-gray-900 hover:bg-black font-black text-white transition-all text-sm"
                     >
