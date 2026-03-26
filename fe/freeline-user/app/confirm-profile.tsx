@@ -8,10 +8,10 @@ import { useSession } from '@/features/session/context';
 import { palette } from '@/theme/colors';
 
 export default function ConfirmProfileScreen() {
-  const { nickname, entryCode, eventProfile, saveAgreements } = useSession();
+  const { nickname, entryCode, eventProfile, confirmProfile } = useSession();
 
   async function handleStart() {
-    await saveAgreements(true, false);
+    await confirmProfile();
     router.replace('/(tabs)/home');
   }
 

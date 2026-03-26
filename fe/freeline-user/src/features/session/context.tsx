@@ -1,8 +1,10 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { authenticateEntryCode as authenticateEntryCodeApi, logout as logoutApi } from '@/features/api/auth';
+import { clearPushRegistrationCache } from '@/features/notifications/registration-cache';
 import { fetchMyEventDetail } from '@/features/api/event';
 import { usePushRegistration } from '@/features/notifications/register-push';
 import { getUserIdFromToken } from '@/utils/jwt';
+import { validateNickname } from '@/utils/nickname';
 import { getEventProfile, parseEventIdFromEntryCode, toEventProfile } from '@/utils/event';
 import { clearSessionStorage, emptySession, readSession, writeSession } from './storage';
 import type { PersistedSession, SessionState } from './types';
@@ -12,7 +14,7 @@ type SessionContextValue = SessionState & {
   authenticateEntryCode: (entryCode: string) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   saveNickname: (nickname: string) => Promise<void>;
-  saveAgreements: (requiredAgreed: boolean, marketingAgreed: boolean) => Promise<void>;
+  confirmProfile: () => Promise<void>;
   logout: () => Promise<void>;
   resetAll: () => Promise<void>;
 };
@@ -96,7 +98,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const visitorId = getUserIdFromToken(response.accessToken);
 
     await persist({
-      ...session,
+      ...emptySession,
       hasSeenOnboarding: true,
       entryCode: trimmed,
       eventId,
@@ -114,17 +116,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }
 
   async function saveNickname(nickname: string) {
+    const normalized = validateNickname(nickname);
+
     await persist({
       ...session,
-      nickname: nickname.trim(),
+      nickname: normalized,
     });
   }
 
-  async function saveAgreements(requiredAgreed: boolean, marketingAgreed: boolean) {
+  async function confirmProfile() {
     await persist({
       ...session,
-      requiredAgreed,
-      marketingAgreed,
+      requiredAgreed: true,
+      marketingAgreed: false,
     });
   }
 
@@ -138,8 +142,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
 
     await clearSessionStorage();
+    await clearPushRegistrationCache();
     setSession({
       ...emptySession,
+      hasSeenOnboarding: true,
       isReady: true,
     });
     setEventProfile(null);
@@ -147,8 +153,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   async function resetAll() {
     await clearSessionStorage();
+    await clearPushRegistrationCache();
     setSession({
       ...emptySession,
+      hasSeenOnboarding: true,
       isReady: true,
     });
     setEventProfile(null);
@@ -162,7 +170,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         authenticateEntryCode,
         completeOnboarding,
         saveNickname,
-        saveAgreements,
+        confirmProfile,
         logout,
         resetAll,
       }}
