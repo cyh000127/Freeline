@@ -10,6 +10,7 @@ interface UserProfile {
   boothName: string;
   boothLocation?: string;
   role: string;
+  isPasswordChanged?: boolean;
 }
 
 interface AuthContextType {
@@ -31,54 +32,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const adminName = typeof window !== 'undefined' ? localStorage.getItem("adminName") : null;
 
     if (token) {
-      if (boothId) {
-        const bId = parseInt(boothId);
-        setUser({
-          id: "", 
-          boothId: bId,
-          boothName: boothName || "부스",
-          role: "BOOTH_ADMIN"
-        });
-
-        // Fetch additional booth info (location)
-        getBoothInfo(bId).then(res => {
-          if (res.success && res.data) {
-            setUser(prev => prev ? {
-              ...prev,
-              boothName: res.data.name,
-              boothLocation: res.data.locationCode
-            } : null);
+      try {
+        const res = await authApi.getMe();
+        if (res.data?.success && res.data?.data) {
+          const data = res.data.data;
+          // Support both snake_case, camelCase and the new isChanged from backend
+          const pwdChanged = data.isChanged ?? data.isPasswordChanged ?? data.is_password_changed ?? true;
+          
+          setUser({
+            id: data.id?.toString() || "",
+            boothId: data.boothId,
+            boothName: data.boothName || data.company || data.name || "부스",
+            role: data.role || "BOOTH_ADMIN",
+            isPasswordChanged: pwdChanged
+          });
+          
+          // Sync localStorage
+          localStorage.setItem("boothId", data.boothId.toString());
+          if (data.boothName || data.company || data.name) {
+            localStorage.setItem("boothName", data.boothName || data.company || data.name);
           }
-        }).catch(err => console.error("Failed to fetch booth info:", err));
-
-        setIsLoading(false);
-      } else {
-        // Fallback: if boothId is missing but token exists, try to fetch from /v1/auth/me
-        try {
-          const res = await authApi.getMe();
-          if (res.data?.success && res.data?.data) {
-            const data = res.data.data;
-            setUser({
-              id: data.id || "",
-              boothId: data.boothId,
-              boothName: data.boothName || "부스",
-              role: data.role || "BOOTH_ADMIN"
-            });
-            // Update localStorage for future use
-            localStorage.setItem("boothId", data.boothId.toString());
-            if (data.boothName) localStorage.setItem("boothName", data.boothName);
-            if (data.name) localStorage.setItem("adminName", data.name);
+          localStorage.setItem("isPasswordChanged", pwdChanged.toString());
+          
+          // Optionally fetch more detailed booth info if location is missing
+          if (data.boothId) {
+             getBoothInfo(data.boothId).then(res => {
+               if (res.success && res.data) {
+                 setUser(prev => prev ? {
+                   ...prev,
+                   boothLocation: res.data.locationCode
+                 } : null);
+               }
+             }).catch(err => console.error("Failed to fetch booth info:", err));
           }
-        } catch (error) {
-          console.error("Failed to fetch user info from API:", error);
-          setUser(null);
-        } finally {
-          setIsLoading(false);
+        } else {
+           // If API succeeds but data is weird, fallback to storage
+           setFallbackUser();
         }
+      } catch (error) {
+        console.error("Failed to fetch user info from API:", error);
+        // On error, let's try fallback to storage instead of clearing immediately 
+        // unless it's a 401/403 which is handled by interceptor
+        setFallbackUser();
+      } finally {
+        setIsLoading(false);
       }
     } else {
       setUser(null);
       setIsLoading(false);
+    }
+  };
+
+  const setFallbackUser = () => {
+    const boothId = localStorage.getItem("boothId");
+    const boothName = localStorage.getItem("boothName") || localStorage.getItem("adminName");
+    if (boothId) {
+      setUser({
+        id: "",
+        boothId: parseInt(boothId),
+        boothName: boothName || "부스",
+        role: "BOOTH_ADMIN",
+        isPasswordChanged: localStorage.getItem("isPasswordChanged") === "true"
+      });
+    } else {
+      setUser(null);
     }
   };
 
