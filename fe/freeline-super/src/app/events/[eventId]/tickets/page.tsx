@@ -7,13 +7,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Ticket, 
-  Plus, 
-  Printer, 
-  Download, 
-  Trash2, 
-  Loader2, 
+import {
+  Ticket,
+  Plus,
+  Printer,
+  Download,
+  Trash2,
+  Loader2,
   CheckCircle2,
   ExternalLink
 } from "lucide-react";
@@ -29,7 +29,7 @@ interface TicketData {
 export default function VisitorTicketsPage() {
   const params = useParams();
   const eventId = Number(params.eventId as string);
-  
+
   const [userName, setUserName] = useState("관리자");
   const [eventName, setEventName] = useState("행사");
   const [quantity, setQuantity] = useState<number>(50);
@@ -45,7 +45,7 @@ export default function VisitorTicketsPage() {
           authApi.getMe(),
           eventApi.getEvent(eventId.toString())
         ]);
-        
+
         if (meRes.data?.success) setUserName(meRes.data.data.name);
         if (eventRes.data?.success) setEventName(eventRes.data.data.name);
       } catch (err) {
@@ -62,7 +62,7 @@ export default function VisitorTicketsPage() {
       alert("생성할 티켓 수량을 입력해주세요.");
       return;
     }
-    
+
     setIsGenerating(true);
     try {
       const res = await authApi.generateTickets({ eventId, quantity });
@@ -228,11 +228,11 @@ export default function VisitorTicketsPage() {
                       value={quantity}
                       onChange={(e) => setQuantity(Number(e.target.value))}
                       className="h-14 bg-[#F8F9FA] border-0 rounded-2xl px-6 text-lg font-bold focus:ring-2 focus:ring-[#2D2A4A]/10 transition-all shadow-inner"
-                      placeholder="예: 50"
+                      placeholder="예: 5000"
                     />
                     <div className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 font-black">매</div>
                   </div>
-                  <p className="text-xs text-gray-400 ml-1">한 번에 최대 500매까지 생성이 권장됩니다.</p>
+                  <p className="text-xs text-gray-400 ml-1">한 번에 최대 10,000매까지 생성이 권장됩니다.</p>
                 </div>
 
                 <Button
@@ -271,7 +271,7 @@ export default function VisitorTicketsPage() {
                   <h2 className="text-xl font-bold text-[#2D2A4A]">생성된 티켓 목록</h2>
                   <p className="text-sm text-gray-400 mt-1">총 {tickets.length}개의 티켓이 준비되었습니다.</p>
                 </div>
-                
+
                 {tickets.length > 0 && (
                   <Button
                     onClick={handlePrint}
@@ -287,7 +287,7 @@ export default function VisitorTicketsPage() {
                 {tickets.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {tickets.map((ticket) => (
-                      <div 
+                      <div
                         key={ticket.visitorId}
                         className="bg-[#F8F9FA] p-5 rounded-2xl border border-gray-100 group hover:border-[#2D2A4A]/20 transition-all hover:shadow-md"
                       >
@@ -319,7 +319,7 @@ export default function VisitorTicketsPage() {
                   </div>
                 )}
               </div>
-              
+
               {tickets.length > 0 && (
                 <div className="p-6 bg-[#F8F9FA] border-t border-gray-50">
                   <p className="text-[11px] text-gray-400 text-center font-medium">

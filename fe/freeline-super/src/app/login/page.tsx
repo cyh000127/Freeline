@@ -85,9 +85,18 @@ export default function LoginPage() {
                 placeholder="이메일 (아이디)"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                maxLength={100}
                 required
-                className="h-12 rounded-xl bg-[#F4F5F7] pl-12 border-0 text-[15px] focus-visible:ring-1 focus-visible:ring-[#2D2A4A]"
+                className={`h-12 rounded-xl pl-12 border-0 text-[15px] focus-visible:ring-2 transition-all ${email.length >= 100
+                  ? "bg-red-50 ring-2 ring-red-500"
+                  : "bg-[#F4F5F7] focus-visible:ring-[#2D2A4A]"
+                  }`}
               />
+              {email.length >= 100 && (
+                <p className="text-[11px] text-red-500 mt-1 font-medium pl-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                  최대 100자까지 입력 가능합니다.
+                </p>
+              )}
             </div>
             <div className="relative">
               <Lock className="absolute left-4 top-3.5 h-5 w-5 text-gray-400" />
@@ -96,9 +105,18 @@ export default function LoginPage() {
                 placeholder="비밀번호"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                maxLength={20}
                 required
-                className="h-12 rounded-xl bg-[#F4F5F7] pl-12 border-0 text-[15px] focus-visible:ring-1 focus-visible:ring-[#2D2A4A]"
+                className={`h-12 rounded-xl pl-12 border-0 text-[15px] focus-visible:ring-2 transition-all ${password.length >= 20
+                  ? "bg-red-50 ring-2 ring-red-500"
+                  : "bg-[#F4F5F7] focus-visible:ring-[#2D2A4A]"
+                  }`}
               />
+              {password.length >= 20 && (
+                <p className="text-[11px] text-red-500 mt-1 font-medium pl-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                  최대 20자까지 입력 가능합니다.
+                </p>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-2">
