@@ -19,6 +19,9 @@ public record BoothMapResDto(
         String mapImageUrl,
 
         @Schema(description = "부스 영역 목록")
-        List<BoothMapAreaResDto> booths
+        List<BoothMapAreaResDto> booths,
+
+        @Schema(description = "AI 분석 임시 부스 영역 목록 (저장된 매핑이 없을 때 제공될 수 있음)")
+        List<BoothAreaDraftDto> drafts
 ) {
 }
