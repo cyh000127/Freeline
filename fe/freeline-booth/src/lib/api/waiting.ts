@@ -108,12 +108,6 @@ export const waitingApi = {
     return response.data;
   },
 
-  // 대기 순서 미루기 (기존 경로 유지)
-  postponeWaiting: async (waitingId: number) => {
-    const response = await api.patch(`/v1/waitings/${waitingId}/postpone`);
-    return response.data;
-  },
-
   // 예상 대기 시간 조회
   getExpectedWaitTime: async (boothId: number) => {
     const response = await api.get(`/v1/booths/${boothId}/waitings/expected-time`);
