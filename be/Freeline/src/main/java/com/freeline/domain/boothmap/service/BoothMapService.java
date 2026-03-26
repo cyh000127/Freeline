@@ -74,8 +74,10 @@ public class BoothMapService {
         final EventMap eventMap = getEventMap(eventId, request.eventMapId());
         validateBoothOwnership(eventId, request);
 
+        // 1. 기존 데이터 전체 삭제
         boothMapAreaRepository.deleteAllByEventMapId(eventMap.getId());
 
+        // 2. 새로운 데이터 리스트 생성 (여기에 .toList()가 있어야 합니다!)
         final List<BoothMapArea> newAreas = request.areas().stream()
                 .map(item -> BoothMapArea.builder()
                         .eventMapId(eventMap.getId())
@@ -84,15 +86,16 @@ public class BoothMapService {
                         .yRatio(item.yRatio())
                         .widthRatio(item.widthRatio())
                         .heightRatio(item.heightRatio())
-                        .build());
-            }
-        }
+                        .build())
+                .toList();
 
-        areasToDelete.addAll(existingAreaMap.values());
-        boothMapAreaRepository.deleteAll(areasToDelete);
+        // 3. 새로운 데이터 일괄 저장
         boothMapAreaRepository.saveAll(newAreas);
+        
+        // 4. 저장 완료 후 스냅샷 초기화
         eventMap.updateMappingSnapshot(null);
 
+        // 5. 대표 지도 승격 로직
         if (!eventMap.isVisible()) {
             eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(eventId)
                     .ifPresent(visibleMap -> visibleMap.update(visibleMap.getImagePath(), false));
