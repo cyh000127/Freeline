@@ -50,14 +50,11 @@ pipeline {
         stage('Change Detection') {
             steps {
                 script {
-                    env.USER_RELEASE_ACTION = 'none'
-
                     if (params.FORCE_REDEPLOY) {
                         echo "FORCE_REDEPLOY 활성화됨. 모든 프론트엔드 빌드 대상으로 설정."
                         env.BUILD_USER  = 'true'
                         env.BUILD_BOOTH = 'true'
                         env.BUILD_SUPER = 'true'
-                        env.USER_RELEASE_ACTION = 'build'
                         return
                     }
 
@@ -83,12 +80,7 @@ pipeline {
                         error('No relevant changes in fe/')
                     }
 
-                    env.USER_RELEASE_ACTION = env.BUILD_USER == 'true'
-                        ? (hasUserNativeChanges(changes) ? 'build' : 'update')
-                        : 'none'
-
                     echo "Build User: ${env.BUILD_USER}, Build Booth: ${env.BUILD_BOOTH}, Build Super: ${env.BUILD_SUPER}"
-                    echo "User Release Action: ${env.USER_RELEASE_ACTION}"
                     echo "Changed files:\n${changes}"
                 }
             }
@@ -187,7 +179,7 @@ pipeline {
             }
         }
 
-        stage('Release User App') {
+        stage('Build APK') {
             when {
                 allOf {
                     expression { isMainBranch() }
@@ -195,20 +187,8 @@ pipeline {
                 }
             }
             steps {
-                script {
-                    if (!env.USER_RELEASE_ACTION?.trim() || env.USER_RELEASE_ACTION == 'none') {
-                        if (params.FORCE_REDEPLOY) {
-                            env.USER_RELEASE_ACTION = 'build'
-                        } else {
-                            def changes = getChangedFiles()
-                            env.USER_RELEASE_ACTION = hasUserNativeChanges(changes) ? 'build' : 'update'
-                        }
-                    }
-                    echo "Releasing user app with action: ${env.USER_RELEASE_ACTION}"
-                }
                 dir('fe/freeline-user') {
-                    sh '''set -eu
-                        set +x
+                    sh '''set +x
                         export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
                             --client-id=$INFISICAL_CLIENT_ID \
                             --client-secret=$INFISICAL_CLIENT_SECRET \
@@ -221,68 +201,19 @@ pipeline {
                             --domain=$INFISICAL_URL/api \
                             --projectId=$INFISICAL_PROJECT_ID \
                             --env=prod --path=/fe \
-                            -- bash -s -- <<'EOF'
-                                set -euo pipefail
+                            -- bash -c '
+                                npm ci
+                                npx eas-cli build -p android \
+                                    --profile production \
+                                    --non-interactive \
+                                    --wait \
+                                    --output ./build/freeline.apk
 
-                                command -v docker >/dev/null 2>&1 || { echo "ERROR: docker not found on Jenkins agent"; exit 1; }
-
-                                : "${EXPO_TOKEN:?ERROR: EXPO_TOKEN is missing from Infisical /fe}"
-                                : "${EAS_PROJECT_ID:?ERROR: EAS_PROJECT_ID is missing from Infisical /fe}"
-
-                                action="${USER_RELEASE_ACTION:-build}"
-                                case "$action" in
-                                    update|build) ;;
-                                    *)
-                                        echo "ERROR: invalid USER_RELEASE_ACTION='$action'"
-                                        exit 1
-                                        ;;
-                                esac
-
-                                # Docker 데몬과 Jenkins 에이전트가 분리되어 있을 수 있어 bind mount 대신 docker cp를 사용한다.
-                                publish_container=""
-                                release_container="$(docker create \
-                                    -e EXPO_TOKEN \
-                                    -e EAS_PROJECT_ID \
-                                    -e USER_RELEASE_ACTION="$action" \
-                                    -e BUILD_ID="${BUILD_ID:-0}" \
-                                    -w /app \
-                                    node:20-bullseye \
-                                    bash -lc '
-                                        set -euo pipefail
-                                        npm ci
-                                        if [ "$USER_RELEASE_ACTION" = "update" ]; then
-                                            npx eas-cli update \
-                                                --channel production \
-                                                --platform android \
-                                                --non-interactive \
-                                                --message "jenkins-${BUILD_ID}"
-                                        else
-                                            mkdir -p ./build
-                                            npx eas-cli build -p android \
-                                                --profile production \
-                                                --non-interactive \
-                                                --wait \
-                                                --output ./build/freeline.apk
-                                        fi
-                                    ')"
-                                trap 'docker rm -f "$release_container" >/dev/null 2>&1 || true; docker rm -f "$publish_container" >/dev/null 2>&1 || true' EXIT
-
-                                docker cp ./. "$release_container:/app"
-                                docker start -a "$release_container"
-
-                                if [ "$action" = "update" ]; then
-                                    echo "EAS update published (channel=production, platform=android)"
-                                else
-                                    mkdir -p ./build
-                                    docker cp "$release_container:/app/build/freeline.apk" ./build/freeline.apk
-
-                                    # host 경로로는 helper 컨테이너를 통해 복사한다.
-                                    publish_container="$(docker create -v "$APK_DIR:/dest" alpine:3.20 sh -c 'mkdir -p /dest && sleep 30')"
-                                    docker start "$publish_container" >/dev/null
-                                    docker cp ./build/freeline.apk "$publish_container:/dest/freeline.apk"
-                                    echo "APK deployed: https://j14a207.p.ssafy.io/app/freeline.apk"
-                                fi
-EOF
+                                # APK를 Nginx 서빙 디렉토리에 복사
+                                mkdir -p $APK_DIR
+                                cp ./build/freeline.apk $APK_DIR/freeline.apk
+                                echo "APK deployed: https://j14a207.p.ssafy.io/app/freeline.apk"
+                            '
                     '''
                 }
             }
@@ -328,24 +259,6 @@ def getChangedFiles() {
         script: 'git diff --name-only HEAD~1 HEAD 2>/dev/null || git log --name-only --pretty=format: -1 HEAD',
         returnStdout: true
     ).trim()
-}
-
-def hasUserNativeChanges(final String changes) {
-    if (!changes) {
-        return false
-    }
-
-    def nativeSensitivePaths = [
-        'fe/freeline-user/app.json',
-        'fe/freeline-user/app.config.ts',
-        'fe/freeline-user/eas.json',
-        'fe/freeline-user/package.json',
-        'fe/freeline-user/package-lock.json',
-        'fe/freeline-user/android/',
-        'fe/freeline-user/ios/'
-    ]
-
-    return nativeSensitivePaths.any { path -> changes.contains(path) }
 }
 
 // main 브랜치 push 또는 수동 실행일 때 true (MR 이벤트 제외)
