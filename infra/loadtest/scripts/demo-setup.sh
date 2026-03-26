@@ -84,6 +84,8 @@ if [ "$READY_PACK" = "true" ]; then
   REPORT_FALLBACK_SEED=true
 fi
 
+TOTAL_VISITORS=$((VU_COUNT * ITERATIONS))
+
 # Colors
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -139,23 +141,27 @@ extract_json_field() {
 
 run_sql() {
   local sql="$1"
-  if command -v psql &>/dev/null; then
+  if command -v psql &>/dev/null && \
+    PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -c 'SELECT 1' >/dev/null 2>&1; then
     PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "$sql" 2>/dev/null
-  else
-    docker exec -e PGPASSWORD="${DB_PASSWORD}" freeline-db \
-      psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "$sql" 2>/dev/null
+    return
   fi
+
+  docker exec -e PGPASSWORD="${DB_PASSWORD}" freeline-db \
+    psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "$sql" 2>/dev/null
 }
 
 run_sql_file() {
   local file="$1"
-  if command -v psql &>/dev/null; then
+  if command -v psql &>/dev/null && \
+    PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -c 'SELECT 1' >/dev/null 2>&1; then
     PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -f "$file" 2>/dev/null
-  else
-    docker cp "$file" freeline-db:/tmp/_bulk_insert.sql && \
-    docker exec -e PGPASSWORD="${DB_PASSWORD}" freeline-db \
-      psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -t -A -f /tmp/_bulk_insert.sql 2>/dev/null
+    return
   fi
+
+  docker cp "$file" freeline-db:/tmp/_bulk_insert.sql && \
+  docker exec -e PGPASSWORD="${DB_PASSWORD}" freeline-db \
+    psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -t -A -f /tmp/_bulk_insert.sql 2>/dev/null
 }
 
 find_booth_name_by_id() {
@@ -356,7 +362,7 @@ echo "╔═══════════════════════�
 echo "║           Freeline 시연용 데이터 셋업 스크립트          ║"
 echo "╠══════════════════════════════════════════════════════════╣"
 echo "║  행사명:   ${EVENT_NAME}"
-echo "║  방문자:   ${VU_COUNT}명 × ${ITERATIONS}회 시뮬레이션"
+echo "║  방문자:   ${TOTAL_VISITORS}명 (${VU_COUNT} VU × ${ITERATIONS}회)"
 echo "║  자동종료: ${AUTO_CLOSE}"
 echo "║  리포트:   ${AUTO_REPORT}"
 echo "║  부스계정: ${SEED_BOOTH_ADMINS}"
@@ -468,7 +474,7 @@ fi
 # Step 5: 방문자 DB 생성
 # ═══════════════════════════════════════════════════════════════════════════════
 
-log_step "5" "방문자 ${VU_COUNT}명 DB 생성"
+log_step "5" "방문자 ${TOTAL_VISITORS}명 DB 생성"
 
 KOREAN_NAMES=("김민수" "이서연" "박지호" "최유진" "정도현" "강수빈" "조현우" "윤서영" "임재현" "한예린"
               "송민지" "오태양" "배은서" "홍준혁" "류하은" "문성민" "신유나" "권도윤" "황지우" "전소율"
@@ -484,7 +490,7 @@ SQL_FILE="/tmp/demo_visitors_${EVENT_ID}.sql"
 
 BATCH_VALUES=""
 BATCH_N=0
-for i in $(seq 1 "${VU_COUNT}"); do
+for i in $(seq 1 "${TOTAL_VISITORS}"); do
   CODE=$(printf "${ENTRY_PREFIX}%03d" "$i")
   NAME_IDX=$(( (i - 1) % NAME_COUNT ))
   VISITOR_NAME="${KOREAN_NAMES[$NAME_IDX]}"
@@ -778,7 +784,7 @@ echo -e "${CYAN}║${NC}"
 echo -e "${CYAN}║${NC}  행사 ID:     ${GREEN}${EVENT_ID}${NC}"
 echo -e "${CYAN}║${NC}  행사명:      ${EVENT_NAME}"
 echo -e "${CYAN}║${NC}  부스:        ${#BOOTH_IDS[@]}개 (${BOOTH_NAMES[*]})"
-echo -e "${CYAN}║${NC}  방문자:      ${VU_COUNT}명"
+echo -e "${CYAN}║${NC}  방문자:      ${TOTAL_VISITORS}명"
 echo -e "${CYAN}║${NC}  현재 상태:   ${DEMO_EVENT_STATUS}"
 echo -e "${CYAN}║${NC}  리포트 상태: ${REPORT_FINAL_STATUS}"
 echo -e "${CYAN}║${NC}  프로필 파일: ${PROFILE_FILE}"

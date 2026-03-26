@@ -37,6 +37,10 @@ CREATE EXTERNAL TABLE IF NOT EXISTS booth_waiting_dump (
     defer_count     INT,
     requested_at    STRING,
     called_at       STRING,
+    call_expires_at STRING,
+    registered_at   STRING,
+    entered_at      STRING,
+    exited_at       STRING,
     created_at      STRING,
     updated_at      STRING
 )

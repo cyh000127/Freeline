@@ -96,8 +96,8 @@ public class ReportImportService {
                             .eventId(rs.getLong("event_id"))
                             .totalVisitors(rs.getLong("total_visitors"))
                             .totalRegistrations(rs.getLong("total_registrations"))
-                            .avgWaitingSeconds(rs.getDouble("avg_waiting_seconds"))
-                            .overallDropoutRate(rs.getDouble("overall_dropout_rate"))
+                            .avgWaitingSeconds(getNullableDouble(rs, "avg_waiting_seconds"))
+                            .overallDropoutRate(getNullableDouble(rs, "overall_dropout_rate"))
                             .peakHour(rs.getString("peak_hour"))
                             .analyzedAt(rs.getString("analyzed_at"))
                             .build();
@@ -208,5 +208,13 @@ public class ReportImportService {
         }
         problemSpotResultRepository.saveAll(list);
         log.info("Imported {} ProblemSpotResult records.", list.size());
+    }
+
+    private Double getNullableDouble(ResultSet rs, String columnName) throws SQLException {
+        Object value = rs.getObject(columnName);
+        if (value == null) {
+            return null;
+        }
+        return rs.getDouble(columnName);
     }
 }

@@ -239,23 +239,27 @@ log_step "3" "방문자 Entry Code DB 생성"
 
 run_sql() {
   local sql="$1"
-  if [ "$USE_DOCKER_PSQL" = "true" ]; then
-    docker exec -e PGPASSWORD="${DB_PASSWORD}" freeline-db \
-      psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "$sql" 2>/dev/null
-  else
+  if [ "$USE_DOCKER_PSQL" != "true" ] && \
+    PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -c 'SELECT 1' >/dev/null 2>&1; then
     PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "$sql" 2>/dev/null
+    return
   fi
+
+  docker exec -e PGPASSWORD="${DB_PASSWORD}" freeline-db \
+    psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -t -A -c "$sql" 2>/dev/null
 }
 
 run_sql_file() {
   local file="$1"
-  if [ "$USE_DOCKER_PSQL" = "true" ]; then
-    docker cp "$file" freeline-db:/tmp/_bulk_insert.sql && \
-    docker exec -e PGPASSWORD="${DB_PASSWORD}" freeline-db \
-      psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -t -A -f /tmp/_bulk_insert.sql 2>/dev/null
-  else
+  if [ "$USE_DOCKER_PSQL" != "true" ] && \
+    PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -c 'SELECT 1' >/dev/null 2>&1; then
     PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -f "$file" 2>/dev/null
+    return
   fi
+
+  docker cp "$file" freeline-db:/tmp/_bulk_insert.sql && \
+  docker exec -e PGPASSWORD="${DB_PASSWORD}" freeline-db \
+    psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -t -A -f /tmp/_bulk_insert.sql 2>/dev/null
 }
 
 TOTAL_VISITORS=$((VU_COUNT * ITERATIONS))

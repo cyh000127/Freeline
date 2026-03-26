@@ -66,7 +66,8 @@ public class DbDumpService {
     private void dumpBoothWaiting(Long eventId) {
         String sql = "SELECT bw.id, bw.booth_id, bw.visitor_id, bw.status, "
                 + "bw.waiting_number, bw.defer_count, bw.requested_at, "
-                + "bw.called_at, bw.created_at, bw.updated_at "
+                + "bw.called_at, bw.call_expires_at, bw.registered_at, "
+                + "bw.entered_at, bw.exited_at, bw.created_at, bw.updated_at "
                 + "FROM booth_waiting bw "
                 + "JOIN booths b ON bw.booth_id = b.id "
                 + "WHERE b.event_id = ?";
