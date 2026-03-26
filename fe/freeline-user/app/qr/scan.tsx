@@ -7,6 +7,7 @@ import { Screen } from '@/components/Screen';
 import { useAppData } from '@/features/app-data/context';
 import { usePageTracking } from '@/features/tracking/use-page-tracking';
 import { palette } from '@/theme/colors';
+import { toUserErrorMessage } from '@/utils/error';
 
 export default function QrScanScreen() {
   usePageTracking('qr-scan');
@@ -27,7 +28,7 @@ export default function QrScanScreen() {
       await scanQr(qrCode);
       router.back();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'QR 인증에 실패했습니다.');
+      setError(toUserErrorMessage(submitError, 'QR 인증에 실패했습니다.'));
       setLocked(false);
     }
   }

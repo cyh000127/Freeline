@@ -7,6 +7,7 @@ import { Screen } from '@/components/Screen';
 import { TextField } from '@/components/TextField';
 import { useSession } from '@/features/session/context';
 import { palette } from '@/theme/colors';
+import { toUserErrorMessage } from '@/utils/error';
 
 export default function EntryCodeScreen() {
   const { authenticateEntryCode } = useSession();
@@ -21,7 +22,7 @@ export default function EntryCodeScreen() {
       await authenticateEntryCode(entryCode);
       router.replace('/nickname');
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : '인증에 실패했습니다.');
+      setError(toUserErrorMessage(submitError, '인증에 실패했습니다.'));
     } finally {
       setSubmitting(false);
     }

@@ -32,7 +32,7 @@ function TrackingShell() {
           <Stack.Screen name="nickname" />
           <Stack.Screen name="confirm-profile" />
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="booths/[boothId]" />
+          <Stack.Screen name="booths/[boothId]/index" options={{ presentation: 'modal' }} />
           <Stack.Screen name="search" options={{ presentation: 'modal' }} />
           <Stack.Screen name="qr/scan" options={{ presentation: 'modal' }} />
         </Stack>

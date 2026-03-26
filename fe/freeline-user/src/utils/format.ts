@@ -39,3 +39,16 @@ export function formatQueueStatus(status: string) {
       return status;
   }
 }
+
+export function formatHistoryStatus(status: string) {
+  switch (status) {
+    case 'EXITED':
+      return '체험 완료';
+    case 'CANCELED':
+      return '예약 취소';
+    case 'EXPIRED':
+      return '호출 만료';
+    default:
+      return formatWaitingStatus(status);
+  }
+}

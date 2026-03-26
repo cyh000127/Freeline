@@ -1,5 +1,4 @@
-import { http } from '@/lib/http';
-import { unwrap } from '@/lib/api';
+import { postData, postOk, withAccessToken } from '@/lib/request';
 
 export type LoginResponse = {
   accessToken: string;
@@ -12,21 +11,15 @@ export type LoginResponse = {
 };
 
 export async function authenticateEntryCode(entryCode: string) {
-  const response = await http.post('/auth/visitors/entry-code/authenticate', {
+  return postData<LoginResponse>('/auth/visitors/entry-code/authenticate', {
     entryCode,
   });
-
-  return unwrap<LoginResponse>(response);
 }
 
 export async function logout(accessToken: string) {
-  await http.post(
+  await postOk(
     '/auth/logout',
     {},
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    },
+    withAccessToken(accessToken),
   );
 }

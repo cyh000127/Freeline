@@ -1,5 +1,4 @@
-import { unwrap } from '@/lib/api';
-import { http } from '@/lib/http';
+import { postData } from '@/lib/request';
 
 export type PushPlatform = 'ANDROID' | 'IOS';
 
@@ -9,13 +8,11 @@ export async function upsertPushToken(payload: {
   fcmToken: string;
   platform: PushPlatform;
 }) {
-  const response = await http.post('/push-notifications/tokens', payload);
-
-  return unwrap<{
+  return postData<{
     tokenId: number;
     visitorId: number;
     deviceId: string;
     platform: PushPlatform;
     updatedAt: string;
-  }>(response);
+  }>('/push-notifications/tokens', payload);
 }

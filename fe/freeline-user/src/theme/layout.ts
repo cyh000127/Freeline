@@ -5,5 +5,7 @@ export const spacing = {
   radiusLg: 28,
   radiusMd: 20,
   radiusSm: 14,
-  navHeight: 86,
+  navHeight: 72,
+  screenTop: 10,
+  viewportMaxWidth: 560,
 };

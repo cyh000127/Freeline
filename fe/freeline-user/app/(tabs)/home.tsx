@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { router } from 'expo-router';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ActionButton';
 import { BrandMark } from '@/components/BrandMark';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { FloatingTabBar } from '@/components/FloatingTabBar';
@@ -10,6 +12,7 @@ import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
 import { WaitingCard } from '@/components/WaitingCard';
 import { useAppData } from '@/features/app-data/context';
+import type { DecoratedWaiting } from '@/features/app-data/types';
 import { useSession } from '@/features/session/context';
 import { usePageTracking } from '@/features/tracking/use-page-tracking';
 import { palette } from '@/theme/colors';
@@ -30,10 +33,15 @@ export default function HomeScreen() {
     exitWaiting,
     postponeWaiting,
   } = useAppData();
+  const [pendingCancel, setPendingCancel] = useState<DecoratedWaiting | null>(null);
 
   if (!eventProfile) {
     return <Screen />;
   }
+
+  const calledCount = queueWaitings.filter((waiting) => waiting.status === 'CALLED').length;
+  const waitingCount = queueWaitings.filter((waiting) => waiting.status === 'WAITING').length;
+  const highlightedWaitings = queueWaitings.slice(0, 2);
 
   return (
     <Screen padded={false} scroll={false}>
@@ -60,6 +68,33 @@ export default function HomeScreen() {
             title={eventProfile.name}
             venueLabel={eventProfile.venueLabel}
           />
+
+          <View style={styles.overviewCard}>
+            <View style={styles.overviewCopy}>
+              <Text style={styles.overviewTitle}>지금 확인할 상태</Text>
+              <Text style={styles.overviewBody}>
+                {calledCount
+                  ? `도착 인증이 필요한 예약이 ${calledCount}건 있습니다.`
+                  : currentExperience
+                    ? '현재 체험 중인 부스가 있습니다.'
+                    : queueWaitings.length
+                      ? '예약 중인 부스를 관리해보세요.'
+                      : '배치도에서 원하는 부스를 먼저 찾아보세요.'}
+              </Text>
+            </View>
+
+            <View style={styles.overviewStats}>
+              <StatusPill label="도착 인증" value={`${calledCount}건`} />
+              <StatusPill label="대기 중" value={`${waitingCount}건`} />
+              <StatusPill label="체험 중" value={currentExperience ? '1건' : '0건'} />
+            </View>
+
+            <ActionButton
+              label={calledCount ? '예약 관리 보기' : '배치도 열기'}
+              onPress={() => router.replace(calledCount ? '/(tabs)/reservations' : '/(tabs)/map')}
+              variant={calledCount ? 'secondary' : 'ghost'}
+            />
+          </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
@@ -102,10 +137,10 @@ export default function HomeScreen() {
             />
           ) : null}
 
-          {queueWaitings.map((waiting) => (
+          {highlightedWaitings.map((waiting) => (
             <WaitingCard
               key={waiting.waiting_id}
-              onCancel={() => void cancelWaiting(waiting)}
+              onCancel={() => setPendingCancel(waiting)}
               onOpen={() => {
                 if (waiting.boothId) {
                   router.push(`/booths/${waiting.boothId}`);
@@ -125,15 +160,45 @@ export default function HomeScreen() {
             />
           ))}
 
+          {queueWaitings.length > highlightedWaitings.length ? (
+            <ActionButton
+              label={`예약 관리에서 전체 ${queueWaitings.length}건 보기`}
+              onPress={() => router.replace('/(tabs)/reservations')}
+              variant="ghost"
+            />
+          ) : null}
+
           <ActionButton
             label="배치도에서 부스 찾기"
             onPress={() => router.replace('/(tabs)/map')}
           />
         </ScrollView>
 
+        <ConfirmDialog
+          body={`${pendingCancel?.booth_name ?? '이 부스'} 예약을 취소할까요? 취소 후에는 다시 대기를 등록해야 합니다.`}
+          confirmLabel="예약 취소하기"
+          onClose={() => setPendingCancel(null)}
+          onConfirm={() => {
+            if (pendingCancel) {
+              void cancelWaiting(pendingCancel).finally(() => setPendingCancel(null));
+            }
+          }}
+          title="예약을 취소할까요?"
+          visible={!!pendingCancel}
+        />
+
         <FloatingTabBar />
       </View>
     </Screen>
+  );
+}
+
+function StatusPill({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.statusPill}>
+      <Text style={styles.statusPillLabel}>{label}</Text>
+      <Text style={styles.statusPillValue}>{value}</Text>
+    </View>
   );
 }
 
@@ -166,6 +231,48 @@ const styles = StyleSheet.create({
   },
   loading: {
     color: palette.textMuted,
+  },
+  overviewCard: {
+    backgroundColor: palette.surface,
+    borderRadius: 24,
+    padding: 18,
+    gap: 16,
+  },
+  overviewCopy: {
+    gap: 6,
+  },
+  overviewTitle: {
+    color: palette.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  overviewBody: {
+    color: palette.textMuted,
+    lineHeight: 21,
+  },
+  overviewStats: {
+    flexDirection: 'row',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  statusPill: {
+    flex: 1,
+    minWidth: 96,
+    backgroundColor: palette.surfaceAlt,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 4,
+  },
+  statusPillLabel: {
+    color: palette.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statusPillValue: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: '800',
   },
   statsRow: {
     flexDirection: 'row',

@@ -1,5 +1,4 @@
-import { unwrap } from '@/lib/api';
-import { http } from '@/lib/http';
+import { postData, withAccessToken } from '@/lib/request';
 
 export type QrScanResponse = {
   qrId: number;
@@ -12,15 +11,9 @@ export type QrScanResponse = {
 };
 
 export async function scanQr(accessToken: string, qrCode: string) {
-  const response = await http.post(
+  return postData<QrScanResponse>(
     '/qr/scan',
     { qrCode },
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    },
+    withAccessToken(accessToken),
   );
-
-  return unwrap<QrScanResponse>(response);
 }
