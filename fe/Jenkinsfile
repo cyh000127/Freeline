@@ -207,6 +207,7 @@ pipeline {
                                 : "${EXPO_TOKEN:?ERROR: EXPO_TOKEN is missing from Infisical /fe}"
                                 : "${EAS_PROJECT_ID:?ERROR: EAS_PROJECT_ID is missing from Infisical /fe}"
                                 command -v docker >/dev/null 2>&1 || { echo "ERROR: docker not found on Jenkins agent"; exit 1; }
+                                current_git_commit="$(git rev-parse HEAD)"
 
                                 release_container=""
                                 publish_container=""
@@ -219,6 +220,7 @@ pipeline {
                                 release_container="$(docker create \
                                     -e EXPO_TOKEN \
                                     -e EAS_PROJECT_ID \
+                                    -e CURRENT_GIT_COMMIT="$current_git_commit" \
                                     -w /app \
                                     node:20-bullseye \
                                     bash -lc "
@@ -228,8 +230,17 @@ pipeline {
                                         npx eas-cli build -p android \
                                             --profile production \
                                             --non-interactive \
-                                            --wait \
-                                            --output ./build/freeline.apk
+                                            --wait
+
+                                        BUILD_URL=\$(npx eas-cli build:list \
+                                            --platform android \
+                                            --build-profile production \
+                                            --status finished \
+                                            --git-commit-hash \"\$CURRENT_GIT_COMMIT\" \
+                                            --limit 1 \
+                                            --json | node -e \"const builds=JSON.parse(require('fs').readFileSync(0,'utf8')); const url=builds[0]?.artifacts?.buildUrl; if(!url){console.error('ERROR: APK URL not found for current commit'); process.exit(1);} console.log(url);\")
+
+                                        node -e \"const fs=require('fs'); const http=require('http'); const https=require('https'); const { URL } = require('url'); const target=process.argv[1]; const dest=process.argv[2]; function fetch(url, redirects=5){ if(redirects < 0){ console.error('ERROR: too many redirects while downloading APK'); process.exit(1); } const parsed=new URL(url); const client=parsed.protocol === 'http:' ? http : https; const req=client.get(parsed, (res) => { if(res.statusCode >= 300 && res.statusCode < 400 && res.headers.location){ fetch(res.headers.location, redirects - 1); return; } if(res.statusCode !== 200){ console.error('ERROR: failed to download APK, status=' + res.statusCode); process.exit(1); } const file=fs.createWriteStream(dest); res.pipe(file); file.on('finish', () => file.close()); file.on('close', () => process.exit(0)); file.on('error', (err) => { console.error(err.message); process.exit(1); }); }); req.on('error', (err) => { console.error(err.message); process.exit(1); }); } fetch(target);\" \"\$BUILD_URL\" ./build/freeline.apk
                                     ")"
 
                                 docker cp ./. "$release_container:/app"
