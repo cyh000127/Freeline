@@ -48,3 +48,43 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+---
+
+## APK 배포 (발표용, 심사 없이 설치)
+
+### 1) 최초 1회 설정
+
+```bash
+npm install
+npx eas-cli login
+npm run apk:configure
+npm run apk:update:configure
+```
+
+- `apk:configure`: EAS Build 연결 및 `projectId` 설정
+- `apk:update:configure`: OTA(EAS Update) 연결 설정
+
+### 2) 클라우드에서 APK 빌드
+
+```bash
+npm run apk:build
+```
+
+- 완료 후 EAS에서 제공하는 URL로 APK 다운로드/공유
+- 안드로이드 기기에서 URL 열어 바로 설치 가능
+
+### 3) 수정사항 빠른 반영 (APK 재빌드 없이)
+
+```bash
+npm run apk:update -- --message "발표 직전 텍스트 수정"
+```
+
+- JS/TS/스타일/이미지 변경은 OTA 업데이트로 빠르게 반영 가능
+- 설치된 앱을 재실행하거나 새로고침하면 최신 업데이트를 받음
+
+### 4) APK 재빌드가 필요한 경우
+
+- 네이티브 의존성 추가/변경
+- `app.json`의 네이티브 설정(권한/패키지/플러그인 등) 변경
+- Expo SDK 업그레이드
