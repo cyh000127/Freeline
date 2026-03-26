@@ -215,11 +215,7 @@ export default function EventDetailPage() {
 
         const hasUnmapped = areas.some(a => a.boothId === null);
         if (hasUnmapped) {
-<<<<<<< Updated upstream
-            if (globalThis.confirm("설정되지 않은 부스가 있습니다. 임시저장하시겠습니까?")) {
-=======
             showConfirm("설정되지 않은 부스가 있습니다. 임시저장하시겠습니까?", async () => {
->>>>>>> Stashed changes
                 await handleTempSave();
             });
             return;
