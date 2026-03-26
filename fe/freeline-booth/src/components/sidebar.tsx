@@ -7,10 +7,10 @@ import { Menu, PackageOpen, Users, Settings, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const navigation = [
-  { name: "대시보드", href: "/", icon: Menu },
-  { name: "굿즈 관리", href: "/goods", icon: PackageOpen },
-  { name: "사용자 통계", href: "/statistics", icon: Users },
-  { name: "환경 설정", href: "/settings", icon: Settings },
+  { name: "대시보드", href: "/", icon: Menu, isReady: true },
+  { name: "굿즈 관리", href: "/goods", icon: PackageOpen, isReady: true },
+  { name: "사용자 통계", href: "/statistics", icon: Users, isReady: false },
+  { name: "환경 설정", href: "/settings", icon: Settings, isReady: true },
 ];
 
 export function Sidebar() {
@@ -39,6 +39,25 @@ export function Sidebar() {
       <nav className="flex-1 space-y-1 px-4 py-8">
         {navigation.map((item) => {
           const isActive = pathname === item.href;
+          const content = (
+            <>
+              <item.icon className="w-5 h-5" />
+              {item.name}
+            </>
+          );
+          
+          if (!item.isReady) {
+            return (
+              <button
+                key={item.name}
+                onClick={() => alert("준비 중인 기능입니다.")}
+                className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-sm font-medium text-gray-500 transition-colors hover:bg-white/5 hover:text-white cursor-not-allowed"
+              >
+                {content}
+              </button>
+            );
+          }
+
           return (
             <Link
               key={item.name}
@@ -49,8 +68,7 @@ export function Sidebar() {
                   : "text-gray-300 hover:bg-white/5 hover:text-white"
               }`}
             >
-              <item.icon className="w-5 h-5" />
-              {item.name}
+              {content}
             </Link>
           );
         })}
@@ -58,7 +76,10 @@ export function Sidebar() {
 
       {/* Bottom Profile Section */}
       <div className="p-4">
-        <button className="w-full rounded-xl bg-white/10 px-4 py-3 text-xs font-bold text-white transition-colors hover:bg-white/20">
+        <button 
+          onClick={() => alert("준비 중인 기능입니다.")}
+          className="w-full rounded-xl bg-white/10 px-4 py-3 text-xs font-bold text-white transition-colors hover:bg-white/20"
+        >
           총괄 관리자에게 문의하기
         </button>
         

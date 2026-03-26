@@ -227,7 +227,7 @@ export default function GoodsPage() {
                 </button>
 
                 {/* Title */}
-                <div className="text-center font-bold text-gray-900 mb-4 text-lg">
+                <div className="text-center font-bold text-gray-900 mb-4 text-lg px-8 break-words">
                   {item.name}
                 </div>
                 

@@ -28,9 +28,16 @@ export default function RegisterPage() {
 
   const [isLoading, setIsLoading] = useState(false);
 
+  // 이메일 유효성 검사 함수
+  const validateEmail = (email: string) => {
+    // TLD length limited to 2-10 for realistic validation
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/;
+    return emailRegex.test(email);
+  };
+
   // 이메일 중복 확인 (직접 호출용)
   const handleCheckEmailDuplicate = async (emailToCheck: string = email) => {
-    if (!emailToCheck.includes("@") || !emailToCheck.includes(".")) return;
+    if (!validateEmail(emailToCheck)) return;
     if (isVerified) return;
 
     try {
@@ -50,7 +57,7 @@ export default function RegisterPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (isVerified) return;
-    if (!email.includes("@") || !email.includes(".")) {
+    if (!validateEmail(email)) {
       setIsEmailAvailable(null);
       return;
     }
@@ -121,11 +128,17 @@ export default function RegisterPage() {
     }
   };
 
+  // 비밀번호 조건 확인
+  const hasMinLength = password.length >= 8;
+  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/g.test(password);
+  const passwordsMatch = password.length > 0 && password === passwordConfirm;
+
   // 모든 조건이 충족되었는지 확인
   const isFormValid =
     email.length > 0 &&
     isVerified &&
-    password.length >= 8 &&
+    hasMinLength &&
+    hasSpecialChar &&
     password === passwordConfirm &&
     name.trim().length > 0 &&
     company.trim().length > 0 &&
@@ -163,10 +176,25 @@ export default function RegisterPage() {
                 <Input
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="실명 입력"
-                  className="h-12 rounded-xl bg-[#F4F5F7] pl-12 border-0 text-[15px] focus-visible:ring-1 focus-visible:ring-[#2D2A4A]"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // 한글 자음/모음(ㄱ-ㅎ, ㅏ-ㅣ) 포함하여 IME 입력 시 끊김 현상 방지
+                    if (/^[a-zA-Z0-9ㄱ-ㅎㅏ-ㅣ가-힣\s]*$/.test(value)) {
+                      setName(value);
+                    }
+                  }}
+                  maxLength={20}
+                  placeholder="실명 입력 (최대 20자)"
+                  className={`h-12 rounded-xl pl-12 border-0 text-[15px] focus-visible:ring-2 transition-all ${name.length >= 20
+                    ? "bg-red-50 ring-2 ring-red-500"
+                    : "bg-[#F4F5F7] focus-visible:ring-[#2D2A4A]"
+                    }`}
                 />
+                {name.length >= 20 && (
+                  <p className="text-[11px] text-red-500 mt-1 font-medium pl-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                    최대 20자까지 입력 가능합니다.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -178,10 +206,25 @@ export default function RegisterPage() {
                 <Input
                   type="text"
                   value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  placeholder="소속 단체명 입력"
-                  className="h-12 rounded-xl bg-[#F4F5F7] pl-12 border-0 text-[15px] focus-visible:ring-1 focus-visible:ring-[#2D2A4A]"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // 한글 자음/모음(ㄱ-ㅎ, ㅏ-ㅣ) 포함하여 IME 입력 시 끊김 현상 방지
+                    if (/^[a-zA-Z0-9ㄱ-ㅎㅏ-ㅣ가-힣\s]*$/.test(value)) {
+                      setCompany(value);
+                    }
+                  }}
+                  maxLength={50}
+                  placeholder="소속 단체명 입력 (최대 50자)"
+                  className={`h-12 rounded-xl pl-12 border-0 text-[15px] focus-visible:ring-2 transition-all ${company.length >= 50
+                    ? "bg-red-50 ring-2 ring-red-500"
+                    : "bg-[#F4F5F7] focus-visible:ring-[#2D2A4A]"
+                    }`}
                 />
+                {company.length >= 50 && (
+                  <p className="text-[11px] text-red-500 mt-1 font-medium pl-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                    최대 50자까지 입력 가능합니다.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -199,19 +242,25 @@ export default function RegisterPage() {
                     }}
                     onBlur={() => handleCheckEmailDuplicate()}
                     disabled={isVerified}
+                    maxLength={100}
                     placeholder="이메일 주소 입력"
-                    className={`h-12 rounded-xl bg-[#F4F5F7] pl-12 pr-32 border-0 text-[15px] focus-visible:ring-1 focus-visible:ring-[#2D2A4A] disabled:opacity-50 ${isEmailAvailable === false ? "ring-1 ring-red-400" : ""
+                    className={`h-12 rounded-xl pl-12 pr-32 border-0 text-[15px] focus-visible:ring-2 transition-all focus-visible:ring-[#2D2A4A] disabled:opacity-50 ${isEmailAvailable === false || (email.length > 0 && !validateEmail(email))
+                      ? "bg-red-50 ring-2 ring-red-500"
+                      : "bg-[#F4F5F7]"
                       }`}
                   />
                   {/* 오른쪽 상태 메시지 */}
                   <div className="absolute right-4 top-0 h-full flex items-center pointer-events-none">
+                    {email.length > 0 && !validateEmail(email) && (
+                      <span className="text-xs font-bold text-red-500 whitespace-nowrap">올바르지 않은 형식</span>
+                    )}
                     {isCheckingEmail && (
                       <span className="text-xs font-semibold text-gray-400 whitespace-nowrap">확인 중...</span>
                     )}
-                    {!isCheckingEmail && isEmailAvailable === true && (
+                    {!isCheckingEmail && validateEmail(email) && isEmailAvailable === true && (
                       <span className="text-xs font-bold text-green-600 whitespace-nowrap">사용 가능</span>
                     )}
-                    {!isCheckingEmail && isEmailAvailable === false && (
+                    {!isCheckingEmail && validateEmail(email) && isEmailAvailable === false && (
                       <span className="text-xs font-bold text-red-500 whitespace-nowrap">이미 가입된 이메일</span>
                     )}
                   </div>
@@ -219,8 +268,8 @@ export default function RegisterPage() {
                 <Button
                   type="button"
                   onClick={handleSendVerification}
-                  disabled={isEmailAvailable === false || isVerificationSent || isLoading || isVerified}
-                  className="h-12 px-6 rounded-xl bg-[#2D2A4A] font-bold text-white hover:bg-[#3A375C] whitespace-nowrap"
+                  disabled={!validateEmail(email) || isEmailAvailable === false || isLoading || isVerified}
+                  className="h-12 px-6 rounded-xl bg-[#2D2A4A] font-bold text-white hover:bg-[#3A375C] whitespace-nowrap disabled:bg-gray-400"
                 >
                   {isVerified ? "인증완료" : isVerificationSent ? "재전송" : "인증하기"}
                 </Button>
@@ -273,10 +322,29 @@ export default function RegisterPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 rounded-xl bg-[#F4F5F7] pl-12 border-0 text-[15px] focus-visible:ring-1 focus-visible:ring-[#2D2A4A]"
+                  maxLength={20}
+                  className={`h-12 rounded-xl pl-12 border-0 text-[15px] focus-visible:ring-2 transition-all ${password.length >= 20
+                    ? "bg-red-50 ring-2 ring-red-500"
+                    : "bg-[#F4F5F7] focus-visible:ring-[#2D2A4A]"
+                    }`}
                 />
               </div>
-              <p className="text-xs text-gray-400 mt-1 pl-1">8자 이상 / 특수기호 포함</p>
+              {password.length >= 20 && (
+                <p className="text-[11px] text-red-500 mt-1 font-medium pl-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                  최대 20자까지 입력 가능합니다.
+                </p>
+              )}
+              {/* 비밀번호 조건 상태 표시 */}
+              <div className="flex gap-4 mt-2 pl-1">
+                <div className={`flex items-center text-xs font-medium transition-colors ${hasMinLength ? "text-green-600" : "text-gray-400"}`}>
+                  <CheckCircle2 className={`mr-1 h-3.5 w-3.5 ${hasMinLength ? "opacity-100" : "opacity-30"}`} />
+                  8자 이상
+                </div>
+                <div className={`flex items-center text-xs font-medium transition-colors ${hasSpecialChar ? "text-green-600" : "text-gray-400"}`}>
+                  <CheckCircle2 className={`mr-1 h-3.5 w-3.5 ${hasSpecialChar ? "opacity-100" : "opacity-30"}`} />
+                  특수문자 포함
+                </div>
+              </div>
             </div>
 
             {/* Password Confirm Field */}
@@ -288,9 +356,24 @@ export default function RegisterPage() {
                   type="password"
                   value={passwordConfirm}
                   onChange={(e) => setPasswordConfirm(e.target.value)}
-                  className="h-12 rounded-xl bg-[#F4F5F7] pl-12 border-0 text-[15px] focus-visible:ring-1 focus-visible:ring-[#2D2A4A]"
+                  maxLength={20}
+                  className={`h-12 rounded-xl pl-12 border-0 text-[15px] focus-visible:ring-2 transition-all ${passwordConfirm.length >= 20
+                    ? "bg-red-50 ring-2 ring-red-500"
+                    : "bg-[#F4F5F7] focus-visible:ring-[#2D2A4A]"
+                    }`}
                 />
               </div>
+              {passwordConfirm.length >= 20 && (
+                <p className="text-[11px] text-red-500 mt-1 font-medium pl-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                  최대 20자까지 입력 가능합니다.
+                </p>
+              )}
+              {passwordConfirm.length > 0 && (
+                <div className={`flex items-center mt-2 pl-1 text-xs font-medium transition-colors ${passwordsMatch ? "text-green-600" : "text-red-500"}`}>
+                  <CheckCircle2 className={`mr-1 h-3.5 w-3.5 ${passwordsMatch ? "opacity-100" : "opacity-30"}`} />
+                  {passwordsMatch ? "비밀번호가 일치합니다" : "비밀번호가 일치하지 않습니다"}
+                </div>
+              )}
             </div>
 
             {/* Terms Checkbox */}
