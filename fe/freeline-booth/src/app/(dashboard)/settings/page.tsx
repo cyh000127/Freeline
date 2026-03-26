@@ -66,7 +66,6 @@ export default function SettingsPage() {
     maxWaitingCount: 4,
     callCount: 2,
     callValidSeconds: 4,
-    deferLimit: 2,
   };
 
   // QR Info State
@@ -720,7 +719,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <Label htmlFor="callCount">호출 허용 횟수</Label>
@@ -741,32 +740,6 @@ export default function SettingsPage() {
                       className={cn(
                         "h-12 border-0 rounded-xl transition-all",
                         policyInfo.callCount.toString().length >= MAX_LENGTHS.callCount 
-                          ? "bg-red-50 ring-2 ring-red-500" 
-                          : "bg-[#F8F9FA] focus-visible:ring-[#2D2A4A]"
-                      )}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <Label htmlFor="deferLimit">노쇼 취소 제한 횟수</Label>
-                      <span className={cn("text-[11px]", policyInfo.deferLimit.toString().length >= MAX_LENGTHS.deferLimit ? "text-red-500 font-bold" : "text-gray-400")}>
-                        {policyInfo.deferLimit.toString().length}/{MAX_LENGTHS.deferLimit}
-                      </span>
-                    </div>
-                    <Input
-                      id="deferLimit"
-                      type="number"
-                      value={policyInfo.deferLimit}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, '');
-                        if (val.length <= MAX_LENGTHS.deferLimit) {
-                          setPolicyInfo({ ...policyInfo, deferLimit: parseInt(val) || 0 });
-                        }
-                      }}
-                      className={cn(
-                        "h-12 border-0 rounded-xl transition-all",
-                        policyInfo.deferLimit.toString().length >= MAX_LENGTHS.deferLimit 
                           ? "bg-red-50 ring-2 ring-red-500" 
                           : "bg-[#F8F9FA] focus-visible:ring-[#2D2A4A]"
                       )}
