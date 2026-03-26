@@ -19,6 +19,7 @@ import { useAuth } from "@/context/AuthContext";
 import { waitingApi, WaitingInfo, DashboardResponse } from "@/lib/api/waiting";
 import { getBoothPolicy, BoothPolicy } from "@/lib/api/booth";
 import { useWaitingSSE } from "@/hooks/useWaitingSSE";
+import { useModal } from "@/context/ModalContext";
 
 type TabStatus = 'WAITING' | 'ENTERED' | 'CANCELLED';
 
@@ -59,6 +60,7 @@ function CountdownTimer({ enteredAt, staySeconds }: { enteredAt: string, staySec
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { showAlert, showConfirm } = useModal();
   const [dashboardData, setDashboardData] = useState<DashboardResponse['data'] | null>(null);
   const [fullQueue, setFullQueue] = useState<WaitingInfo[]>([]);
   const [activeTab, setActiveTab] = useState<TabStatus>('WAITING');
@@ -120,10 +122,10 @@ export default function DashboardPage() {
     if (!user?.boothId) return;
     try {
       await waitingApi.callNext(user.boothId);
-      alert("다음 대기자를 호출했습니다.");
+      showAlert("다음 대기자를 호출했습니다.");
       fetchData(false);
     } catch (error: any) {
-      alert(error.response?.data?.message || "호출에 실패했습니다.");
+      showAlert(error.response?.data?.message || "호출에 실패했습니다.");
     }
   };
 
@@ -133,19 +135,20 @@ export default function DashboardPage() {
       await waitingApi.admitWaiting(user.boothId, waitingId);
       fetchData(false);
     } catch (error: any) {
-      alert(error.response?.data?.message || "입장 처리에 실패했습니다.");
+      showAlert(error.response?.data?.message || "입장 처리에 실패했습니다.");
     }
   };
 
   const handleCancel = async (waitingId: number) => {
     if (!user?.boothId) return;
-    if (!confirm("정말 이 대기를 취소하시겠습니까?")) return;
-    try {
-      await waitingApi.cancelWaiting(user.boothId, waitingId);
-      fetchData(false);
-    } catch (error: any) {
-      alert(error.response?.data?.message || "취소 처리에 실패했습니다.");
-    }
+    showConfirm("정말 이 대기를 취소하시겠습니까?", async () => {
+      try {
+        await waitingApi.cancelWaiting(user.boothId!, waitingId);
+        fetchData(false);
+      } catch (error: any) {
+        showAlert(error.response?.data?.message || "취소 처리에 실패했습니다.");
+      }
+    });
   };
 
   const handleExit = async (waitingId: number) => {
@@ -154,10 +157,22 @@ export default function DashboardPage() {
       await waitingApi.exitWaiting(user.boothId, waitingId);
       fetchData(false);
     } catch (error: any) {
-      alert(error.response?.data?.message || "퇴장 처리에 실패했습니다.");
+      showAlert(error.response?.data?.message || "퇴장 처리에 실패했습니다.");
     }
   };
 
+<<<<<<< HEAD
+=======
+  const handlePostpone = async (waitingId: number) => {
+    try {
+      await waitingApi.postponeWaiting(waitingId);
+      fetchData(false);
+    } catch (error: any) {
+      showAlert(error.response?.data?.message || "미루기 처리에 실패했습니다.");
+    }
+  };
+
+>>>>>>> 3371ea5 (fix: 행사관리자/부스관리자 모달 창 수정 및 티켓 생성 숫자 제한)
   const calculatedCount = {
     waiting: fullQueue.filter(w => w.status === 'REGISTERED' || w.status === 'WAITING' || w.status === 'CALLED').length,
     inUse: fullQueue.filter(w => w.status === 'ENTERED').length,

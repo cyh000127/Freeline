@@ -9,6 +9,7 @@ import {BoothSearchModal} from "@/components/map/BoothSearchModal";
 import {eventApi, Event} from "@/lib/api/event";
 import { authApi } from "@/lib/api/auth";
 import {boothMapApi} from "@/lib/api/boothMap";
+import { useModal } from "@/context/ModalContext";
 import { 
   Map as MapIcon, 
   Upload,
@@ -36,6 +37,7 @@ export default function EventDetailPage() {
   const params = useParams();
     const eventId = Number(params.eventId as string);
   const router = useRouter();
+  const { showAlert, showConfirm } = useModal();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [userName, setUserName] = useState("관리자");
@@ -199,10 +201,9 @@ export default function EventDetailPage() {
         } catch (err: any) {
             const errorStatus = err.response?.data?.status || err.response?.data?.error?.status;
             if (errorStatus === "INVALID_IMAGE_FORMAT") {
-                alert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
+                showAlert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
             } else {
-                console.error("Map upload failed", err);
-                alert("지도 업로드에 실패했습니다.");
+                showAlert("지도 업로드에 실패했습니다.");
             }
         } finally {
             setIsLoading(false);
@@ -214,9 +215,13 @@ export default function EventDetailPage() {
 
         const hasUnmapped = areas.some(a => a.boothId === null);
         if (hasUnmapped) {
+<<<<<<< Updated upstream
             if (globalThis.confirm("설정되지 않은 부스가 있습니다. 임시저장하시겠습니까?")) {
+=======
+            showConfirm("설정되지 않은 부스가 있습니다. 임시저장하시겠습니까?", async () => {
+>>>>>>> Stashed changes
                 await handleTempSave();
-            }
+            });
             return;
         }
 
@@ -234,10 +239,10 @@ export default function EventDetailPage() {
             await boothMapApi.updateBoothMapAreas(eventId, eventMapId, validAreas);
             setIsEditMode(false);
             setHasUnsavedChanges(false);
-            alert("저장되었습니다.");
+            showAlert("저장되었습니다.");
         } catch (err) {
             console.error("Failed to save map areas", err);
-            alert("지도 저장에 실패했습니다.");
+            showAlert("지도 저장에 실패했습니다.");
         } finally {
             setIsSaving(false);
         }
@@ -249,10 +254,10 @@ export default function EventDetailPage() {
             setIsSaving(true);
             await boothMapApi.updateBoothMapSnapshot(eventId, eventMapId, {areas});
             setHasUnsavedChanges(false);
-            alert("임시저장되었습니다.");
+            showAlert("임시저장되었습니다.");
         } catch (err) {
             console.error("Failed to save snapshot", err);
-            alert("임시저장에 실패했습니다.");
+            showAlert("임시저장에 실패했습니다.");
         } finally {
             setIsSaving(false);
         }

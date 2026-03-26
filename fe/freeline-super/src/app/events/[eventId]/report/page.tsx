@@ -20,9 +20,11 @@ import {
 } from "@/lib/api/report";
 import { eventApi, Event } from "@/lib/api/event";
 import { authApi } from "@/lib/api/auth";
+import { useModal } from "@/context/ModalContext";
 
 export default function ReportPage() {
   const params = useParams();
+  const { showAlert } = useModal();
   const eventId = params.eventId as string;
 
   const [event, setEvent] = useState<Event | null>(null);
@@ -195,7 +197,7 @@ export default function ReportPage() {
       pdf.save(fileName);
     } catch (err) {
       console.error("PDF export failed:", err);
-      alert("PDF 다운로드에 실패했습니다.");
+      showAlert("PDF 다운로드에 실패했습니다.");
     } finally {
       setIsExporting(false);
     }

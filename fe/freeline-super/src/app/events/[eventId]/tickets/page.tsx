@@ -19,8 +19,10 @@ import {
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { authApi } from "@/lib/api/auth";
 import { eventApi } from "@/lib/api/event";
+import { useModal } from "@/context/ModalContext";
 
 interface TicketData {
   visitorId: number;
@@ -30,6 +32,7 @@ interface TicketData {
 
 export default function VisitorTicketsPage() {
   const params = useParams();
+  const { showAlert } = useModal();
   const eventId = Number(params.eventId as string);
 
   const [userName, setUserName] = useState("관리자");
@@ -91,7 +94,13 @@ export default function VisitorTicketsPage() {
 
   const handleGenerate = async () => {
     if (quantity <= 0) {
-      alert("생성할 티켓 수량을 입력해주세요.");
+      showAlert("생성할 티켓 수량을 입력해주세요.");
+      return;
+    }
+
+    if (quantity > 9999) {
+      showAlert("한 번에 최대 9,999매까지 생성 가능합니다.");
+      setQuantity(9999);
       return;
     }
 
@@ -100,12 +109,12 @@ export default function VisitorTicketsPage() {
       const res = await authApi.generateTickets({ eventId, quantity });
       if (res.data?.success) {
         setGeneratedAt(new Date().toLocaleString());
-        alert(`${res.data.data.createdCount}개의 티켓이 성공적으로 생성되었습니다.`);
+        showAlert(`${res.data.data.createdCount}개의 티켓이 성공적으로 생성되었습니다.`);
         setPage(0);
         await fetchTickets(0);
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || "티켓 생성에 실패했습니다.");
+      showAlert(err.response?.data?.message || "티켓 생성에 실패했습니다.");
     } finally {
       setIsGenerating(false);
     }
@@ -258,14 +267,40 @@ export default function VisitorTicketsPage() {
                     <Input
                       id="quantity"
                       type="number"
-                      value={quantity}
-                      onChange={(e) => setQuantity(Number(e.target.value))}
-                      className="h-14 bg-[#F8F9FA] border-0 rounded-2xl px-6 text-lg font-bold focus:ring-2 focus:ring-[#2D2A4A]/10 transition-all shadow-inner"
+                      value={quantity === 0 ? "" : quantity}
+                      onChange={(e) => {
+                        const inputVal = e.target.value;
+                        if (inputVal.length > 4) {
+                          showAlert("최대 4자리(9,999매)까지만 입력 가능합니다.");
+                          return;
+                        }
+                        const numVal = Number(inputVal);
+                        if (numVal > 9999) {
+                          showAlert("최대 9,999매까지 생성 가능합니다.");
+                          setQuantity(9999);
+                        } else {
+                          setQuantity(numVal);
+                        }
+                      }}
+                      max={9999}
+                      min={1}
+                      className={cn(
+                        "h-14 bg-[#F8F9FA] border-0 rounded-2xl px-6 text-lg font-bold focus:ring-2 transition-all shadow-inner",
+                        quantity >= 9999 ? "text-red-500 ring-2 ring-red-500 bg-red-50" : "text-[#2D2A4A] focus:ring-[#2D2A4A]/10"
+                      )}
                       placeholder="예: 5000"
                     />
-                    <div className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 font-black">매</div>
+                    <div className={cn(
+                      "absolute right-6 top-1/2 -translate-y-1/2 font-black transition-colors",
+                      quantity >= 9999 ? "text-red-500" : "text-gray-400"
+                    )}>매</div>
                   </div>
-                  <p className="text-xs text-gray-400 ml-1">한 번에 최대 10,000매까지 생성이 권장됩니다.</p>
+                  <p className={cn(
+                    "text-xs ml-1 transition-colors",
+                    quantity >= 9999 ? "text-red-500 font-bold" : "text-gray-400"
+                  )}>
+                    한 번에 최대 9,999매까지 생성이 권장됩니다.
+                  </p>
                 </div>
 
                 <Button
@@ -440,6 +475,16 @@ export default function VisitorTicketsPage() {
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: #D1D5DB;
+        }
+
+        /* Hide number input spinners */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type="number"] {
+          -moz-appearance: textfield;
         }
       `}</style>
     </div>
