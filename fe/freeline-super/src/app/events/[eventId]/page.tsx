@@ -257,6 +257,14 @@ export default function EventDetailPage() {
         setActiveLocalId(null);
   };
 
+    const handleDeleteArea = () => {
+        if (!activeLocalId) return;
+
+        setAreas(prev => prev.filter(area => area.localId !== activeLocalId));
+        setIsSearchModalOpen(false);
+        setActiveLocalId(null);
+    };
+
     if (isLoading && !layoutImageUrl) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#F1F3F5]">
@@ -443,6 +451,7 @@ export default function EventDetailPage() {
             eventId={eventId}
             alreadyMappedBoothIds={mappedBoothIds}
             onSelect={handleSelectBooth}
+            onDeleteArea={handleDeleteArea}
         />
     </div>
   );
