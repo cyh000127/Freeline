@@ -120,6 +120,17 @@ run_sql() {
   fi
 }
 
+run_sql_file() {
+  local file="$1"
+  if command -v psql &>/dev/null; then
+    PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -f "$file" 2>/dev/null
+  else
+    docker cp "$file" freeline-db:/tmp/_bulk_insert.sql && \
+    docker exec -e PGPASSWORD="${DB_PASSWORD}" freeline-db \
+      psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -t -A -f /tmp/_bulk_insert.sql 2>/dev/null
+  fi
+}
+
 # ─── Banner ──────────────────────────────────────────────────────────────────
 
 echo -e "${CYAN}"
@@ -206,25 +217,41 @@ log_ok "부스 ${#BOOTH_IDS[@]}개 생성: ${BOOTH_IDS_CSV}"
 
 log_step "4" "방문자 ${VU_COUNT}명 DB 생성"
 
-SQL="INSERT INTO visitors (event_id, entry_code, name, is_active, created_at, updated_at) VALUES "
-VALUES=""
 KOREAN_NAMES=("김민수" "이서연" "박지호" "최유진" "정도현" "강수빈" "조현우" "윤서영" "임재현" "한예린"
               "송민지" "오태양" "배은서" "홍준혁" "류하은" "문성민" "신유나" "권도윤" "황지우" "전소율"
               "장민재" "안서현" "서준호" "남지안" "유하윤" "구민서" "노태현" "양수아" "하지훈" "손예나"
               "김태윤" "이하린" "박준서" "최서아" "정민호" "강은우" "조하영" "윤재민" "임소희" "한도영"
               "송유진" "오서윤" "배준혁" "홍지아" "류민재" "문수현" "신태양" "권서영" "황도현" "전유나")
+NAME_COUNT=${#KOREAN_NAMES[@]}
 
 ENTRY_PREFIX="E${EVENT_ID}_"
+BATCH_SIZE=500
+SQL_FILE="/tmp/demo_visitors_${EVENT_ID}.sql"
+> "$SQL_FILE"
+
+BATCH_VALUES=""
+BATCH_N=0
 for i in $(seq 1 "${VU_COUNT}"); do
   CODE=$(printf "${ENTRY_PREFIX}%03d" "$i")
-  NAME_IDX=$(( (i - 1) % ${#KOREAN_NAMES[@]} ))
+  NAME_IDX=$(( (i - 1) % NAME_COUNT ))
   VISITOR_NAME="${KOREAN_NAMES[$NAME_IDX]}"
-  if [ -n "$VALUES" ]; then VALUES="${VALUES},"; fi
-  VALUES="${VALUES}(${EVENT_ID}, '${CODE}', '${VISITOR_NAME}', true, NOW(), NOW())"
-done
-SQL="${SQL}${VALUES} ON CONFLICT (entry_code) DO NOTHING;"
+  if [ -n "$BATCH_VALUES" ]; then BATCH_VALUES="${BATCH_VALUES},"; fi
+  BATCH_VALUES="${BATCH_VALUES}(${EVENT_ID},'${CODE}','${VISITOR_NAME}',true,NOW(),NOW())"
+  BATCH_N=$((BATCH_N + 1))
 
-run_sql "$SQL" 2>&1 || true
+  if [ "$BATCH_N" -ge "$BATCH_SIZE" ]; then
+    echo "INSERT INTO visitors (event_id,entry_code,name,is_active,created_at,updated_at) VALUES ${BATCH_VALUES} ON CONFLICT (entry_code) DO NOTHING;" >> "$SQL_FILE"
+    BATCH_VALUES=""
+    BATCH_N=0
+  fi
+done
+# 남은 건 flush
+if [ -n "$BATCH_VALUES" ]; then
+  echo "INSERT INTO visitors (event_id,entry_code,name,is_active,created_at,updated_at) VALUES ${BATCH_VALUES} ON CONFLICT (entry_code) DO NOTHING;" >> "$SQL_FILE"
+fi
+
+run_sql_file "$SQL_FILE" 2>&1 || true
+rm -f "$SQL_FILE"
 
 AFTER_COUNT=$(run_sql "SELECT COUNT(*) FROM visitors WHERE event_id = ${EVENT_ID};" 2>/dev/null || echo "0")
 log_ok "방문자 ${AFTER_COUNT}명 생성 완료"
@@ -272,11 +299,12 @@ fi
 log_step "6" "방문자 시뮬레이션 (k6: ${VU_COUNT} VU × ${ITERATIONS} iterations)"
 
 K6_ENV="-e TARGET_URL=${TARGET_URL} -e ADMIN_ID=${ADMIN_ID} -e ADMIN_PW=${ADMIN_PW} -e VU_COUNT=${VU_COUNT} -e ITERATIONS=${ITERATIONS} -e PRESET_EVENT_ID=${EVENT_ID} -e PRESET_BOOTH_IDS=${BOOTH_IDS_CSV} -e ENTRY_PREFIX=${ENTRY_PREFIX}"
+K6_OUT="--out experimental-prometheus-rw"
 
 K6_OK=false
 if ssh -o ConnectTimeout=5 "${HDFS_SERVER}" "docker ps --format '{{.Names}}' | grep -q k6-manager" 2>/dev/null; then
   log_info "Server B k6-manager에서 실행..."
-  K6_RESULT=$(ssh "${HDFS_SERVER}" "docker exec k6-manager k6 run ${K6_ENV} /scripts/e2e-report-test.js" 2>&1) || true
+  K6_RESULT=$(ssh "${HDFS_SERVER}" "docker exec k6-manager k6 run ${K6_OUT} ${K6_ENV} /scripts/e2e-report-test.js" 2>&1) || true
   K6_OK=true
 elif command -v k6 &>/dev/null; then
   log_info "로컬 k6로 실행..."
@@ -284,7 +312,7 @@ elif command -v k6 &>/dev/null; then
   K6_OK=true
 elif docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^k6-manager$'; then
   log_info "로컬 k6-manager 컨테이너에서 실행..."
-  K6_RESULT=$(docker exec k6-manager k6 run ${K6_ENV} /scripts/e2e-report-test.js 2>&1) || true
+  K6_RESULT=$(docker exec k6-manager k6 run ${K6_OUT} ${K6_ENV} /scripts/e2e-report-test.js 2>&1) || true
   K6_OK=true
 else
   log_fail "k6를 찾을 수 없습니다"
