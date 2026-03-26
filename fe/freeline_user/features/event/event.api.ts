@@ -14,9 +14,8 @@ function unwrapResponse<T>(response: { data: ApiResponse<T> }): T {
 
 export const getEventDetail = async (
   accessToken: string,
-  eventId: number,
 ): Promise<EventDetail> => {
-  const response = await api.get<ApiResponse<EventDetail>>(`events/${eventId}`, {
+  const response = await api.get<ApiResponse<EventDetail>>(`visitors/me/event`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 

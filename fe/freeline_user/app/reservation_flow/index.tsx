@@ -104,7 +104,7 @@ export default function BoothListScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#F7F7F8',
+    backgroundColor: '#F0F2F5',
   },
   header: {
     flexDirection: 'row',

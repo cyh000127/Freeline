@@ -80,14 +80,6 @@ export default function My() {
         </MySection>
 
         <MySection title="기타">
-          <MyActionItem
-            iconName="swap-horizontal-outline"
-            label="행사 변경"
-            helperText="다른 행사 화면으로 이동할 수 있습니다."
-            onPress={() => {
-              // later: event select
-            }}
-          />
 
           <MyActionItem
             iconName="refresh-outline"

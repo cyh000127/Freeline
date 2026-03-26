@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, ImageBackground } from 'react-native';
+import { StyleSheet, Text, View, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { EventDetail } from '@/features/event/types';
 
@@ -37,24 +37,20 @@ export default function HomeBanner({ eventDetail, loading }: Props) {
     ? getEventDayCount(eventDetail.startDate, eventDetail.endDate) 
     : '-';
 
-  const bannerSource = eventDetail?.imageUrl 
-    ? { uri: eventDetail.imageUrl }
-    : require('@/assets/events/event_banner.png');
+  const bannerUri = eventDetail?.imageUrl ? { uri: eventDetail.imageUrl } : null;
 
   return (
     <View style={styles.container}>
-      <ImageBackground
-        source={bannerSource}
-        style={styles.banner}
-        imageStyle={styles.bannerImage}
-        resizeMode="cover"
-      >
+      <View style={[styles.banner, !bannerUri && { backgroundColor: '#000000' }]}>
+        {bannerUri && (
+          <Image source={bannerUri} style={styles.bannerImage} resizeMode="cover" />
+        )}
         <View style={styles.overlay} />
 
         <View style={styles.content}>
           <Text style={styles.title}>{title}</Text>
         </View>
-      </ImageBackground>
+      </View>
 
       <View style={styles.infoRow}>
         <View style={styles.dateGroup}>
@@ -85,9 +81,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'flex-end',
     alignSelf: 'stretch',
+    position: 'relative',
   },
 
   bannerImage: {
+    ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
   },

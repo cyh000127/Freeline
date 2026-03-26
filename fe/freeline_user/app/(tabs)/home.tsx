@@ -66,7 +66,7 @@ export default function HomeScreen() {
       }
       try {
         setLoadingEvent(true);
-        const data = await getEventDetail(accessToken, eventId ?? 1);
+        const data = await getEventDetail(accessToken);
         setEventDetail(data);
       } catch (err) {
         console.error('Failed to fetch event for HomeBanner', err);

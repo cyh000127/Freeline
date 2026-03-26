@@ -55,7 +55,7 @@ export default function ReservationComplete() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#F7F7F8',
+    backgroundColor: '#F0F2F5',
   },
 
   topArea: {

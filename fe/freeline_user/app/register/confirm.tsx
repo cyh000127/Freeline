@@ -37,7 +37,7 @@ export default function ConfirmScreen() {
     const fetchEvent = async () => {
       try {
         setLoadingEvent(true);
-        const data = await getEventDetail(accessToken, eventId ?? 1);
+        const data = await getEventDetail(accessToken);
         setEventDetail(data);
       } catch (err) {
         console.error('Failed to fetch event details:', err);
