@@ -130,6 +130,21 @@ public class AuthController {
     }
 
     /**
+     * 부스 관리자 계정 삭제 (행사 주최자용)
+     */
+    @Operation(summary = "부스 관리자 계정 삭제")
+    @DeleteMapping("/booth-admins/{adminId}")
+    @PreAuthorize("hasRole('EVENT_ADMIN')")
+    public ResponseEntity<BaseResponse<Void>> deleteBoothAdmin(
+            final Authentication authentication,
+            @PathVariable final Long adminId
+    ) {
+        final Long userId = Long.parseLong(authentication.getName());
+        authService.deleteBoothAdmin(userId, adminId);
+        return ResponseUtils.ok(null);
+    }
+
+    /**
      * 부스 관리자 일괄 생성 (행사 주최자용)
      */
     @Operation(summary = "부스 관리자 일괄 생성")

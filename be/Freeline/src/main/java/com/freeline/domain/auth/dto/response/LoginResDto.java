@@ -9,6 +9,9 @@ public record LoginResDto(
         String accessToken,
         String refreshToken,
         Role role,
-        Long boothId
+        Long boothId,
+        boolean isPasswordChangeRequired,
+        String company,
+        String boothName
 ) {
 }
