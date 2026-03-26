@@ -46,6 +46,7 @@ import com.freeline.domain.auth.entity.Role;
 import com.freeline.domain.auth.exception.AuthException;
 import com.freeline.domain.auth.repository.BoothAdminRepository;
 import com.freeline.domain.auth.repository.EventAdminRepository;
+import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.Visitor;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.VisitorRepository;
@@ -184,7 +185,7 @@ public class AuthService {
                 throw new AuthException(ErrorCode.ACCESS_DENIED);
             }
             if (!boothAdmin.isPasswordChanged()) {
-                throw new AuthException(ErrorCode.PASSWORD_CHANGE_REQUIRED);
+                return buildPasswordChangeRequiredResponse(boothAdmin);
             }
             boothAdmin.recordLogin();
             return generateLoginResponse(
@@ -309,6 +310,29 @@ public class AuthService {
     }
 
     /**
+     * 부스 관리자 개별 삭제
+     */
+    @Transactional
+    public void deleteBoothAdmin(final Long eventAdminId, final Long adminId) {
+        final BoothAdmin boothAdmin = boothAdminRepository.findById(adminId)
+                .orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));
+        final Booth booth = boothRepository.findById(boothAdmin.getBoothId())
+                .orElseThrow(() -> new AuthException(ErrorCode.BOOTH_NOT_FOUND));
+
+        validateEventOwnership(eventAdminId, booth.getEventId());
+
+        redisTemplate.delete(buildRefreshKey(boothAdmin.getId(), Role.BOOTH_ADMIN));
+        boothAdminRepository.delete(boothAdmin);
+
+        log.info(
+                "[Auth] Booth admin deleted {eventAdminId: {}, boothAdminId: {}, boothId: {}}",
+                eventAdminId,
+                boothAdmin.getId(),
+                boothAdmin.getBoothId()
+        );
+    }
+
+    /**
      * 부스 관리자 일괄 생성
      */
     @Transactional
@@ -430,6 +454,24 @@ public class AuthService {
 
     private String formatEntryCode(final Long eventId, final long sequence) {
         return String.format("%s%d-%0" + ENTRY_CODE_SEQUENCE_LENGTH + "d", ENTRY_CODE_PREFIX, eventId, sequence);
+    }
+
+    private LoginResDto buildPasswordChangeRequiredResponse(final BoothAdmin boothAdmin) {
+        final Booth booth = boothRepository.findById(boothAdmin.getBoothId())
+                .orElseThrow(() -> new AuthException(ErrorCode.BOOTH_NOT_FOUND));
+
+        log.info(
+                "[Auth] Booth admin password change required {boothAdminId: {}, boothId: {}}",
+                boothAdmin.getId(),
+                boothAdmin.getBoothId()
+        );
+
+        return authConverter.toPasswordChangeRequiredLoginResDto(
+                Role.BOOTH_ADMIN,
+                boothAdmin.getBoothId(),
+                boothAdmin.getCompany(),
+                booth.getName()
+        );
     }
 
     private Visitor resolveInactiveOrMissingVisitor(final String entryCode) {

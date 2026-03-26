@@ -35,6 +35,26 @@ public class AuthConverter {
                 .refreshToken(refreshToken)
                 .role(role)
                 .boothId(boothId)
+                .isPasswordChangeRequired(false)
+                .company(null)
+                .boothName(null)
+                .build();
+    }
+
+    public LoginResDto toPasswordChangeRequiredLoginResDto(
+            final Role role,
+            final Long boothId,
+            final String company,
+            final String boothName
+    ) {
+        return LoginResDto.builder()
+                .accessToken(null)
+                .refreshToken(null)
+                .role(role)
+                .boothId(boothId)
+                .isPasswordChangeRequired(true)
+                .company(company)
+                .boothName(boothName)
                 .build();
     }
 
