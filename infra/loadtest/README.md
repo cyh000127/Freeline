@@ -51,6 +51,33 @@ docker exec k6-manager k6 run \
 - 20 VU까지 ramp-up, 5분 실행
 - 주요 API 엔드포인트 대상
 
+### Queue Lifecycle Stress 테스트 (`./run.sh stress`)
+
+```bash
+cd infra/loadtest
+./run.sh stress
+```
+
+상태 전이 기반으로 실제 운영 흐름을 시뮬레이션:
+- `visitor_flow`: 부스 조회/대기 등록 → `CALLED` 시 QR 스캔 → `ENTERED` 후 `EXIT`
+- `booth_operator_flow`: 부스 큐 조회 → 다음 대기 호출(`call`) → 도착자 입장 처리(`admit`)
+- 일부 호출자는 QR 미스캔(`NO_SHOW_RATE`)으로 남겨 `EXPIRED` 경로도 함께 검증
+
+대표 조정 파라미터:
+- `PEAK_VUS`, `SPIKE_VUS`, `TEST_DURATION`
+- `OPERATOR_VUS`, `OPERATOR_DURATION`
+- `WAITING_JOIN_RATE`, `NO_SHOW_RATE`, `CANCEL_RATE`, `POSTPONE_RATE`
+- `MIN_STAY_SECONDS`, `MAX_STAY_SECONDS`
+
+예시:
+
+```bash
+PEAK_VUS=80 SPIKE_VUS=160 TEST_DURATION=4m \
+OPERATOR_VUS=4 OPERATOR_DURATION=10m \
+NO_SHOW_RATE=0.2 WAITING_JOIN_RATE=0.65 \
+./run.sh stress
+```
+
 ### 커스텀 타겟 URL
 
 ```bash
@@ -125,3 +152,4 @@ export default function () {
 - 부하 테스트는 Server B에서 실행되므로 Jenkins 빌드와 동시 실행 시 리소스 경합 가능
 - 테스트 VU 수를 보수적으로 설정하여 서버 과부하 방지 권장
 - 테스트 결과 JSON 파일은 `output/` 디렉토리에 저장되며, git에 포함되지 않음
+- 안정성 검증 목적이라면 `PEAK_VUS`/`OPERATOR_VUS`를 작은 값으로 시작해 단계적으로 올리는 방식 권장
