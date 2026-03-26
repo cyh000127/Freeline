@@ -6,6 +6,8 @@ import type { BoothPerformanceDto } from "@/lib/api/report";
 
 interface Props {
   data: BoothPerformanceDto[];
+  selectedBoothId?: number | null;
+  onSelectBooth?: (booth: BoothPerformanceDto) => void;
 }
 
 type SortKey = keyof BoothPerformanceDto;
@@ -37,7 +39,11 @@ function RateBar({ value, color }: { value: number; color: string }) {
   );
 }
 
-export function BoothPerformanceTable({ data }: Props) {
+export function BoothPerformanceTable({
+  data,
+  selectedBoothId = null,
+  onSelectBooth,
+}: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("viewCount");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -114,10 +120,22 @@ export function BoothPerformanceTable({ data }: Props) {
               {sorted.map((row) => (
                 <tr
                   key={row.boothId}
-                  className="hover:bg-gray-50 transition-colors"
+                  className={`transition-colors ${
+                    selectedBoothId === row.boothId
+                      ? "bg-indigo-50/70"
+                      : "hover:bg-gray-50"
+                  } ${onSelectBooth ? "cursor-pointer" : ""}`}
+                  onClick={() => onSelectBooth?.(row)}
                 >
                   <td className="px-4 py-3 font-semibold text-gray-900">
-                    {row.boothName}
+                    <div className="flex items-center gap-2">
+                      <span>{row.boothName}</span>
+                      {selectedBoothId === row.boothId && (
+                        <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-[11px] font-bold text-indigo-700">
+                          선택됨
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-gray-700">
                     {row.viewCount.toLocaleString()}
@@ -147,6 +165,12 @@ export function BoothPerformanceTable({ data }: Props) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {onSelectBooth && data.length > 0 && (
+        <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/60 text-xs font-medium text-gray-500">
+          부스를 클릭하면 해당 부스 관리자가 보는 사용자 통계를 아래에서 확인할 수 있습니다.
         </div>
       )}
     </div>
