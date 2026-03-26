@@ -27,7 +27,6 @@ pipeline {
         DOCKER_TAG = "${env.BUILD_ID}"
 
         APK_DIR = '/opt/freeline/apk'
-        USER_RELEASE_ACTION = 'none'
 
         INFISICAL_URL = 'https://j14a207.p.ssafy.io:8443'
         INFISICAL_PROJECT_ID = credentials('infisical-project-id')
@@ -51,6 +50,8 @@ pipeline {
         stage('Change Detection') {
             steps {
                 script {
+                    env.USER_RELEASE_ACTION = 'none'
+
                     if (params.FORCE_REDEPLOY) {
                         echo "FORCE_REDEPLOY 활성화됨. 모든 프론트엔드 빌드 대상으로 설정."
                         env.BUILD_USER  = 'true'
@@ -194,6 +195,17 @@ pipeline {
                 }
             }
             steps {
+                script {
+                    if (!env.USER_RELEASE_ACTION?.trim() || env.USER_RELEASE_ACTION == 'none') {
+                        if (params.FORCE_REDEPLOY) {
+                            env.USER_RELEASE_ACTION = 'build'
+                        } else {
+                            def changes = getChangedFiles()
+                            env.USER_RELEASE_ACTION = hasUserNativeChanges(changes) ? 'build' : 'update'
+                        }
+                    }
+                    echo "Releasing user app with action: ${env.USER_RELEASE_ACTION}"
+                }
                 dir('fe/freeline-user') {
                     sh '''set -eu
                         set +x
