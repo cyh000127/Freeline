@@ -6,6 +6,10 @@ import {Rnd} from "react-rnd";
 interface AreaItem {
     boothId: number | null;
     boothName?: string;
+    locationCode?: string;
+    adminName?: string;
+    contact?: string;
+    color?: string;
     xRatio: number;
     yRatio: number;
     widthRatio: number;
@@ -14,13 +18,13 @@ interface AreaItem {
 }
 
 interface BoothMapEditorProps {
-    layoutImageUrl: string;
-    initialAreas: AreaItem[];
-    isEditMode: boolean;
-    onOpenSearchModal: (localId: string) => void;
-    onAreasChange: (areas: AreaItem[]) => void;
-    containerWidth: number;
-    containerHeight: number;
+    readonly layoutImageUrl: string;
+    readonly initialAreas: AreaItem[];
+    readonly isEditMode: boolean;
+    readonly onOpenSearchModal: (localId: string) => void;
+    readonly onAreasChange: (areas: AreaItem[]) => void;
+    readonly containerWidth: number;
+    readonly containerHeight: number;
 }
 
 export function BoothMapEditor({
@@ -42,7 +46,7 @@ export function BoothMapEditor({
 
     useEffect(() => {
         if (!layoutImageUrl) return;
-        const img = new window.Image();
+        const img = new globalThis.Image();
         img.onload = () => {
             setImageSize({width: img.naturalWidth, height: img.naturalHeight});
         };
@@ -158,11 +162,15 @@ export function BoothMapEditor({
                         disableDragging={!isEditMode}
                         enableResizing={isEditMode}
                         bounds="parent"
-                        className={`absolute flex items-center justify-center border-2 ${
-                            area.boothId
+                        className={`absolute flex items-center justify-center border-2 transition-colors group cursor-pointer ${
+                            !area.color && (area.boothId
                                 ? "border-blue-500 bg-blue-500/20"
-                                : "border-red-400 bg-red-400/20 border-dashed"
-                        } transition-colors group cursor-pointer`}
+                                : "border-red-400 bg-red-400/20 border-dashed")
+                        }`}
+                        style={{
+                            backgroundColor: area.color ? `${area.color}33` : undefined,
+                            borderColor: area.color || undefined,
+                        }}
                         onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
                             if (isEditMode && !isDraggingRef.current) {
