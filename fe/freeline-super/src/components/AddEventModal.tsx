@@ -4,6 +4,12 @@ import React, { useEffect, useState } from "react";
 import DaumPostcode from "react-daum-postcode";
 import { api } from "@/lib/api";
 import { eventApi } from "@/lib/api/event";
+import {
+  EVENT_FORM_LIMITS,
+  getEventInputClassName,
+  getTodayDateString,
+  parsePolicyValue,
+} from "@/lib/event-form";
 
 interface AddEventModalProps {
   isOpen: boolean;
@@ -75,7 +81,7 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: parseInt(value) || 0 }));
+    setFormData((prev) => ({ ...prev, [name]: parsePolicyValue(value) }));
   };
 
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,6 +96,21 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
     reader.readAsDataURL(file);
   };
 
+  const nameLength = formData.name.length;
+  const descriptionLength = formData.description.length;
+  const locationAddressLength = formData.locationAddress.length;
+  const today = getTodayDateString();
+  const hasNameLengthError = nameLength > EVENT_FORM_LIMITS.name;
+  const hasDescriptionLengthError = descriptionLength > EVENT_FORM_LIMITS.description;
+  const hasLocationAddressLengthError = locationAddressLength > EVENT_FORM_LIMITS.locationAddress;
+  const hasStartDateError = formData.startDate !== "" && formData.startDate < today;
+  const hasEndDateError =
+    formData.endDate !== "" &&
+    formData.startDate !== "" &&
+    formData.endDate < formData.startDate;
+  const hasInputLengthError = hasNameLengthError || hasDescriptionLengthError || hasLocationAddressLengthError;
+  const hasDateError = hasStartDateError || hasEndDateError;
+
   const isFormValid =
     formData.name.trim() !== "" &&
     formData.description.trim() !== "" &&
@@ -102,7 +123,9 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
     formData.default_max_waiting > 0 &&
     formData.default_call_count > 0 &&
     formData.default_call_ttl > 0 &&
-    formData.default_defer_limit > 0;
+    formData.default_defer_limit > 0 &&
+    !hasInputLengthError &&
+    !hasDateError;
 
   const handleSubmit = async () => {
     if (!isFormValid || isLoading) return;
@@ -197,8 +220,16 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className="w-full bg-[#F3F4F6] border-none rounded-2xl p-4 text-[15px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:bg-white transition-all outline-none"
+              className={getEventInputClassName(hasNameLengthError)}
             />
+            <div className="flex items-center justify-between px-1">
+              <p className={`text-[13px] ${hasNameLengthError ? "font-semibold text-red-500" : "text-gray-400"}`}>
+                {hasNameLengthError ? `행사 이름은 ${EVENT_FORM_LIMITS.name}자 이하여야 합니다.` : " "}
+              </p>
+              <span className={`text-[12px] ${hasNameLengthError ? "font-semibold text-red-500" : "text-gray-400"}`}>
+                {nameLength}/{EVENT_FORM_LIMITS.name}
+              </span>
+            </div>
           </div>
 
           {/* 행사 설명 */}
@@ -208,10 +239,18 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
               name="description"
               value={formData.description}
               onChange={handleChange}
-              placeholder="250자 이내로 작성"
+              placeholder="행사 설명을 입력해주세요"
               rows={3}
-              className="w-full bg-[#F3F4F6] border-none rounded-2xl p-4 text-[15px] text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-[#2D2A4A] focus:bg-white transition-all outline-none resize-none"
+              className={getEventInputClassName(hasDescriptionLengthError, "placeholder-gray-400 resize-none")}
             />
+            <div className="flex items-center justify-between px-1">
+              <p className={`text-[13px] ${hasDescriptionLengthError ? "font-semibold text-red-500" : "text-gray-400"}`}>
+                {hasDescriptionLengthError ? `행사 설명은 ${EVENT_FORM_LIMITS.description}자 이하여야 합니다.` : " "}
+              </p>
+              <span className={`text-[12px] ${hasDescriptionLengthError ? "font-semibold text-red-500" : "text-gray-400"}`}>
+                {descriptionLength}/{EVENT_FORM_LIMITS.description}
+              </span>
+            </div>
           </div>
 
           {/* 시작 날짜 / 종료 날짜 */}
@@ -227,9 +266,13 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
                   name="startDate"
                   value={formData.startDate}
                   onChange={handleChange}
-                  className="w-full bg-[#F3F4F6] border-none rounded-2xl p-4 pl-12 text-[15px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:bg-white transition-all outline-none cursor-pointer"
+                  min={today}
+                  className={getEventInputClassName(hasStartDateError, "pl-12 cursor-pointer")}
                 />
               </div>
+              <p className={`min-h-5 px-1 text-[13px] ${hasStartDateError ? "font-semibold text-red-500" : "text-gray-400"}`}>
+                {hasStartDateError ? "시작 날짜는 오늘 이전으로 설정할 수 없습니다." : " "}
+              </p>
             </div>
 
             <div className="flex flex-col gap-2.5">
@@ -243,9 +286,13 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
                   name="endDate"
                   value={formData.endDate}
                   onChange={handleChange}
-                  className="w-full bg-[#F3F4F6] border-none rounded-2xl p-4 pl-12 text-[15px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:bg-white transition-all outline-none cursor-pointer"
+                  min={formData.startDate && formData.startDate >= today ? formData.startDate : today}
+                  className={getEventInputClassName(hasEndDateError, "pl-12 cursor-pointer")}
                 />
               </div>
+              <p className={`min-h-5 px-1 text-[13px] ${hasEndDateError ? "font-semibold text-red-500" : "text-gray-400"}`}>
+                {hasEndDateError ? "종료 날짜는 시작 날짜보다 빠를 수 없습니다." : " "}
+              </p>
             </div>
           </div>
 
@@ -294,7 +341,7 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
                 value={formData.locationAddress}
                 onChange={handleChange}
                 placeholder="상세 주소를 입력하거나 검색을 이용하세요"
-                className="flex-1 w-full bg-[#F3F4F6] border-none rounded-2xl p-4 text-[15px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:bg-white transition-all outline-none"
+                className={`flex-1 ${getEventInputClassName(hasLocationAddressLengthError)}`}
               />
               <button
                 type="button"
@@ -304,6 +351,14 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
                 주소 검색
               </button>
             </div>
+            <div className="flex items-center justify-between px-1">
+              <p className={`text-[13px] ${hasLocationAddressLengthError ? "font-semibold text-red-500" : "text-gray-400"}`}>
+                {hasLocationAddressLengthError ? `행사 주소는 ${EVENT_FORM_LIMITS.locationAddress}자 이하여야 합니다.` : " "}
+              </p>
+              <span className={`text-[12px] ${hasLocationAddressLengthError ? "font-semibold text-red-500" : "text-gray-400"}`}>
+                {locationAddressLength}/{EVENT_FORM_LIMITS.locationAddress}
+              </span>
+            </div>
           </div>
 
           <div className="h-px bg-gray-100 my-2" />
@@ -312,16 +367,20 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
           <div className="flex flex-col gap-3">
             <h3 className="text-[15px] font-bold text-gray-900">행사 정책 기본 설정</h3>
             <p className="text-[13px] text-gray-500 mb-1">웨이팅, 호출 등에 대한 기본 정책의 디폴트 값입니다. 필요시 수정할 수 있습니다.</p>
+            <p className="text-[12px] text-gray-400 -mt-2">모든 정책 값은 숫자만 입력 가능하며 최대 {EVENT_FORM_LIMITS.policyMax}까지 설정할 수 있습니다.</p>
 
             <div className="grid grid-cols-2 gap-3 bg-[#F8F9FA] p-5 rounded-2xl border border-gray-100">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[13px] font-bold text-gray-700">기본 체류 시간 (초)</label>
                 <div className="relative">
                   <input
-                    type="number"
+                    type="text"
                     name="default_stay_sec"
                     value={formData.default_stay_sec}
                     onChange={handleNumberChange}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={5}
                     className="w-full bg-white border border-gray-200 rounded-xl p-3 pr-10 text-[14px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-gray-400 pointer-events-none">sec</span>
@@ -332,10 +391,13 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
                 <label className="text-[13px] font-bold text-gray-700">기본 최대 대기 인원</label>
                 <div className="relative">
                   <input
-                    type="number"
+                    type="text"
                     name="default_max_waiting"
                     value={formData.default_max_waiting}
                     onChange={handleNumberChange}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={5}
                     className="w-full bg-white border border-gray-200 rounded-xl p-3 pr-10 text-[14px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-gray-400 pointer-events-none">명</span>
@@ -346,10 +408,13 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
                 <label className="text-[13px] font-bold text-gray-700">기본 호출 횟수</label>
                 <div className="relative">
                   <input
-                    type="number"
+                    type="text"
                     name="default_call_count"
                     value={formData.default_call_count}
                     onChange={handleNumberChange}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={5}
                     className="w-full bg-white border border-gray-200 rounded-xl p-3 pr-10 text-[14px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-gray-400 pointer-events-none">회</span>
@@ -360,10 +425,13 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
                 <label className="text-[13px] font-bold text-gray-700">기본 호출 수명 (초)</label>
                 <div className="relative">
                   <input
-                    type="number"
+                    type="text"
                     name="default_call_ttl"
                     value={formData.default_call_ttl}
                     onChange={handleNumberChange}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={5}
                     className="w-full bg-white border border-gray-200 rounded-xl p-3 pr-10 text-[14px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-gray-400 pointer-events-none">sec</span>
@@ -374,10 +442,13 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
                 <label className="text-[13px] font-bold text-gray-700">기본 미루기 제한</label>
                 <div className="relative">
                   <input
-                    type="number"
+                    type="text"
                     name="default_defer_limit"
                     value={formData.default_defer_limit}
                     onChange={handleNumberChange}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={5}
                     className="w-full bg-white border border-gray-200 rounded-xl p-3 pr-10 text-[14px] text-gray-900 focus:ring-2 focus:ring-[#2D2A4A] focus:border-transparent outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-gray-400 pointer-events-none">회</span>
