@@ -1,7 +1,7 @@
 "use client";
 
 import React, {useState, useEffect, useRef} from "react";
-import {X, Search} from "lucide-react";
+import {X, Search, Trash2} from "lucide-react";
 import {api} from "@/lib/api/axios";
 
 interface BoothSearchResDto {
@@ -17,6 +17,7 @@ interface BoothSearchModalProps {
     eventId: number;
     alreadyMappedBoothIds: number[];
     onSelect: (booth: BoothSearchResDto) => void;
+    onDeleteArea?: () => void;
 }
 
 export function BoothSearchModal({
@@ -25,6 +26,7 @@ export function BoothSearchModal({
                                      eventId,
                                      alreadyMappedBoothIds,
                                      onSelect,
+                                     onDeleteArea,
                                  }: BoothSearchModalProps) {
     const [keyword, setKeyword] = useState("");
     const [booths, setBooths] = useState<BoothSearchResDto[]>([]);
@@ -79,12 +81,23 @@ export function BoothSearchModal({
                     <h2 className="text-xl font-bold text-gray-800 dark:text-white">
                         부스 매핑
                     </h2>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-                    >
-                        <X className="w-6 h-6"/>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {onDeleteArea && (
+                            <button
+                                onClick={onDeleteArea}
+                                className="text-red-500 hover:bg-red-50 p-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                            >
+                                <Trash2 className="w-4 h-4"/>
+                                영역 삭제
+                            </button>
+                        )}
+                        <button
+                            onClick={onClose}
+                            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                        >
+                            <X className="w-6 h-6"/>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Search Input */}
