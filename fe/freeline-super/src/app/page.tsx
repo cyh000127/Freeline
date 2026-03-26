@@ -8,16 +8,15 @@ import { Button } from "@/components/ui/button";
 import { AddEventModal } from "@/components/AddEventModal";
 import { EditEventModal } from "@/components/EditEventModal";
 import { MoreVertical, Settings, LogOut, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
-import { api } from "@/lib/api";
 import { authApi } from "@/lib/api/auth";
 import { eventApi, Event } from "@/lib/api/event";
 
 const EVENT_PAGE_SIZE = 10;
+const PAGINATION_WINDOW = 5;
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [userName, setUserName] = useState("익명");
   const [timeLeft, setTimeLeft] = useState(3600); // 1시간 (초 단위)
   const [events, setEvents] = useState<Event[]>([]);
@@ -161,7 +160,16 @@ export default function SuperAdminDashboard() {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index);
+  const startItem = totalElements === 0 ? 0 : currentPage * EVENT_PAGE_SIZE + 1;
+  const endItem = totalElements === 0 ? 0 : Math.min((currentPage + 1) * EVENT_PAGE_SIZE, totalElements);
+  const paginationStart = Math.max(0, currentPage - Math.floor(PAGINATION_WINDOW / 2));
+  const paginationEnd = Math.min(totalPages, paginationStart + PAGINATION_WINDOW);
+  const visiblePages = Array.from(
+    { length: Math.max(0, paginationEnd - paginationStart) },
+    (_, index) => paginationStart + index,
+  );
+  const showLeadingJump = paginationStart > 0;
+  const showTrailingJump = paginationEnd < totalPages;
 
   const handleRefresh = async () => {
     try {
@@ -277,7 +285,10 @@ export default function SuperAdminDashboard() {
           </Button>
           
           <div className="text-right">
-            <p className="text-sm font-medium text-gray-500 mb-1">총 {totalElements}개 행사</p>
+            <p className="text-sm font-medium text-gray-500 mb-1">
+              총 {totalElements}개 행사
+              {totalElements > 0 && ` · ${startItem}-${endItem} 표시 중`}
+            </p>
             <span className="text-lg font-bold text-gray-900 leading-none">{userName}님, 환영합니다.</span>
           </div>
         </div>
@@ -354,42 +365,76 @@ export default function SuperAdminDashboard() {
         </div>
 
         {totalPages > 1 && (
-          <div className="mt-2 flex items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 0))}
-              disabled={currentPage === 0}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
+          <div className="mt-3 flex items-center justify-center">
+            <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+              <p className="hidden text-sm font-semibold text-gray-500 md:block">
+                {currentPage + 1} / {totalPages} 페이지
+              </p>
 
-            {pageNumbers.map((pageNumber) => {
-              const isActive = pageNumber === currentPage;
-              return (
+              <div className="flex items-center gap-1.5">
                 <button
-                  key={pageNumber}
                   type="button"
-                  onClick={() => setCurrentPage(pageNumber)}
-                  className={`h-10 min-w-10 rounded-xl px-3 text-sm font-bold transition-colors ${
-                    isActive
-                      ? "bg-[#2D2A4A] text-white shadow-sm"
-                      : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                  }`}
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 0))}
+                  disabled={currentPage === 0}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {pageNumber + 1}
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
-              );
-            })}
 
-            <button
-              type="button"
-              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages - 1))}
-              disabled={currentPage >= totalPages - 1}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
+                {showLeadingJump && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(0)}
+                      className="h-10 min-w-10 rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-50"
+                    >
+                      1
+                    </button>
+                    <span className="px-1 text-sm font-bold text-gray-300">...</span>
+                  </>
+                )}
+
+                {visiblePages.map((pageNumber) => {
+                  const isActive = pageNumber === currentPage;
+                  return (
+                    <button
+                      key={pageNumber}
+                      type="button"
+                      onClick={() => setCurrentPage(pageNumber)}
+                      className={`h-10 min-w-10 rounded-xl px-3 text-sm font-bold transition-colors ${
+                        isActive
+                          ? "bg-[#2D2A4A] text-white shadow-sm"
+                          : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {pageNumber + 1}
+                    </button>
+                  );
+                })}
+
+                {showTrailingJump && (
+                  <>
+                    <span className="px-1 text-sm font-bold text-gray-300">...</span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(totalPages - 1)}
+                      className="h-10 min-w-10 rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-50"
+                    >
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages - 1))}
+                  disabled={currentPage >= totalPages - 1}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
