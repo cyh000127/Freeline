@@ -1,0 +1,16 @@
+# Infra (contains files with restricted permissions)
+infra/jenkins
+
+# Backend
+be
+
+# Other frontend apps
+fe/freeline-booth
+fe/freeline-super
+
+# Common ignores
+node_modules
+.git
+build
+dist
+.expo

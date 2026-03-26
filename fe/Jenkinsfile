@@ -26,6 +26,8 @@ pipeline {
 
         DOCKER_TAG = "${env.BUILD_ID}"
 
+        APK_DIR = '/opt/freeline/apk'
+
         INFISICAL_URL = 'https://j14a207.p.ssafy.io:8443'
         INFISICAL_PROJECT_ID = credentials('infisical-project-id')
         INFISICAL_CLIENT_ID = credentials('infisical-client-id')
@@ -174,6 +176,46 @@ pipeline {
                     echo "\\nSome frontends failed to start in time."
                     exit 1
                 '''
+            }
+        }
+
+        stage('Build APK') {
+            when {
+                allOf {
+                    expression { isMainBranch() }
+                    expression { env.BUILD_USER == 'true' }
+                }
+            }
+            steps {
+                dir('fe/freeline_user') {
+                    sh '''set +x
+                        export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
+                            --client-id=$INFISICAL_CLIENT_ID \
+                            --client-secret=$INFISICAL_CLIENT_SECRET \
+                            --domain=$INFISICAL_URL/api \
+                            --silent --plain)
+                        set -x
+
+                        # Infisical에서 EXPO_TOKEN, EAS_PROJECT_ID 주입
+                        infisical run \
+                            --domain=$INFISICAL_URL/api \
+                            --projectId=$INFISICAL_PROJECT_ID \
+                            --env=prod --path=/fe \
+                            -- bash -c '
+                                npm ci
+                                npx eas-cli build -p android \
+                                    --profile production \
+                                    --non-interactive \
+                                    --wait \
+                                    --output ./build/freeline.apk
+
+                                # APK를 Nginx 서빙 디렉토리에 복사
+                                mkdir -p $APK_DIR
+                                cp ./build/freeline.apk $APK_DIR/freeline.apk
+                                echo "APK deployed: https://j14a207.p.ssafy.io/app/freeline.apk"
+                            '
+                    '''
+                }
             }
         }
     }

@@ -1,9 +1,16 @@
 {
   "cli": {
-    "version": ">= 16.22.0"
+    "version": ">= 16.22.0",
+    "requireCommit": true
   },
   "build": {
+    "base": {
+      "android": {
+        "image": "latest"
+      }
+    },
     "dev-apk": {
+      "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
       "channel": "dev",
@@ -12,6 +19,7 @@
       }
     },
     "preview": {
+      "extends": "base",
       "distribution": "internal",
       "channel": "preview",
       "android": {
@@ -19,7 +27,19 @@
       }
     },
     "production": {
-      "channel": "production"
+      "extends": "base",
+      "distribution": "internal",
+      "channel": "production",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_ENV": "production"
+      },
+      "autoIncrement": false
     }
+  },
+  "submit": {
+    "production": {}
   }
 }
