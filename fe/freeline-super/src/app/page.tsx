@@ -7,35 +7,47 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { AddEventModal } from "@/components/AddEventModal";
 import { EditEventModal } from "@/components/EditEventModal";
-import { MoreVertical, Settings, LogOut, Loader2 } from "lucide-react";
-import { api } from "@/lib/api";
+import { MoreVertical, Settings, LogOut, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { authApi } from "@/lib/api/auth";
 import { eventApi, Event } from "@/lib/api/event";
+
+const EVENT_PAGE_SIZE = 10;
+const PAGINATION_WINDOW = 5;
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [userName, setUserName] = useState("익명");
   const [timeLeft, setTimeLeft] = useState(3600); // 1시간 (초 단위)
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
 
-  const fetchEvents = async () => {
+  const fetchEvents = async (page = currentPage) => {
     try {
       setIsLoadingEvents(true);
-      const res = await eventApi.getEvents();
+      const res = await eventApi.getEvents(page, EVENT_PAGE_SIZE);
       
       // 1. 데이터가 'data' 필드 안에 있는 경우 (래퍼가 있는 경우)
       if (res.data?.success && res.data?.data && Array.isArray(res.data.data.content)) {
         setEvents(res.data.data.content);
+        setCurrentPage(res.data.data.page ?? page);
+        setTotalPages(res.data.data.totalPages ?? 0);
+        setTotalElements(res.data.data.totalElements ?? 0);
       } 
       // 2. 데이터(PaginatedResponse)가 최상위에 바로 있는 경우 (래퍼가 없는 경우)
       else if (res.data && Array.isArray((res.data as any).content)) {
         setEvents((res.data as any).content);
+        setCurrentPage((res.data as any).page ?? page);
+        setTotalPages((res.data as any).totalPages ?? 0);
+        setTotalElements((res.data as any).totalElements ?? 0);
       }
       else {
         setEvents([]);
+        setTotalPages(0);
+        setTotalElements(0);
       }
     } catch (err: any) {
       console.error("Failed to fetch events", err);
@@ -45,6 +57,8 @@ export default function SuperAdminDashboard() {
       }
       // 404 등 에러 발생 시 빈 목록으로 처리
       setEvents([]);
+      setTotalPages(0);
+      setTotalElements(0);
     } finally {
       setIsLoadingEvents(false);
     }
@@ -73,8 +87,11 @@ export default function SuperAdminDashboard() {
     };
 
     fetchUser();
-    fetchEvents();
   }, [router]);
+
+  useEffect(() => {
+    fetchEvents(currentPage);
+  }, [currentPage]);
 
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
@@ -99,7 +116,12 @@ export default function SuperAdminDashboard() {
       try {
         await eventApi.deleteEvent(id);
         alert("행사가 성공적으로 삭제되었습니다.");
-        fetchEvents(); // 목록 새로고침
+        const nextPage = currentPage > 0 && events.length === 1 ? currentPage - 1 : currentPage;
+        if (nextPage !== currentPage) {
+          setCurrentPage(nextPage);
+        } else {
+          fetchEvents(nextPage);
+        }
       } catch (err) {
         console.error("삭제 실패", err);
         alert("삭제에 실패했습니다.");
@@ -137,6 +159,17 @@ export default function SuperAdminDashboard() {
     const s = seconds % 60;
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
+
+  const startItem = totalElements === 0 ? 0 : currentPage * EVENT_PAGE_SIZE + 1;
+  const endItem = totalElements === 0 ? 0 : Math.min((currentPage + 1) * EVENT_PAGE_SIZE, totalElements);
+  const paginationStart = Math.max(0, currentPage - Math.floor(PAGINATION_WINDOW / 2));
+  const paginationEnd = Math.min(totalPages, paginationStart + PAGINATION_WINDOW);
+  const visiblePages = Array.from(
+    { length: Math.max(0, paginationEnd - paginationStart) },
+    (_, index) => paginationStart + index,
+  );
+  const showLeadingJump = paginationStart > 0;
+  const showTrailingJump = paginationEnd < totalPages;
 
   const handleRefresh = async () => {
     try {
@@ -252,6 +285,10 @@ export default function SuperAdminDashboard() {
           </Button>
           
           <div className="text-right">
+            <p className="text-sm font-medium text-gray-500 mb-1">
+              총 {totalElements}개 행사
+              {totalElements > 0 && ` · ${startItem}-${endItem} 표시 중`}
+            </p>
             <span className="text-lg font-bold text-gray-900 leading-none">{userName}님, 환영합니다.</span>
           </div>
         </div>
@@ -327,18 +364,92 @@ export default function SuperAdminDashboard() {
           )}
         </div>
 
+        {totalPages > 1 && (
+          <div className="mt-3 flex items-center justify-center">
+            <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+              <p className="hidden text-sm font-semibold text-gray-500 md:block">
+                {currentPage + 1} / {totalPages} 페이지
+              </p>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 0))}
+                  disabled={currentPage === 0}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+
+                {showLeadingJump && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(0)}
+                      className="h-10 min-w-10 rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-50"
+                    >
+                      1
+                    </button>
+                    <span className="px-1 text-sm font-bold text-gray-300">...</span>
+                  </>
+                )}
+
+                {visiblePages.map((pageNumber) => {
+                  const isActive = pageNumber === currentPage;
+                  return (
+                    <button
+                      key={pageNumber}
+                      type="button"
+                      onClick={() => setCurrentPage(pageNumber)}
+                      className={`h-10 min-w-10 rounded-xl px-3 text-sm font-bold transition-colors ${
+                        isActive
+                          ? "bg-[#2D2A4A] text-white shadow-sm"
+                          : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {pageNumber + 1}
+                    </button>
+                  );
+                })}
+
+                {showTrailingJump && (
+                  <>
+                    <span className="px-1 text-sm font-bold text-gray-300">...</span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(totalPages - 1)}
+                      className="h-10 min-w-10 rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-50"
+                    >
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages - 1))}
+                  disabled={currentPage >= totalPages - 1}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <AddEventModal 
           isOpen={isAddEventOpen} 
           onClose={() => {
             setIsAddEventOpen(false);
-            fetchEvents();
+            fetchEvents(currentPage);
           }} 
         />
         <EditEventModal
           isOpen={isEditEventOpen}
           onClose={() => {
             setIsEditEventOpen(false);
-            fetchEvents();
+            fetchEvents(currentPage);
           }}
           event={selectedEvent}
         />
