@@ -22,5 +22,7 @@ export interface BoothDetailData {
   waitingCount: number;
   callCount: number;
   callValidSeconds: number;
+  representativeImageUrl: string | null;
+  boothImageUrls: string[];
   goods: BoothGoodsItem[];
 }

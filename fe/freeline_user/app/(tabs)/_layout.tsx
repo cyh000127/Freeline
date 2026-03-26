@@ -10,7 +10,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="home" />
       <Tabs.Screen name="reservation" />
-      <Tabs.Screen name="map" />
+      <Tabs.Screen name="maps" />
       <Tabs.Screen name="my" />
       <Tabs.Screen name="search" />
     </Tabs>

@@ -14,9 +14,13 @@ function unwrapResponse<T>(response: { data: ApiResponse<T> }): T {
 
 export const getEventDetail = async (
   accessToken: string,
+  options?: { includeBooths?: boolean },
 ): Promise<EventDetail> => {
-  const response = await api.get<ApiResponse<EventDetail>>(`visitors/me/event`, {
+  const response = await api.get<ApiResponse<EventDetail>>('visitors/me/event', {
     headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      includeBooths: options?.includeBooths ?? false,
+    },
   });
 
   return unwrapResponse(response);

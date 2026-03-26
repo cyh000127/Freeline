@@ -7,23 +7,14 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import { api } from '@/api/axios';
+import { verifyEntryCode } from '@/features/auth/auth.api';
+import { getUserIdFromAccessToken } from '@/features/auth/jwt';
 import {
   clearAuthSessionStorage,
   loadAuthSession,
   saveAuthSession,
   type PersistedAuthSession,
 } from '@/features/auth/auth-session.storage';
-
-type EntryAuthApiResponse = {
-  success: boolean;
-  data: {
-    visitorId: number;
-    accessToken: string;
-    accountStatus: string;
-    queueStatus: string;
-  };
-};
 
 type AuthSessionState = PersistedAuthSession;
 
@@ -48,34 +39,11 @@ const initialState: AuthSessionState = {
   eventId: null,
   visitorId: null,
   accessToken: null,
+  refreshToken: null,
   nickname: null,
   requiredAgreed: false,
   marketingAgreed: false,
-  accountStatus: null,
-  queueStatus: null,
 };
-
-async function authenticateEntryCodeRequest(entryCode: string) {
-  const response = await api.post<EntryAuthApiResponse>(
-    'auth/visitors/entry-code/authenticate',
-    {
-      entryCode,
-    },
-  );
-
-  const payload = response.data;
-
-  if (!payload?.success || !payload?.data?.accessToken) {
-    throw new Error('입장 코드 인증에 실패했습니다.');
-  }
-
-  return {
-    visitorId: payload.data.visitorId,
-    accessToken: payload.data.accessToken,
-    accountStatus: payload.data.accountStatus,
-    queueStatus: payload.data.queueStatus,
-  };
-}
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSessionState>(initialState);
@@ -109,9 +77,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         throw new Error('입장 코드를 입력해주세요.');
       }
 
-      const result = await authenticateEntryCodeRequest(trimmed);
-
-      // Extract eventId from entryCode (e.g. "E2-1974" -> 2)
+      const result = await verifyEntryCode({ entryCode: trimmed });
       const match = trimmed.match(/^E(\d+)-/i);
       const eventId = match ? parseInt(match[1], 10) : 1;
 
@@ -119,10 +85,9 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         ...session,
         entryCode: trimmed,
         eventId,
-        visitorId: result.visitorId,
+        visitorId: getUserIdFromAccessToken(result.accessToken),
         accessToken: result.accessToken,
-        accountStatus: result.accountStatus,
-        queueStatus: result.queueStatus,
+        refreshToken: result.refreshToken,
       };
 
       await persist(nextState);
