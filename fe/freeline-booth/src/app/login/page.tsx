@@ -9,13 +9,17 @@ import { Card } from "@/components/ui/card";
 import { KeyRound, Lock } from "lucide-react";
 import axios from "axios";
 import { authApi } from "@/lib/api/auth";
+import { InitFlow } from "@/components/InitFlow";
+import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { refreshUser } = useAuth();
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [showInitFlow, setShowInitFlow] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,15 +36,34 @@ export default function LoginPage() {
         // Store additional booth/user info from response
         const userData = response.data?.data || response.data;
         if (userData.boothId) localStorage.setItem("boothId", userData.boothId.toString());
-        if (userData.boothName) localStorage.setItem("boothName", userData.boothName);
-        if (userData.name) localStorage.setItem("adminName", userData.name);
+        
+        const bName = userData.boothName || userData.company || userData.name;
+        if (bName) localStorage.setItem("boothName", bName);
+        
+        const pwdChanged = userData.isChanged ?? userData.isPasswordChanged ?? userData.is_password_changed;
+        if (pwdChanged !== undefined) {
+          localStorage.setItem("isPasswordChanged", pwdChanged.toString());
+        }
+
+        // Force refresh AuthContext before redirecting
+        await refreshUser();
       }
       
       router.push("/");
     } catch (error: unknown) {
       console.error("Login Error:", error);
       if (axios.isAxiosError(error)) {
-        setErrorMsg(error.response?.data?.error?.message || "로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.");
+        const responseData = error.response?.data;
+        const errorData = responseData?.error;
+        const msg = errorData?.message || responseData?.message || "";
+        const status = errorData?.status || responseData?.status || "";
+        
+        if (status === "PASSWORD_CHANGE_REQUIRED" || msg.includes("비밀번호 변경")) {
+          setShowInitFlow(true);
+          return;
+        }
+        
+        setErrorMsg(msg || "로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.");
       } else {
         setErrorMsg("로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.");
       }
@@ -50,7 +73,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F1F3F5] p-4">
+    <>
+      {showInitFlow && (
+        <InitFlow 
+          isStandalone={true} 
+          initialLoginId={loginId} 
+          initialOldPassword={password}
+          onFinish={() => setShowInitFlow(false)} 
+        />
+      )}
+      <div className="flex min-h-screen items-center justify-center bg-[#F1F3F5] p-4">
       <Card className="w-full max-w-[480px] p-0 gap-0 overflow-hidden rounded-2xl border-0 shadow-xl">
         {/* Header Section */}
         <div className="bg-[#2D2A4A] px-8 py-10 text-center text-white rounded-t-2xl">
@@ -112,6 +144,7 @@ export default function LoginPage() {
           </form>
         </div>
       </Card>
-    </div>
+      </div>
+    </>
   );
 }

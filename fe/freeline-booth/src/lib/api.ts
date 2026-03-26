@@ -32,6 +32,13 @@ api.interceptors.response.use(
   (error) => {
     // Handle global API errors here (e.g., 401 Unauthorized)
     if (error.response?.status === 401 || error.response?.status === 403) {
+      const errorStatus = error.response?.data?.error?.status || error.response?.data?.status;
+      
+      // Don't redirect if it's a mandatory password change - handled locally in login
+      if (errorStatus === "PASSWORD_CHANGE_REQUIRED") {
+        return Promise.reject(error);
+      }
+
       if (typeof window !== 'undefined') {
         localStorage.removeItem('accessToken');
         window.location.href = '/booth/login';
