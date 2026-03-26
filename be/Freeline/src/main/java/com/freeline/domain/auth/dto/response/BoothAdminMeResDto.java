@@ -16,6 +16,7 @@ public record BoothAdminMeResDto(
         String name,
         String company,
         BoothAdminStatus status,
+        boolean isChanged,
         boolean isActive,
         LocalDateTime lastLoginAt
 ) {
