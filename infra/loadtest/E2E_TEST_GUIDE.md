@@ -91,7 +91,13 @@ VU_COUNT=1000 ITERATIONS=5 ./run.sh
 
 # 시연용 + 행사 자동 CLOSED
 ./run.sh demo --auto-close
+
+# 완성형 데모 팩(권장): 부스 관리자 계정 + CLOSED + 리포트 생성까지 자동
+./run.sh demo --ready-pack
 ```
+
+`--ready-pack` 실행 시 `infra/loadtest/output/demo-profile-event-<eventId>.md` 파일이 생성되며,
+행사 관리자 계정/부스 관리자 계정/리포트 준비 상태를 한 번에 확인할 수 있습니다.
 
 > `run.sh`는 `infisical run --env=prod --path=/be`로 `ADMIN_ID`, `ADMIN_PW`, `DB_USERNAME`, `DB_PASSWORD` 등을 자동 주입한 뒤 대상 스크립트를 실행합니다.
 
