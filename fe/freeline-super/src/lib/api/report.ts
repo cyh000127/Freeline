@@ -40,6 +40,13 @@ export interface ProblemSpotDto {
   description: string;
 }
 
+export interface BoothReportResponseDto {
+  boothPerformance: BoothPerformanceDto;
+  hourlyTraffics: HourlyTrafficDto[];
+  problemSpots: ProblemSpotDto[];
+  eventSummary: EventSummaryDto | null;
+}
+
 export interface ReportResponseDto {
   summary: EventSummaryDto;
   boothPerformances: BoothPerformanceDto[];
@@ -64,6 +71,11 @@ interface ApiResponse<T> {
 export const reportApi = {
   getEventReport: (eventId: string | number) =>
     api.get<ApiResponse<ReportResponseDto>>(`/v1/reports/events/${eventId}`),
+
+  getBoothReport: (boothId: string | number) =>
+    api.get<ApiResponse<BoothReportResponseDto>>(`/v1/reports/booths/me`, {
+      params: { boothId },
+    }),
 
   generateReport: (eventId: string | number) =>
     api.post<ApiResponse<ReportStatusDto>>(`/v1/reports/events/${eventId}/generate`),

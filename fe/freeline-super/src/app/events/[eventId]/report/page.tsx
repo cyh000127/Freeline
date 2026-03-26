@@ -7,10 +7,17 @@ import { Sidebar } from "@/components/Sidebar";
 import { SummaryCards } from "@/components/report/SummaryCards";
 import { HourlyTrafficChart } from "@/components/report/HourlyTrafficChart";
 import { BoothPerformanceTable } from "@/components/report/BoothPerformanceTable";
+import { BoothSummaryCards } from "@/components/report/BoothSummaryCards";
+import { EventSummaryCard } from "@/components/report/EventSummaryCard";
 import { VisitorPaths } from "@/components/report/VisitorPaths";
 import { ProblemSpots } from "@/components/report/ProblemSpots";
 import { ReportGenerator } from "@/components/report/ReportGenerator";
-import { reportApi, ReportResponseDto } from "@/lib/api/report";
+import {
+  reportApi,
+  ReportResponseDto,
+  BoothPerformanceDto,
+  BoothReportResponseDto,
+} from "@/lib/api/report";
 import { eventApi, Event } from "@/lib/api/event";
 import { authApi } from "@/lib/api/auth";
 
@@ -24,6 +31,10 @@ export default function ReportPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasReport, setHasReport] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedBooth, setSelectedBooth] = useState<BoothPerformanceDto | null>(null);
+  const [boothReport, setBoothReport] = useState<BoothReportResponseDto | null>(null);
+  const [isBoothReportLoading, setIsBoothReportLoading] = useState(false);
+  const [boothReportError, setBoothReportError] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
 
   const fetchReport = useCallback(async () => {
@@ -38,6 +49,27 @@ export default function ReportPage() {
     }
   }, [eventId]);
 
+  const fetchBoothReport = useCallback(async (booth: BoothPerformanceDto) => {
+    try {
+      setIsBoothReportLoading(true);
+      setBoothReportError(null);
+
+      const res = await reportApi.getBoothReport(booth.boothId);
+      if (res.data?.success && res.data?.data) {
+        setBoothReport(res.data.data);
+        return;
+      }
+
+      setBoothReport(null);
+      setBoothReportError("선택한 부스의 사용자 통계를 불러오지 못했습니다.");
+    } catch {
+      setBoothReport(null);
+      setBoothReportError("선택한 부스의 사용자 통계를 불러오지 못했습니다.");
+    } finally {
+      setIsBoothReportLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -49,14 +81,8 @@ export default function ReportPage() {
         }
 
         const eventRes = await eventApi.getEvent(eventId);
-        let detail = null;
         if (eventRes.data?.success && eventRes.data?.data) {
-          detail = eventRes.data.data;
-        } else if (eventRes.data && (eventRes.data as any).eventId) {
-          detail = eventRes.data;
-        }
-        if (detail) {
-          setEvent(detail as Event);
+          setEvent(eventRes.data.data);
         }
 
         await fetchReport();
@@ -73,6 +99,28 @@ export default function ReportPage() {
   const handleReportComplete = () => {
     fetchReport();
   };
+
+  useEffect(() => {
+    if (!report?.boothPerformances?.length) {
+      setSelectedBooth(null);
+      setBoothReport(null);
+      setBoothReportError(null);
+      return;
+    }
+
+    const nextBooth =
+      report.boothPerformances.find((booth) => booth.boothId === selectedBooth?.boothId) ??
+      report.boothPerformances[0];
+
+    if (nextBooth.boothId !== selectedBooth?.boothId) {
+      setSelectedBooth(nextBooth);
+    }
+  }, [report, selectedBooth?.boothId]);
+
+  useEffect(() => {
+    if (!selectedBooth) return;
+    fetchBoothReport(selectedBooth);
+  }, [selectedBooth, fetchBoothReport]);
 
   const handleExportPdf = async () => {
     if (!reportRef.current) return;
@@ -210,7 +258,11 @@ export default function ReportPage() {
               {/* Two-column: Booth Performance + Problem Spots */}
               <div className="grid grid-cols-5 gap-6">
                 <div className="col-span-3">
-                  <BoothPerformanceTable data={report.boothPerformances} />
+                  <BoothPerformanceTable
+                    data={report.boothPerformances}
+                    selectedBoothId={selectedBooth?.boothId ?? null}
+                    onSelectBooth={setSelectedBooth}
+                  />
                 </div>
                 <div className="col-span-2">
                   <ProblemSpots data={report.problemSpots} />
@@ -219,6 +271,54 @@ export default function ReportPage() {
 
               {/* Visitor Paths */}
               <VisitorPaths data={report.visitorPaths} />
+
+              {/* Booth Drill-down */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">
+                      부스 관리자 관점 사용자 통계
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      선택한 부스에서 부스 관리자 앱과 동일한 기준으로 보는 리포트입니다.
+                    </p>
+                  </div>
+                  {selectedBooth && (
+                    <div className="px-4 py-2 rounded-xl bg-[#2D2A4A] text-white text-sm font-bold">
+                      {selectedBooth.boothName}
+                    </div>
+                  )}
+                </div>
+
+                {isBoothReportLoading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-[#2D2A4A]" />
+                  </div>
+                ) : boothReportError ? (
+                  <div className="h-40 flex items-center justify-center rounded-2xl bg-rose-50 text-sm font-medium text-rose-700">
+                    {boothReportError}
+                  </div>
+                ) : boothReport ? (
+                  <div className="space-y-6">
+                    <BoothSummaryCards performance={boothReport.boothPerformance} />
+                    <HourlyTrafficChart data={boothReport.hourlyTraffics} />
+                    <div className="grid grid-cols-2 gap-6">
+                      <ProblemSpots data={boothReport.problemSpots} />
+                      {boothReport.eventSummary ? (
+                        <EventSummaryCard summary={boothReport.eventSummary} />
+                      ) : (
+                        <div className="bg-gray-50 rounded-2xl border border-dashed border-gray-200 flex items-center justify-center text-sm font-medium text-gray-400">
+                          행사 요약 데이터가 없습니다.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-40 flex items-center justify-center rounded-2xl bg-gray-50 text-sm font-medium text-gray-400">
+                    확인할 부스를 선택해주세요.
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="max-w-[1200px] bg-white rounded-[32px] shadow-sm border border-gray-100">

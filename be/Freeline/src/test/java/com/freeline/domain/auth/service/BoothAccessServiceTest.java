@@ -16,7 +16,11 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import com.freeline.domain.auth.entity.BoothAdmin;
 import com.freeline.domain.auth.exception.AuthException;
 import com.freeline.domain.auth.repository.BoothAdminRepository;
+import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothGoods;
+import com.freeline.domain.booth.repository.BoothRepository;
+import com.freeline.domain.event.entity.Event;
+import com.freeline.domain.event.repository.EventRepository;
 import com.freeline.domain.goods.exception.GoodsException;
 import com.freeline.domain.goods.repository.GoodsRepository;
 
@@ -29,12 +33,23 @@ class BoothAccessServiceTest {
     @Mock
     private GoodsRepository goodsRepository;
 
+    @Mock
+    private BoothRepository boothRepository;
+
+    @Mock
+    private EventRepository eventRepository;
+
     private BoothAccessService boothAccessService;
 
     @BeforeEach
     void setUp() {
         final BoothAdminContextService boothAdminContextService = new BoothAdminContextService(boothAdminRepository);
-        boothAccessService = new BoothAccessService(boothAdminContextService, goodsRepository);
+        boothAccessService = new BoothAccessService(
+                boothAdminContextService,
+                goodsRepository,
+                boothRepository,
+                eventRepository
+        );
     }
 
     @Test
@@ -99,6 +114,84 @@ class BoothAccessServiceTest {
         final Long goodsId = boothAccessService.validateGoodsAccess(authentication, 101L);
 
         Assertions.assertThat(goodsId).isEqualTo(101L);
+    }
+
+    @Test
+    void 이벤트관리자는_자신이_소유한_이벤트의_부스에_접근할_수_있다() {
+        final Authentication authentication = new UsernamePasswordAuthenticationToken(
+                "21",
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_EVENT_ADMIN"))
+        );
+        final Booth booth = Booth.builder()
+                .id(7L)
+                .eventId(3L)
+                .build();
+        final Event event = Event.builder()
+                .id(3L)
+                .eventAdminId(21L)
+                .build();
+
+        org.mockito.Mockito.when(boothRepository.findById(7L)).thenReturn(Optional.of(booth));
+        org.mockito.Mockito.when(eventRepository.findById(3L)).thenReturn(Optional.of(event));
+
+        final Long boothId = boothAccessService.validateBoothAccess(authentication, 7L);
+
+        Assertions.assertThat(boothId).isEqualTo(7L);
+    }
+
+    @Test
+    void 이벤트관리자는_다른_주최자의_부스에_접근할_수_없다() {
+        final Authentication authentication = new UsernamePasswordAuthenticationToken(
+                "21",
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_EVENT_ADMIN"))
+        );
+        final Booth booth = Booth.builder()
+                .id(7L)
+                .eventId(3L)
+                .build();
+        final Event event = Event.builder()
+                .id(3L)
+                .eventAdminId(999L)
+                .build();
+
+        org.mockito.Mockito.when(boothRepository.findById(7L)).thenReturn(Optional.of(booth));
+        org.mockito.Mockito.when(eventRepository.findById(3L)).thenReturn(Optional.of(event));
+
+        Assertions.assertThatThrownBy(() -> boothAccessService.validateBoothAccess(authentication, 7L))
+                .isInstanceOf(AuthException.class);
+    }
+
+    @Test
+    void 부스관리자의_접근_boothId는_본인_부스로_해석된다() {
+        final Authentication authentication = new UsernamePasswordAuthenticationToken(
+                "11",
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_BOOTH_ADMIN"))
+        );
+        final BoothAdmin boothAdmin = BoothAdmin.builder()
+                .id(11L)
+                .boothId(7L)
+                .build();
+
+        org.mockito.Mockito.when(boothAdminRepository.findById(11L)).thenReturn(Optional.of(boothAdmin));
+
+        final Long boothId = boothAccessService.resolveAccessibleBoothId(authentication, null);
+
+        Assertions.assertThat(boothId).isEqualTo(7L);
+    }
+
+    @Test
+    void 이벤트관리자는_부스관리자_me_API_호출시_boothId가_필수다() {
+        final Authentication authentication = new UsernamePasswordAuthenticationToken(
+                "21",
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_EVENT_ADMIN"))
+        );
+
+        Assertions.assertThatThrownBy(() -> boothAccessService.resolveAccessibleBoothId(authentication, null))
+                .isInstanceOf(AuthException.class);
     }
 
     @Test
