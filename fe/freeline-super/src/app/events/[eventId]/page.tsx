@@ -212,6 +212,20 @@ export default function EventDetailPage() {
         }
     };
 
+    const handleTempSave = async () => {
+        if (!eventMapId) return;
+        try {
+            setIsSaving(true);
+            await boothMapApi.updateBoothMapSnapshot(eventId, eventMapId, {areas});
+            alert("임시저장되었습니다.");
+        } catch (err) {
+            console.error("Failed to save snapshot", err);
+            alert("임시저장에 실패했습니다.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const handleAddArea = () => {
         const newArea = {
             localId: `new-${Date.now()}`,
@@ -310,6 +324,14 @@ export default function EventDetailPage() {
                   {layoutImageUrl && (
                       isEditMode ? (
                           <>
+                              <button
+                                  onClick={handleTempSave}
+                                  disabled={isSaving}
+                                  className="flex items-center gap-2 px-5 py-2.5 bg-green-100 text-green-700 rounded-xl font-black text-[15px] hover:bg-green-200 transition-all shadow-sm disabled:opacity-50"
+                              >
+                                  {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
+                                  임시저장
+                              </button>
                               <button
                                   onClick={handleAddArea}
                                   className="flex items-center gap-2 px-5 py-2.5 bg-blue-100 text-blue-700 rounded-xl font-black text-[15px] hover:bg-blue-200 transition-all shadow-sm"

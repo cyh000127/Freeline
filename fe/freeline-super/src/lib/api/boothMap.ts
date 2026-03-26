@@ -30,4 +30,11 @@ export const boothMapApi = {
             areas,
         });
     },
+
+    updateBoothMapSnapshot: (eventId: number, eventMapId: number, snapshot: any) => {
+        return api.put(`/v1/boothmaps/events/${eventId}/snapshot`, {
+            eventMapId,
+            mappingSnapshot: JSON.stringify(snapshot),
+        });
+    }
 };
