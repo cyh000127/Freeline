@@ -29,6 +29,7 @@ import com.freeline.common.util.ResponseUtils;
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
 import com.freeline.domain.event.dto.request.EventPolicyReqDto;
 import com.freeline.domain.event.dto.request.EventUpdateReqDto;
+import com.freeline.domain.event.dto.response.EntryCodeListResDto;
 import com.freeline.domain.event.dto.response.EventDashboardResDto;
 import com.freeline.domain.event.dto.response.EventDeleteResDto;
 import com.freeline.domain.event.dto.response.EventDetailResDto;
@@ -121,6 +122,24 @@ public class EventController {
         final Long eventAdminId = extractId(authentication);
         final EventDashboardResDto response = eventService.getEventDashboard(eventAdminId, eventId);
         return ResponseUtils.ok(response);
+    }
+
+    @Operation(summary = "행사 엔트리 코드 목록 조회", description = "주최자가 행사에 발급된 엔트리 코드 목록을 페이지 단위로 조회합니다.")
+    @PreAuthorize("hasRole('EVENT_ADMIN')")
+    @GetMapping("/{eventId}/entry-codes")
+    public ResponseEntity<PageResponse<EntryCodeListResDto>> getEntryCodes(
+            final Authentication authentication,
+            @PathVariable final Long eventId,
+            @RequestParam(defaultValue = "0") final int page,
+            @RequestParam(defaultValue = "20") final int size
+    ) {
+        final Page<EntryCodeListResDto> response = eventService.getEntryCodes(
+                extractId(authentication),
+                eventId,
+                page,
+                size
+        );
+        return ResponseUtils.page(response);
     }
 
     @Operation(summary = "행사 수정", description = "행사 정보와 상태를 부분 수정합니다.")

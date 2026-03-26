@@ -33,6 +33,7 @@ import com.freeline.domain.event.dto.request.EventPolicyReqDto;
 import com.freeline.domain.event.dto.request.EventUpdateReqDto;
 import com.freeline.domain.event.dto.response.BoothCongestionDto;
 import com.freeline.domain.event.dto.response.DashboardSummaryDto;
+import com.freeline.domain.event.dto.response.EntryCodeListResDto;
 import com.freeline.domain.event.dto.response.EventDashboardResDto;
 import com.freeline.domain.event.dto.response.EventDeleteResDto;
 import com.freeline.domain.event.dto.response.EventDetailResDto;
@@ -156,6 +157,20 @@ public class EventService {
                 mapImageUrl,
                 Boolean.TRUE.equals(includeBooths) ? Collections.emptyList() : null
         );
+    }
+
+    @Transactional(readOnly = true)
+    public Page<EntryCodeListResDto> getEntryCodes(
+            final Long eventAdminId,
+            final Long eventId,
+            final int page,
+            final int size
+    ) {
+        getAuthorizedEvent(eventAdminId, eventId);
+
+        final Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return visitorRepository.findAllByEventId(eventId, pageable)
+                .map(EventConverter::toEntryCodeListResDto);
     }
 
     @Transactional(readOnly = true)

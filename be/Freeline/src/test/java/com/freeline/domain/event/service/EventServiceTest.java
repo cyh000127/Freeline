@@ -26,11 +26,14 @@ import org.springframework.data.domain.Sort;
 import com.freeline.common.error.ErrorCode;
 import com.freeline.common.file.service.FileService;
 import com.freeline.common.file.util.CloudflareStorageUtil;
+import com.freeline.domain.booth.entity.Visitor;
+import com.freeline.domain.booth.repository.VisitorRepository;
 import com.freeline.domain.boothmap.entity.EventMap;
 import com.freeline.domain.boothmap.repository.EventMapRepository;
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
 import com.freeline.domain.event.dto.request.EventPolicyReqDto;
 import com.freeline.domain.event.dto.request.EventUpdateReqDto;
+import com.freeline.domain.event.dto.response.EntryCodeListResDto;
 import com.freeline.domain.event.dto.response.EventDashboardResDto;
 import com.freeline.domain.event.dto.response.EventDeleteResDto;
 import com.freeline.domain.event.dto.response.EventDetailResDto;
@@ -56,6 +59,9 @@ class EventServiceTest {
 
     @Mock
     private EventPolicyRepository eventPolicyRepository;
+
+    @Mock
+    private VisitorRepository visitorRepository;
 
     @Mock
     private FileService fileService;
@@ -161,6 +167,45 @@ class EventServiceTest {
         Assertions.assertThatThrownBy(() -> eventService.getEvents(100L, "INVALID", 0, 10))
                 .isInstanceOfSatisfying(EventException.class, ex ->
                         Assertions.assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
+    }
+
+    @Test
+    void getEntryCodes_success() {
+        final PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
+        final Event event = createEvent(301L, 5L, EventStatus.OPEN);
+        final Visitor visitor = Visitor.builder()
+                .id(21L)
+                .eventId(301L)
+                .entryCode("E301-000001")
+                .active(true)
+                .build();
+        setBaseEntityField(visitor, "createdAt", LocalDateTime.of(2026, 3, 26, 10, 0));
+
+        Mockito.when(eventRepository.findById(301L)).thenReturn(Optional.of(event));
+        Mockito.when(visitorRepository.findAllByEventId(301L, pageable))
+                .thenReturn(new PageImpl<>(List.of(visitor), pageable, 1));
+
+        final Page<EntryCodeListResDto> result = eventService.getEntryCodes(5L, 301L, 0, 20);
+
+        Assertions.assertThat(result.getContent()).hasSize(1);
+        Assertions.assertThat(result.getContent().getFirst().visitorId()).isEqualTo(21L);
+        Assertions.assertThat(result.getContent().getFirst().entryCode()).isEqualTo("E301-000001");
+        Assertions.assertThat(result.getContent().getFirst().isActive()).isTrue();
+        Assertions.assertThat(result.getContent().getFirst().createdAt())
+                .isEqualTo(LocalDateTime.of(2026, 3, 26, 10, 0));
+        Mockito.verify(visitorRepository).findAllByEventId(301L, pageable);
+    }
+
+    @Test
+    void getEntryCodes_failWhenAccessDenied() {
+        final Event event = createEvent(302L, 7L, EventStatus.OPEN);
+        Mockito.when(eventRepository.findById(302L)).thenReturn(Optional.of(event));
+
+        Assertions.assertThatThrownBy(() -> eventService.getEntryCodes(5L, 302L, 0, 20))
+                .isInstanceOfSatisfying(EventException.class, ex ->
+                        Assertions.assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
+
+        Mockito.verify(visitorRepository, Mockito.never()).findAllByEventId(Mockito.anyLong(), Mockito.any());
     }
 
     @Test

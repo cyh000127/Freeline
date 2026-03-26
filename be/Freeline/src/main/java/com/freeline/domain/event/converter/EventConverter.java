@@ -5,9 +5,11 @@ import java.util.List;
 
 import lombok.experimental.UtilityClass;
 
+import com.freeline.domain.booth.entity.Visitor;
 import com.freeline.domain.event.dto.request.EventCreateReqDto;
 import com.freeline.domain.event.dto.response.BoothCongestionDto;
 import com.freeline.domain.event.dto.response.DashboardSummaryDto;
+import com.freeline.domain.event.dto.response.EntryCodeListResDto;
 import com.freeline.domain.event.dto.response.EventDashboardResDto;
 import com.freeline.domain.event.dto.response.EventDeleteResDto;
 import com.freeline.domain.event.dto.response.EventDetailResDto;
@@ -127,6 +129,15 @@ public class EventConverter {
                 .boothCongestion(boothCongestion)
                 .topWaitingBooths(topWaitingBooths)
                 .lastUpdated(lastUpdated)
+                .build();
+    }
+
+    public EntryCodeListResDto toEntryCodeListResDto(final Visitor visitor) {
+        return EntryCodeListResDto.builder()
+                .visitorId(visitor.getId())
+                .entryCode(visitor.getEntryCode())
+                .isActive(visitor.isActive())
+                .createdAt(visitor.getCreatedAt())
                 .build();
     }
 }
