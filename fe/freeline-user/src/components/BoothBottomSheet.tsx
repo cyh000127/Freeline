@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type BoothDetail, type BoothSummary } from '@/features/api/booths';
 import { palette } from '@/theme/colors';
@@ -45,7 +46,7 @@ export function BoothBottomSheet({
   const translateY = useRef(new Animated.Value(screenHeight)).current;
   const [mounted, setMounted] = useState(visible);
 
-  const targetHeight = expanded ? screenHeight - insets.top - 12 : Math.min(screenHeight * 0.58, 560);
+  const targetHeight = expanded ? screenHeight - insets.top : Math.min(screenHeight * 0.62, 600);
 
   useEffect(() => {
     if (visible) {
@@ -93,7 +94,7 @@ export function BoothBottomSheet({
             styles.sheet,
             {
               height: targetHeight,
-              paddingTop: expanded ? insets.top + 8 : 10,
+              paddingTop: expanded ? insets.top + 2 : 10,
               paddingBottom: Math.max(insets.bottom, 18),
               transform: [{ translateY }],
             },
@@ -112,11 +113,9 @@ export function BoothBottomSheet({
               </Text>
             </View>
 
-            {expanded ? (
-              <Pressable onPress={onClose} style={styles.closeButton}>
-                <Feather color={palette.ink} name="x" size={20} />
-              </Pressable>
-            ) : null}
+            <Pressable onPress={expanded ? onClose : onExpandToggle} style={styles.closeButton}>
+              <Feather color={palette.ink} name={expanded ? 'x' : 'maximize-2'} size={18} />
+            </Pressable>
           </View>
 
           <ScrollView
@@ -133,10 +132,18 @@ export function BoothBottomSheet({
               )}
             </View>
 
-            <View style={styles.statsRow}>
-              <InfoChip label="현재 대기" value={`${detail?.waitingCount ?? '-'}명`} />
-              <InfoChip label="예상 시간" value={estimatedMinutes ? `약 ${estimatedMinutes}분` : '확인 전'} />
-              <InfoChip label="상태" value={booth.isEmergencyClosed ? '긴급 마감' : '운영 중'} />
+            <View style={styles.queueHero}>
+              <View style={styles.queueHeroMain}>
+                <Text style={styles.queueHeroLabel}>현재 대기 인원</Text>
+                <Text style={styles.queueHeroValue}>{detail?.waitingCount ?? '-'}</Text>
+                <Text style={styles.queueHeroSub}>
+                  {estimatedMinutes ? `예상 대기 약 ${estimatedMinutes}분` : '예상 대기 시간 확인 전'}
+                </Text>
+              </View>
+              <View style={styles.queueHeroSide}>
+                <InfoChip label="상태" value={booth.isEmergencyClosed ? '긴급 마감' : '운영 중'} />
+                <InfoChip label="호출 인원" value={detail ? `${detail.callCount}명` : '확인 중'} />
+              </View>
             </View>
 
             <SectionBlock title="부스 소개">
@@ -155,46 +162,38 @@ export function BoothBottomSheet({
               </View>
             </SectionBlock>
 
-            <SectionBlock title="굿즈 현황">
-              {loading ? <Text style={styles.muted}>부스 정보를 불러오는 중...</Text> : null}
-              {!loading && detail?.goods.length ? (
-                detail.goods.map((goods) => (
-                  <View key={goods.goodsId} style={styles.goodsRow}>
-                    <View style={styles.goodsText}>
-                      <Text style={styles.goodsName}>{goods.name}</Text>
-                      <Text style={styles.goodsSub}>
-                        {goods.isSoldOut ? '현재 품절 상태입니다.' : '현장 수령 가능'}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.goodsBadge,
-                        goods.isSoldOut ? styles.soldOutBadge : styles.openBadge,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.goodsBadgeText,
-                          goods.isSoldOut ? styles.soldOutText : styles.openText,
-                        ]}
-                      >
-                        {goods.isSoldOut ? '품절' : '판매중'}
-                      </Text>
-                    </View>
-                  </View>
-                ))
-              ) : null}
-              {!loading && !detail?.goods.length ? (
-                <Text style={styles.muted}>등록된 굿즈가 없습니다.</Text>
-              ) : null}
+            <SectionBlock title="굿즈 안내">
+              <View style={styles.goodsSummaryCard}>
+                <View style={styles.goodsSummaryCopy}>
+                  <Text style={styles.goodsSummaryTitle}>굿즈 목록</Text>
+                  <Text style={styles.goodsSummaryBody}>
+                    {loading
+                      ? '부스 정보를 불러오는 중입니다.'
+                      : detail?.goods.length
+                        ? `${detail.goods.length}종의 굿즈를 확인할 수 있습니다.`
+                        : '현재 등록된 굿즈가 없습니다.'}
+                  </Text>
+                </View>
+                <ActionButton
+                  label="굿즈 목록 보기"
+                  onPress={() => {
+                    onClose();
+                    router.push(`/booths/${booth.boothId}/goods`);
+                  }}
+                  variant="ghost"
+                />
+              </View>
             </SectionBlock>
           </ScrollView>
 
           <View style={styles.footer}>
             <ActionButton
               grow
-              label={expanded ? '접어두기' : '전체 화면으로 보기'}
-              onPress={onExpandToggle}
+              label="부스 상세 보기"
+              onPress={() => {
+                onClose();
+                router.push(`/booths/${booth.boothId}`);
+              }}
               variant="ghost"
             />
             <ActionButton
@@ -320,7 +319,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     gap: 18,
-    paddingBottom: 16,
+    paddingBottom: 20,
   },
   hero: {
     height: 200,
@@ -345,8 +344,36 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
   },
-  statsRow: {
+  queueHero: {
     flexDirection: 'row',
+    gap: 12,
+  },
+  queueHeroMain: {
+    flex: 1.2,
+    backgroundColor: palette.ink,
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    justifyContent: 'space-between',
+    minHeight: 156,
+  },
+  queueHeroLabel: {
+    color: '#D6D4E6',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  queueHeroValue: {
+    color: '#FFFFFF',
+    fontSize: 48,
+    lineHeight: 54,
+    fontWeight: '900',
+  },
+  queueHeroSub: {
+    color: '#D6D4E6',
+    lineHeight: 20,
+  },
+  queueHeroSide: {
+    flex: 1,
     gap: 10,
   },
   chip: {
@@ -405,46 +432,20 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontWeight: '700',
   },
-  goodsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 4,
+  goodsSummaryCard: {
+    gap: 14,
   },
-  goodsText: {
-    flex: 1,
-    gap: 4,
+  goodsSummaryCopy: {
+    gap: 6,
   },
-  goodsName: {
+  goodsSummaryTitle: {
     color: palette.text,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
   },
-  goodsSub: {
+  goodsSummaryBody: {
     color: palette.textMuted,
-    fontSize: 12,
-  },
-  goodsBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  openBadge: {
-    backgroundColor: '#EAFBF1',
-  },
-  soldOutBadge: {
-    backgroundColor: '#FFF0F0',
-  },
-  goodsBadgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  openText: {
-    color: palette.success,
-  },
-  soldOutText: {
-    color: palette.danger,
+    lineHeight: 21,
   },
   muted: {
     color: palette.textMuted,

@@ -7,6 +7,7 @@ import { BoothListCard } from '@/components/BoothListCard';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { FloatingTabBar } from '@/components/FloatingTabBar';
+import { ReservationConfirmSheet } from '@/components/ReservationConfirmSheet';
 import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
 import {
@@ -48,6 +49,8 @@ export default function MapScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<(typeof mapTabs)[number]['key']>('map');
   const [detailMap, setDetailMap] = useState<Record<number, BoothDetail>>({});
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [confirmingReserve, setConfirmingReserve] = useState(false);
 
   useEffect(() => {
     if (!sheetVisible) {
@@ -117,6 +120,7 @@ export default function MapScreen() {
       },
     });
     selectBooth(booth.boothId);
+    setExpanded(true);
     setSheetVisible(true);
     setLoadingSheet(true);
     setSheetDetail(null);
@@ -138,6 +142,21 @@ export default function MapScreen() {
       }
     } finally {
       setLoadingSheet(false);
+    }
+  }
+
+  async function handleReserveConfirm() {
+    if (!selectedBooth) {
+      return;
+    }
+
+    try {
+      setConfirmingReserve(true);
+      await createWaiting(selectedBooth.boothId);
+      setConfirmVisible(false);
+      setSheetVisible(false);
+    } finally {
+      setConfirmingReserve(false);
     }
   }
 
@@ -297,10 +316,23 @@ export default function MapScreen() {
           onExpandToggle={() => setExpanded((current) => !current)}
           onReserve={() => {
             if (selectedBooth) {
-              void createWaiting(selectedBooth.boothId);
+              setConfirmVisible(true);
             }
           }}
           visible={sheetVisible && !!selectedBooth}
+        />
+
+        <ReservationConfirmSheet
+          boothName={selectedBooth?.name ?? ''}
+          confirming={confirmingReserve}
+          estimatedMinutes={sheetEstimatedMinutes}
+          locationCode={selectedBooth?.locationCode ?? ''}
+          onClose={() => setConfirmVisible(false)}
+          onConfirm={() => {
+            void handleReserveConfirm();
+          }}
+          visible={confirmVisible && !!selectedBooth}
+          waitingCount={sheetDetail?.waitingCount ?? boothWaitingCount(selectedBooth?.boothId ?? -1)}
         />
 
         <FloatingTabBar />
