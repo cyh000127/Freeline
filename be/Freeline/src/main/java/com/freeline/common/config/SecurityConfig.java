@@ -3,6 +3,7 @@ package com.freeline.common.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -49,13 +50,31 @@ public class SecurityConfig {
                                     "/api/v1/auth/visitors/entry-code/authenticate",
                                     "/api/v1/auth/check-id"
                             ).permitAll()
+                            .requestMatchers(HttpMethod.GET,
+                                    "/api/v1/booths/events/*/search",
+                                    "/api/v1/booths/events/*",
+                                    "/api/v1/booths/*",
+                                    "/api/v1/booths/*/queue",
+                                    "/api/v1/booths/*/waitings/expected-time",
+                                    "/api/v1/visitors/me/waitings"
+                            ).permitAll()
+                            .requestMatchers(HttpMethod.POST,
+                                    "/api/v1/booths/*/waitings",
+                                    "/api/v1/qr/scan",
+                                    "/api/v1/push-notifications/tokens"
+                            ).permitAll()
+                            .requestMatchers(HttpMethod.DELETE, "/api/v1/waitings/*").permitAll()
+                            .requestMatchers(HttpMethod.PATCH,
+                                    "/api/v1/waitings/*/postpone",
+                                    "/api/v1/waitings/*/exit"
+                            ).permitAll()
                             .requestMatchers(
                                     "/swagger-ui/**",
                                     "/swagger-ui.html",
                                     "/v3/api-docs/**",
                                     "/actuator/**"
                             ).permitAll()
-                            .anyRequest().authenticated()
+                            .anyRequest().permitAll()
                     )
                     .addFilterBefore(
                             new JwtAuthenticationFilter(jwtProvider, redisTemplate),
