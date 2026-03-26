@@ -7,6 +7,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -37,6 +40,7 @@ public class EventMap extends BaseEntity {
     @Column(name = "is_visible", nullable = false)
     private boolean visible;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "mapping_snapshot", columnDefinition = "json")
     private String mappingSnapshot;
 
