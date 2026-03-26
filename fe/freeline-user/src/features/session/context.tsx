@@ -1,8 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { authenticateEntryCode as authenticateEntryCodeApi, logout as logoutApi } from '@/features/api/auth';
+import { clearPushRegistrationCache } from '@/features/notifications/registration-cache';
+import { fetchMyEventDetail } from '@/features/api/event';
 import { usePushRegistration } from '@/features/notifications/register-push';
 import { getUserIdFromToken } from '@/utils/jwt';
-import { getEventProfile, parseEventIdFromEntryCode } from '@/utils/event';
+import { validateNickname } from '@/utils/nickname';
+import { getEventProfile, parseEventIdFromEntryCode, toEventProfile } from '@/utils/event';
 import { clearSessionStorage, emptySession, readSession, writeSession } from './storage';
 import type { PersistedSession, SessionState } from './types';
 
@@ -11,7 +14,7 @@ type SessionContextValue = SessionState & {
   authenticateEntryCode: (entryCode: string) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   saveNickname: (nickname: string) => Promise<void>;
-  saveAgreements: (requiredAgreed: boolean, marketingAgreed: boolean) => Promise<void>;
+  confirmProfile: () => Promise<void>;
   logout: () => Promise<void>;
   resetAll: () => Promise<void>;
 };
@@ -30,6 +33,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     ...emptySession,
     isReady: false,
   });
+  const [eventProfile, setEventProfile] = useState<ReturnType<typeof getEventProfile> | null>(null);
 
   usePushRegistration(session.visitorId);
 
@@ -41,6 +45,41 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     void hydrate();
   }, []);
+
+  useEffect(() => {
+    if (!session.accessToken) {
+      setEventProfile(session.eventId ? getEventProfile(session.eventId) : null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function hydrateEventProfile() {
+      try {
+        const event = await fetchMyEventDetail(session.accessToken as string);
+
+        if (cancelled) {
+          return;
+        }
+
+        setEventProfile(toEventProfile(event));
+      } catch (error) {
+        console.warn('행사 상세 조회 실패', error);
+
+        if (cancelled) {
+          return;
+        }
+
+        setEventProfile(session.eventId ? getEventProfile(session.eventId) : null);
+      }
+    }
+
+    void hydrateEventProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session.accessToken, session.eventId]);
 
   async function persist(next: PersistedSession) {
     await writeSession(next);
@@ -59,7 +98,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const visitorId = getUserIdFromToken(response.accessToken);
 
     await persist({
-      ...session,
+      ...emptySession,
       hasSeenOnboarding: true,
       entryCode: trimmed,
       eventId,
@@ -77,17 +116,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }
 
   async function saveNickname(nickname: string) {
+    const normalized = validateNickname(nickname);
+
     await persist({
       ...session,
-      nickname: nickname.trim(),
+      nickname: normalized,
     });
   }
 
-  async function saveAgreements(requiredAgreed: boolean, marketingAgreed: boolean) {
+  async function confirmProfile() {
     await persist({
       ...session,
-      requiredAgreed,
-      marketingAgreed,
+      requiredAgreed: true,
+      marketingAgreed: false,
     });
   }
 
@@ -101,29 +142,35 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
 
     await clearSessionStorage();
+    await clearPushRegistrationCache();
     setSession({
       ...emptySession,
+      hasSeenOnboarding: true,
       isReady: true,
     });
+    setEventProfile(null);
   }
 
   async function resetAll() {
     await clearSessionStorage();
+    await clearPushRegistrationCache();
     setSession({
       ...emptySession,
+      hasSeenOnboarding: true,
       isReady: true,
     });
+    setEventProfile(null);
   }
 
   return (
     <SessionContext.Provider
       value={{
         ...session,
-        eventProfile: session.eventId ? getEventProfile(session.eventId) : null,
+        eventProfile,
         authenticateEntryCode,
         completeOnboarding,
         saveNickname,
-        saveAgreements,
+        confirmProfile,
         logout,
         resetAll,
       }}

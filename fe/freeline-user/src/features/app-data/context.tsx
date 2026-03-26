@@ -18,6 +18,7 @@ import {
 import { scanQr as scanQrApi } from '@/features/api/qr';
 import { useSession } from '@/features/session/context';
 import { useTracking } from '@/features/tracking/tracking.context';
+import { toUserErrorMessage } from '@/utils/error';
 import type { AppDataState, DecoratedWaiting, WaitingHistoryItem } from './types';
 
 type AppDataContextValue = AppDataState & {
@@ -25,6 +26,7 @@ type AppDataContextValue = AppDataState & {
   queueWaitings: DecoratedWaiting[];
   selectedBooth: BoothSummary | null;
   selectBooth: (boothId: number | null) => void;
+  findWaitingByBoothId: (boothId: number) => DecoratedWaiting | null;
   refreshAll: () => Promise<void>;
   getBoothDetail: (boothId: number) => Promise<BoothDetail>;
   createWaiting: (boothId: number) => Promise<void>;
@@ -163,8 +165,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         lastError: null,
       }));
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : '앱 데이터를 불러오지 못했습니다.';
+      const message = toUserErrorMessage(error, '앱 데이터를 불러오지 못했습니다.');
       console.warn('앱 데이터 새로고침 실패', error);
       setState((current) => ({
         ...current,
@@ -173,6 +174,27 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         lastError: message,
       }));
     }
+  }
+
+  async function syncBoothDetail(boothId: number) {
+    if (!accessToken) {
+      return null;
+    }
+
+    const detail = await fetchBoothDetail(boothId, accessToken);
+
+    setState((current) => ({
+      ...current,
+      boothDetails: {
+        ...current.boothDetails,
+        [boothId]: detail,
+      },
+      waitings: current.waitings.map((waiting) =>
+        waiting.boothId === boothId ? { ...waiting, boothDetail: detail } : waiting,
+      ),
+    }));
+
+    return detail;
   }
 
   async function getBoothDetailById(boothId: number) {
@@ -216,13 +238,27 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       throw new Error('로그인이 필요합니다.');
     }
 
+    const existingWaiting = state.waitings.find((waiting) => waiting.boothId === boothId);
+
+    if (existingWaiting) {
+      throw new Error('이미 이 부스를 예약했어요. 예약 관리에서 상태를 확인해주세요.');
+    }
+
     await createWaitingApi(accessToken, boothId);
+    const booth = state.booths.find((item) => item.boothId === boothId) ?? null;
     trackEvent({
       action: 'WAITING_REGISTER',
       targetType: 'BOOTH',
       targetId: String(boothId),
+      metadata: booth
+        ? {
+            booth_name: booth.name,
+            location_code: booth.locationCode,
+          }
+        : undefined,
     });
     await refreshAll();
+    await syncBoothDetail(boothId);
   }
 
   async function cancelWaiting(waiting: DecoratedWaiting) {
@@ -245,6 +281,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       history: [historyEntry(waiting, 'CANCELED'), ...current.history].slice(0, 30),
     }));
     await refreshAll();
+    if (waiting.boothId) {
+      await syncBoothDetail(waiting.boothId);
+    }
   }
 
   async function postponeWaiting(waiting: DecoratedWaiting) {
@@ -253,7 +292,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
 
     await postponeWaitingApi(accessToken, waiting.waiting_id);
+    trackEvent({
+      action: 'MAP_INTERACTION',
+      targetType: 'BOOTH',
+      targetId: waiting.boothId ? String(waiting.boothId) : undefined,
+      metadata: {
+        interaction: 'postpone_waiting',
+        waiting_id: waiting.waiting_id,
+        booth_name: waiting.booth_name,
+      },
+    });
     await refreshAll();
+    if (waiting.boothId) {
+      await syncBoothDetail(waiting.boothId);
+    }
   }
 
   async function exitWaiting(waiting: DecoratedWaiting) {
@@ -276,6 +328,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       history: [historyEntry(waiting, 'EXITED'), ...current.history].slice(0, 30),
     }));
     await refreshAll();
+    if (waiting.boothId) {
+      await syncBoothDetail(waiting.boothId);
+    }
   }
 
   async function scanQr(qrCode: string) {
@@ -283,7 +338,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       throw new Error('로그인이 필요합니다.');
     }
 
-    await scanQrApi(accessToken, qrCode);
+    const result = await scanQrApi(accessToken, qrCode);
     trackEvent({
       action: 'MAP_INTERACTION',
       targetType: 'MAP',
@@ -293,6 +348,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       },
     });
     await refreshAll();
+    await syncBoothDetail(result.boothId);
   }
 
   const currentExperience =
@@ -314,6 +370,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         selectedBoothId: boothId,
       }));
     },
+    findWaitingByBoothId: (boothId: number) =>
+      state.waitings.find((waiting) => waiting.boothId === boothId) ?? null,
     refreshAll: async () => {
       await refreshAll();
     },

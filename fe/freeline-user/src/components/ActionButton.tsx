@@ -37,11 +37,11 @@ export function ActionButton({
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 52,
-    borderRadius: 18,
+    minHeight: 48,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
   },
   grow: {
     flex: 1,
@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
     borderColor: palette.borderStrong,
   },
   label: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
   primaryLabel: {

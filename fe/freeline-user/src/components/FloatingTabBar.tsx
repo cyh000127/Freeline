@@ -18,21 +18,23 @@ export function FloatingTabBar() {
 
   return (
     <View style={[styles.wrap, { bottom: Math.max(insets.bottom, 10) }]}>
-      <View style={styles.bar}>
-        {tabs.map((tab) => {
-          const active = pathname === tab.href;
+      <View style={styles.shell}>
+        <View style={styles.bar}>
+          {tabs.map((tab) => {
+            const active = pathname === tab.href;
 
-          return (
-            <Pressable
-              key={tab.href}
-              onPress={() => router.replace(tab.href)}
-              style={[styles.item, active ? styles.activeItem : null]}
-            >
-              <Feather color={active ? palette.ink : '#FFFFFF'} name={tab.icon} size={20} />
-              <Text style={[styles.label, active ? styles.activeLabel : null]}>{tab.label}</Text>
-            </Pressable>
-          );
-        })}
+            return (
+              <Pressable
+                key={tab.href}
+                onPress={() => router.replace(tab.href)}
+                style={[styles.item, active ? styles.activeItem : null]}
+              >
+                <Feather color={active ? palette.ink : '#FFFFFF'} name={tab.icon} size={20} />
+                <Text style={[styles.label, active ? styles.activeLabel : null]}>{tab.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -41,9 +43,15 @@ export function FloatingTabBar() {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    left: spacing.page,
-    right: spacing.page,
+    left: 0,
+    right: 0,
     alignItems: 'center',
+    zIndex: 20,
+  },
+  shell: {
+    width: '100%',
+    maxWidth: spacing.viewportMaxWidth,
+    paddingHorizontal: spacing.page,
   },
   bar: {
     width: '100%',
@@ -51,25 +59,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: palette.ink,
-    borderRadius: 32,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    borderRadius: 28,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     minHeight: spacing.navHeight,
   },
   item: {
     flex: 1,
-    minHeight: 60,
-    borderRadius: 24,
+    minHeight: 52,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 4,
   },
   activeItem: {
     backgroundColor: palette.lime,
   },
   label: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
   },
   activeLabel: {

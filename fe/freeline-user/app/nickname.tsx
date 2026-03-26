@@ -7,6 +7,8 @@ import { Screen } from '@/components/Screen';
 import { TextField } from '@/components/TextField';
 import { useSession } from '@/features/session/context';
 import { palette } from '@/theme/colors';
+import { toUserErrorMessage } from '@/utils/error';
+import { validateNickname } from '@/utils/nickname';
 
 export default function NicknameScreen() {
   const { nickname, saveNickname } = useSession();
@@ -14,15 +16,13 @@ export default function NicknameScreen() {
   const [error, setError] = useState('');
 
   async function handleNext() {
-    const next = value.trim();
-
-    if (!/^[가-힣]{1,8}$/.test(next)) {
-      setError('한글만 가능하며 최대 8자까지 입력할 수 있습니다.');
-      return;
+    try {
+      const next = validateNickname(value);
+      await saveNickname(next);
+      router.replace('/confirm-profile');
+    } catch (submitError) {
+      setError(toUserErrorMessage(submitError, '닉네임 저장에 실패했습니다.'));
     }
-
-    await saveNickname(next);
-    router.replace('/confirm-profile');
   }
 
   return (

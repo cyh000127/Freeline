@@ -25,6 +25,7 @@ export function WaitingCard({
   const canPostpone = waiting.status === 'WAITING' && waiting.postpone_available && onPostpone;
   const canScan = waiting.status === 'CALLED' && onScan;
   const canExit = waiting.status === 'ENTERED' && onExit;
+  const statusAccent = waiting.status === 'CALLED' || waiting.status === 'ENTERED';
 
   return (
     <Pressable onPress={onOpen} style={styles.card}>
@@ -33,25 +34,44 @@ export function WaitingCard({
           <Text style={styles.title}>{waiting.booth_name}</Text>
           <Text style={styles.code}>{waiting.locationCode ?? '위치 정보 없음'}</Text>
         </View>
-        <View style={[styles.badge, waiting.status === 'CALLED' ? styles.badgeAccent : null]}>
-          <Text style={[styles.badgeText, waiting.status === 'CALLED' ? styles.badgeAccentText : null]}>
+        <View style={[styles.badge, statusAccent ? styles.badgeAccent : null]}>
+          <Text style={[styles.badgeText, statusAccent ? styles.badgeAccentText : null]}>
             {formatWaitingStatus(waiting.status)}
           </Text>
         </View>
       </View>
 
-      <View style={styles.row}>
-        <Feather color={palette.textMuted} name="layers" size={16} />
-        <Text style={styles.meta}>내 대기번호: {waiting.my_rank}번째</Text>
-      </View>
+      <View style={styles.summaryRow}>
+        <View style={styles.primaryMetric}>
+          <Text style={styles.metricLabel}>내 순서</Text>
+          <Text style={styles.metricValue}>{waiting.my_rank}</Text>
+          <Text style={styles.metricSub}>번째 대기 중</Text>
+        </View>
 
-      <View style={styles.row}>
-        <Feather color={palette.textMuted} name="clock" size={16} />
-        <Text style={styles.meta}>{formatMinutes(waiting.estimatedMinutes)}</Text>
+        <View style={styles.metaPanel}>
+          <View style={styles.metaRow}>
+            <Feather color={palette.textMuted} name="clock" size={15} />
+            <Text style={styles.meta}>{formatMinutes(waiting.estimatedMinutes)}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Feather color={palette.textMuted} name="map-pin" size={15} />
+            <Text style={styles.meta}>{waiting.locationCode ?? '위치 정보 없음'}</Text>
+          </View>
+        </View>
       </View>
 
       {waiting.status === 'CALLED' ? (
-        <Text style={styles.alert}>입장 5분 전입니다. 도착 인증을 진행해주세요.</Text>
+        <View style={styles.alertCard}>
+          <Feather color="#9A6300" name="bell" size={16} />
+          <Text style={styles.alert}>입장 5분 전입니다. 도착 인증을 진행해주세요.</Text>
+        </View>
+      ) : null}
+
+      {waiting.status === 'ENTERED' ? (
+        <View style={styles.alertCardSecondary}>
+          <Feather color={palette.success} name="check-circle" size={16} />
+          <Text style={styles.alertSecondary}>현재 체험 진행 중입니다. 종료 후 상태를 업데이트하세요.</Text>
+        </View>
       ) : null}
 
       <View style={styles.actions}>
@@ -76,7 +96,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surface,
     borderRadius: 24,
     padding: 18,
-    gap: 12,
+    gap: 14,
     shadowColor: palette.shadow,
     shadowOpacity: 1,
     shadowRadius: 18,
@@ -119,18 +139,80 @@ const styles = StyleSheet.create({
   badgeAccentText: {
     color: '#9A6300',
   },
-  row: {
+  summaryRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  primaryMetric: {
+    flex: 0.9,
+    backgroundColor: palette.ink,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 2,
+  },
+  metricLabel: {
+    color: '#D6D4E6',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  metricValue: {
+    color: '#FFFFFF',
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: '900',
+  },
+  metricSub: {
+    color: '#D6D4E6',
+    fontSize: 12,
+  },
+  metaPanel: {
+    flex: 1,
+    backgroundColor: palette.surfaceAlt,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    justifyContent: 'center',
+    gap: 12,
+  },
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
   meta: {
-    fontSize: 14,
+    flex: 1,
+    fontSize: 13,
     color: palette.text,
   },
+  alertCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF5D8',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  alertCardSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#EAFBF1',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
   alert: {
+    flex: 1,
     fontSize: 13,
-    color: palette.inkMuted,
+    color: '#9A6300',
+    lineHeight: 18,
+  },
+  alertSecondary: {
+    flex: 1,
+    fontSize: 13,
+    color: palette.success,
     lineHeight: 18,
   },
   actions: {

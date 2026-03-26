@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { router } from 'expo-router';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ActionButton';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { FloatingTabBar } from '@/components/FloatingTabBar';
 import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
@@ -9,71 +11,110 @@ import { useAppData } from '@/features/app-data/context';
 import { useSession } from '@/features/session/context';
 import { usePageTracking } from '@/features/tracking/use-page-tracking';
 import { palette } from '@/theme/colors';
+import { toUserErrorMessage } from '@/utils/error';
+import { validateNickname } from '@/utils/nickname';
 
 export default function MyScreen() {
   usePageTracking('my');
   const session = useSession();
   const { queueStatus, waitings } = useAppData();
   const [nickname, setNickname] = useState(session.nickname);
+  const [error, setError] = useState('');
+  const [resetVisible, setResetVisible] = useState(false);
+
+  useEffect(() => {
+    setNickname(session.nickname);
+  }, [session.nickname]);
+
+  async function handleSaveNickname() {
+    try {
+      const next = validateNickname(nickname);
+      setError('');
+      await session.saveNickname(next);
+      setNickname(next);
+    } catch (submitError) {
+      setError(toUserErrorMessage(submitError, '닉네임 저장에 실패했습니다.'));
+    }
+  }
+
+  async function handleResetAll() {
+    await session.resetAll();
+    router.replace('/entry-code');
+  }
 
   return (
-    <Screen>
-      <View style={styles.content}>
-        <SectionTitle caption="환경설정과 개인 상태를 관리하세요" title="MY" />
+    <Screen padded={false} scroll={false}>
+      <View style={styles.flex}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <SectionTitle caption="환경설정과 개인 상태를 관리하세요" title="MY" />
 
-        <View style={styles.profileCard}>
-          <Text style={styles.profileTitle}>{session.nickname || '방문객'}</Text>
-          <Text style={styles.profileMeta}>Entry Code {session.entryCode}</Text>
-          <Text style={styles.profileMeta}>현재 상태 {queueStatus}</Text>
-          <Text style={styles.profileMeta}>활성 예약 {waitings.length}건</Text>
-        </View>
+          <View style={styles.profileCard}>
+            <Text style={styles.profileTitle}>{session.nickname || '방문객'}</Text>
+            <Text style={styles.profileMeta}>Entry Code {session.entryCode}</Text>
+            <Text style={styles.profileMeta}>현재 상태 {queueStatus}</Text>
+            <Text style={styles.profileMeta}>활성 예약 {waitings.length}건</Text>
+          </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>닉네임 수정</Text>
-          <TextField onChangeText={setNickname} placeholder="닉네임" value={nickname} />
-          <ActionButton
-            label="닉네임 저장"
-            onPress={() => {
-              void session.saveNickname(nickname);
-            }}
-          />
-        </View>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>닉네임 수정</Text>
+            <TextField
+              autoCorrect={false}
+              hint="한글만 가능, 최대 8자"
+              maxLength={8}
+              onChangeText={(text) => {
+                setNickname(text);
+                setError('');
+              }}
+              placeholder="닉네임"
+              value={nickname}
+            />
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <ActionButton
+              label="닉네임 저장"
+              onPress={() => {
+                void handleSaveNickname();
+              }}
+            />
+          </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>설정</Text>
-          <ActionButton
-            label={session.marketingAgreed ? '마케팅 수신 동의됨' : '마케팅 수신 미동의'}
-            onPress={() => {
-              void session.saveAgreements(session.requiredAgreed, !session.marketingAgreed);
-            }}
-            variant="ghost"
-          />
-          <ActionButton
-            label="로그아웃"
-            onPress={() => {
-              void session.logout();
-            }}
-            variant="ghost"
-          />
-          <ActionButton
-            label="세션 초기화"
-            onPress={() => {
-              void session.resetAll();
-            }}
-            variant="ghost"
-          />
-        </View>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>설정</Text>
+            <ActionButton
+              label="진짜 세션 초기화"
+              onPress={() => {
+                setResetVisible(true);
+              }}
+              variant="ghost"
+            />
+          </View>
+        </ScrollView>
+
+        <ConfirmDialog
+          body="저장된 로그인 정보와 세션 데이터를 모두 지우고 엔트리코드 입력 화면으로 돌아갑니다."
+          confirmLabel="세션 초기화"
+          onClose={() => setResetVisible(false)}
+          onConfirm={() => {
+            void handleResetAll();
+          }}
+          title="세션을 초기화할까요?"
+          visible={resetVisible}
+        />
+
+        <FloatingTabBar />
       </View>
-
-      <FloatingTabBar />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   content: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
     gap: 20,
-    paddingBottom: 120,
+    paddingBottom: 148,
   },
   profileCard: {
     backgroundColor: palette.ink,
@@ -99,5 +140,9 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     color: palette.text,
+  },
+  error: {
+    fontSize: 13,
+    color: palette.danger,
   },
 });

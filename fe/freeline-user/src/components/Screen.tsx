@@ -13,14 +13,12 @@ type Props = {
 export function Screen({ children, scroll = true, padded = true }: Props) {
   const content = scroll ? (
     <ScrollView
-      contentContainerStyle={[
-        styles.scrollContent,
-        padded ? styles.padded : null,
-      ]}
+      contentContainerStyle={styles.scrollContent}
+      style={styles.flex}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      {children}
+      <View style={[styles.scrollFrame, padded ? styles.padded : null]}>{children}</View>
     </ScrollView>
   ) : (
     <View style={[styles.body, padded ? styles.padded : null]}>{children}</View>
@@ -48,11 +46,20 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 120,
+    alignItems: 'center',
   },
   body: {
     flex: 1,
+    width: '100%',
+    maxWidth: spacing.viewportMaxWidth,
+    alignSelf: 'center',
+  },
+  scrollFrame: {
+    width: '100%',
+    maxWidth: spacing.viewportMaxWidth,
   },
   padded: {
     paddingHorizontal: spacing.page,
+    paddingTop: spacing.screenTop,
   },
 });
