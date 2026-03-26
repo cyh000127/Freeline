@@ -12,6 +12,4 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     Page<Event> findAllByEventAdminId(final Long eventAdminId, final Pageable pageable);
 
     Page<Event> findAllByEventAdminIdAndStatus(final Long eventAdminId, final EventStatus status, final Pageable pageable);
-
-    Page<Event> findAllByStatus(final EventStatus status, final Pageable pageable);
 }
