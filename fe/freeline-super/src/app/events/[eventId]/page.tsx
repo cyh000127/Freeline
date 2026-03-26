@@ -6,28 +6,30 @@ import { Sidebar } from "@/components/Sidebar";
 import { EditEventModal } from "@/components/EditEventModal";
 import {BoothMapEditor} from "@/components/map/BoothMapEditor";
 import {BoothSearchModal} from "@/components/map/BoothSearchModal";
-import { eventApi, Event } from "@/lib/api/event";
+import {eventApi, Event} from "@/lib/api/event";
 import { authApi } from "@/lib/api/auth";
 import {boothMapApi} from "@/lib/api/boothMap";
 import { 
-  Edit3, 
   Map as MapIcon, 
   Upload,
     Calendar,
     MapPin,
     Loader2,
-    Save,
-    X
+    Save
 } from "lucide-react";
 
 interface AreaItem {
-    boothId: number | null;
-    boothName?: string;
-    xRatio: number;
-    yRatio: number;
-    widthRatio: number;
-    heightRatio: number;
-    localId: string;
+    readonly boothId: number | null;
+    readonly boothName?: string;
+    readonly locationCode?: string;
+    readonly adminName?: string;
+    readonly contact?: string;
+    readonly color?: string;
+    readonly xRatio: number;
+    readonly yRatio: number;
+    readonly widthRatio: number;
+    readonly heightRatio: number;
+    readonly localId: string;
 }
 
 export default function EventDetailPage() {
@@ -62,12 +64,11 @@ export default function EventDetailPage() {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             if (hasUnsavedChanges) {
                 e.preventDefault();
-                e.returnValue = "";
             }
         };
 
-        window.addEventListener("beforeunload", handleBeforeUnload);
-        return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+        globalThis.addEventListener("beforeunload", handleBeforeUnload);
+        return () => globalThis.removeEventListener("beforeunload", handleBeforeUnload);
     }, [hasUnsavedChanges]);
 
   useEffect(() => {
@@ -90,7 +91,7 @@ export default function EventDetailPage() {
           detail = eventRes.data;
         }
 
-        if (detail) {
+          if (detail !== null) {
           setEvent(detail as Event);
         }
 
@@ -149,8 +150,8 @@ export default function EventDetailPage() {
 
         // Delay initial measure slightly to ensure DOM is fully painted
         setTimeout(updateSize, 100);
-        window.addEventListener("resize", updateSize);
-        return () => window.removeEventListener("resize", updateSize);
+        globalThis.addEventListener("resize", updateSize);
+        return () => globalThis.removeEventListener("resize", updateSize);
     }, [layoutImageUrl]);
 
     const handleAreasChange = (newAreas: AreaItem[]) => {
@@ -160,7 +161,7 @@ export default function EventDetailPage() {
 
     const handleLayoutUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file) {
+        if (file === undefined) {
             return;
         }
 
@@ -209,11 +210,11 @@ export default function EventDetailPage() {
     };
 
     const handleSaveMap = async () => {
-        if (!eventMapId) return;
+        if (eventMapId === null) return;
 
         const hasUnmapped = areas.some(a => a.boothId === null);
         if (hasUnmapped) {
-            if (confirm("설정되지 않은 부스가 있습니다. 임시저장하시겠습니까?")) {
+            if (globalThis.confirm("설정되지 않은 부스가 있습니다. 임시저장하시겠습니까?")) {
                 await handleTempSave();
             }
             return;
@@ -243,7 +244,7 @@ export default function EventDetailPage() {
     };
 
     const handleTempSave = async () => {
-        if (!eventMapId) return;
+        if (eventMapId === null) return;
         try {
             setIsSaving(true);
             await boothMapApi.updateBoothMapSnapshot(eventId, eventMapId, {areas});
@@ -277,14 +278,29 @@ export default function EventDetailPage() {
         setIsSearchModalOpen(true);
     };
 
-    const handleSelectBooth = (booth: { boothId: number; boothName: string }) => {
-        if (!activeLocalId) return;
+    const handleSelectBooth = (data: {
+        boothId: number | null;
+        boothName: string;
+        locationCode: string;
+        adminName: string;
+        contact: string;
+        color: string;
+    }) => {
+        if (activeLocalId === null) return;
 
         setAreas(prev => {
             setHasUnsavedChanges(true);
             return prev.map(area => {
                 if (area.localId === activeLocalId) {
-                    return {...area, boothId: booth.boothId, boothName: booth.boothName};
+                    return {
+                        ...area,
+                        boothId: data.boothId,
+                        boothName: data.boothName,
+                        locationCode: data.locationCode,
+                        adminName: data.adminName,
+                        contact: data.contact,
+                        color: data.color
+                    };
                 }
                 return area;
             });
@@ -292,10 +308,10 @@ export default function EventDetailPage() {
 
         setIsSearchModalOpen(false);
         setActiveLocalId(null);
-  };
+    };
 
     const handleDeleteArea = () => {
-        if (!activeLocalId) return;
+        if (activeLocalId === null) return;
 
         setAreas(prev => {
             const next = prev.filter(area => area.localId !== activeLocalId);
@@ -306,7 +322,7 @@ export default function EventDetailPage() {
         setActiveLocalId(null);
     };
 
-    if (isLoading && !layoutImageUrl) {
+    if (isLoading && layoutImageUrl === null) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#F1F3F5]">
         <Loader2 className="w-12 h-12 animate-spin text-[#2D2A4A]" />
@@ -314,7 +330,7 @@ export default function EventDetailPage() {
     );
   }
 
-  if (!event) {
+    if (event === null) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#F1F3F5]">
         <div className="text-center">
@@ -344,7 +360,7 @@ export default function EventDetailPage() {
           <div className="mt-4 flex flex-col items-center gap-2">
             <div className="flex items-center gap-2.5 text-[22px] font-bold text-gray-400">
               <Calendar className="w-6 h-6" />
-              <span>{event.startDate.replace(/-/g, '.')} ~ {event.endDate.replace(/-/g, '.')}</span>
+                <span>{event.startDate.replaceAll('-', '.')} ~ {event.endDate.replaceAll('-', '.')}</span>
             </div>
             <div className="flex items-center gap-2.5 text-[24px] font-bold text-gray-500 mt-0.5">
               <MapPin className="w-6 h-6" />
@@ -355,7 +371,7 @@ export default function EventDetailPage() {
 
         {/* Content Area */}
           <div
-              className="w-full max-w-7xl mx-auto bg-white rounded-[40px] shadow-sm border border-gray-100 p-10 flex flex-col relative overflow-hidden min-h-[650px]">
+              className="w-full max-w-7xl mx-auto bg-white rounded-[40px] shadow-sm border border-gray-100 p-10 flex flex-col relative overflow-hidden min-h-162.5">
 
           {/* Status Indicators with Edit Button */}
           <div className="flex items-center gap-6 mb-8">
@@ -374,7 +390,7 @@ export default function EventDetailPage() {
               <div className="ml-auto flex gap-3">
                   {layoutImageUrl && (
                       <>
-                          {isEditMode && (
+                          {isEditMode ? (
                               <button
                                   onClick={handleAddArea}
                                   className="flex items-center gap-2 px-5 py-2.5 bg-blue-100 text-blue-700 rounded-xl font-black text-[15px] hover:bg-blue-200 transition-all shadow-sm"
@@ -382,8 +398,7 @@ export default function EventDetailPage() {
                                   <MapPin className="w-5 h-5"/>
                                   영역 추가
                               </button>
-                          )}
-                          {!isEditMode && (
+                          ) : (
                               <>
                                   <input
                                       type="file"
@@ -493,7 +508,7 @@ export default function EventDetailPage() {
         isOpen={isEditModalOpen}
         onClose={() => {
           setIsEditModalOpen(false);
-          window.location.reload(); 
+            globalThis.location.reload();
         }}
         event={event}
       />
@@ -504,6 +519,7 @@ export default function EventDetailPage() {
             eventId={eventId}
             alreadyMappedBoothIds={mappedBoothIds}
             currentBoothId={currentBoothId}
+            currentData={currentActiveArea}
             onSelect={handleSelectBooth}
             onDeleteArea={handleDeleteArea}
         />

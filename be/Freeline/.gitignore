@@ -70,7 +70,8 @@ Desktop.ini
 
 # [Others]
 docs/
-src/main/resources/dummy.sql
+ai/draft/
+infisical.exe
 node_modules/
 .npm/
 dist/
