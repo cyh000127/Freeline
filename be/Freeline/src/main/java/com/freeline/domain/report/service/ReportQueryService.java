@@ -10,8 +10,11 @@ import lombok.RequiredArgsConstructor;
 
 import com.freeline.common.error.ErrorCode;
 import com.freeline.common.error.exception.BusinessException;
+import com.freeline.domain.booth.entity.Booth;
+import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.repository.EventRepository;
+import com.freeline.domain.report.dto.response.BoothReportResponseDto;
 import com.freeline.domain.report.dto.response.ReportResponseDto;
 import com.freeline.domain.report.entity.BoothPerformanceResult;
 import com.freeline.domain.report.entity.EventSummaryResult;
@@ -30,6 +33,7 @@ import com.freeline.domain.report.repository.VisitorPathResultRepository;
 public class ReportQueryService {
 
     private final EventRepository eventRepository;
+    private final BoothRepository boothRepository;
     private final EventSummaryResultRepository eventSummaryResultRepository;
     private final BoothPerformanceResultRepository boothPerformanceResultRepository;
     private final HourlyTrafficResultRepository hourlyTrafficResultRepository;
@@ -102,6 +106,33 @@ public class ReportQueryService {
             throw new BusinessException(ErrorCode.REPORT_NOT_FOUND);
         }
         return toProblemSpotDtos(problems);
+    }
+
+    public BoothReportResponseDto getBoothReport(final Long boothId) {
+        final Booth booth = boothRepository.findById(boothId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BOOTH_NOT_FOUND));
+        final Long eventId = booth.getEventId();
+
+        final BoothPerformanceResult performance =
+                boothPerformanceResultRepository.findByEventIdAndBoothId(eventId, boothId)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.REPORT_NOT_FOUND));
+
+        final List<HourlyTrafficResult> traffics =
+                hourlyTrafficResultRepository.findAllByEventId(eventId);
+
+        final List<ProblemSpotResult> problems =
+                problemSpotResultRepository.findAllByEventIdAndTargetId(
+                        eventId, String.valueOf(boothId));
+
+        final EventSummaryResult summary = eventSummaryResultRepository.findByEventId(eventId)
+                .orElse(null);
+
+        return BoothReportResponseDto.builder()
+                .boothPerformance(toBoothPerformanceDtos(List.of(performance)).get(0))
+                .hourlyTraffics(toHourlyTrafficDtos(traffics))
+                .problemSpots(toProblemSpotDtos(problems))
+                .eventSummary(summary != null ? toSummaryDto(summary) : null)
+                .build();
     }
 
     private void validateEventAccess(final Long eventAdminId, final Long eventId) {
