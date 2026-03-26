@@ -4,7 +4,7 @@ export type EventProfile = {
   dateLabel: string;
   dayLabel: string;
   venueLabel: string;
-  bannerImage: number;
+  bannerImage: string | number | null;
 };
 
 const defaultEvent = {

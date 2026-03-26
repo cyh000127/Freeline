@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { ActionButton } from '@/components/ActionButton';
+import { AppImage } from '@/components/AppImage';
 import { BottomActionBar } from '@/components/BottomActionBar';
 import { EmptyState } from '@/components/EmptyState';
 import { ReservationConfirmSheet } from '@/components/ReservationConfirmSheet';
@@ -68,13 +68,15 @@ export default function BoothDetailScreen() {
           <>
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
               <View style={styles.hero}>
-                {detail.representativeImageUrl ? (
-                  <Image contentFit="cover" source={detail.representativeImageUrl} style={styles.heroImage} />
-                ) : (
-                  <View style={styles.heroFallback}>
-                    <Text style={styles.heroFallbackText}>{detail.name}</Text>
-                  </View>
-                )}
+                <AppImage
+                  fallback={
+                    <View style={styles.heroFallback}>
+                      <Text style={styles.heroFallbackText}>{detail.name}</Text>
+                    </View>
+                  }
+                  source={detail.representativeImageUrl}
+                  style={styles.heroImage}
+                />
                 <Pressable onPress={() => router.back()} style={styles.closeButton}>
                   <Feather color={palette.ink} name="x" size={20} />
                 </Pressable>

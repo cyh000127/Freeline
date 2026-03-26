@@ -1,12 +1,13 @@
-import { ImageBackground, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { palette } from '@/theme/colors';
+import { AppImage } from './AppImage';
 
 type Props = {
   title: string;
   dateLabel: string;
   dayLabel: string;
   venueLabel: string;
-  imageSource: number;
+  imageSource?: string | number | null;
 };
 
 export function HeroEventCard({
@@ -17,7 +18,17 @@ export function HeroEventCard({
   imageSource,
 }: Props) {
   return (
-    <ImageBackground imageStyle={styles.imageStyle} source={imageSource} style={styles.card}>
+    <View style={styles.card}>
+      <AppImage
+        fallback={
+          <View style={styles.imageFallback}>
+            <Text style={styles.fallbackVenue}>{venueLabel}</Text>
+            <Text style={styles.fallbackTitle}>{title}</Text>
+          </View>
+        }
+        source={imageSource}
+        style={styles.media}
+      />
       <View style={styles.overlay} />
       <View style={styles.content}>
         <Text style={styles.eyebrow}>{venueLabel}</Text>
@@ -27,7 +38,7 @@ export function HeroEventCard({
           <Text style={styles.day}>{dayLabel}</Text>
         </View>
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -38,8 +49,27 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'flex-end',
   },
-  imageStyle: {
+  media: {
+    ...StyleSheet.absoluteFillObject,
     borderRadius: 28,
+  },
+  imageFallback: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: 20,
+    backgroundColor: palette.ink,
+    gap: 8,
+  },
+  fallbackVenue: {
+    color: palette.limeSoft,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  fallbackTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+    lineHeight: 30,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,

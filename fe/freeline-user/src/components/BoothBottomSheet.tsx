@@ -10,12 +10,12 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type BoothDetail, type BoothSummary } from '@/features/api/booths';
 import { palette } from '@/theme/colors';
 import { ActionButton } from './ActionButton';
+import { AppImage } from './AppImage';
 
 type Props = {
   booth: BoothSummary | null;
@@ -123,13 +123,15 @@ export function BoothBottomSheet({
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.hero}>
-              {detail?.representativeImageUrl ? (
-                <Image contentFit="cover" source={detail.representativeImageUrl} style={styles.heroImage} />
-              ) : (
-                <View style={styles.heroFallback}>
-                  <Text style={styles.heroFallbackText}>{booth.name}</Text>
-                </View>
-              )}
+              <AppImage
+                fallback={
+                  <View style={styles.heroFallback}>
+                    <Text style={styles.heroFallbackText}>{booth.name}</Text>
+                  </View>
+                }
+                source={detail?.representativeImageUrl}
+                style={styles.heroImage}
+              />
             </View>
 
             <View style={styles.queueHero}>

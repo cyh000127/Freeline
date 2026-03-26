@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { AppImage } from '@/components/AppImage';
 import { BottomActionBar } from '@/components/BottomActionBar';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
@@ -61,13 +61,15 @@ export default function BoothGoodsScreen() {
                 detail.goods.map((goods) => (
                   <View key={goods.goodsId} style={styles.goodsCard}>
                     <View style={styles.goodsImageWrap}>
-                      {goods.imageUrl ? (
-                        <Image contentFit="cover" source={goods.imageUrl} style={styles.goodsImage} />
-                      ) : (
-                        <View style={styles.goodsFallback}>
-                          <Feather color={palette.inkMuted} name="gift" size={26} />
-                        </View>
-                      )}
+                      <AppImage
+                        fallback={
+                          <View style={styles.goodsFallback}>
+                            <Feather color={palette.inkMuted} name="gift" size={26} />
+                          </View>
+                        }
+                        source={goods.imageUrl}
+                        style={styles.goodsImage}
+                      />
                     </View>
 
                     <View style={styles.goodsCopy}>
