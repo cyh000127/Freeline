@@ -1,11 +1,25 @@
 import {api} from "./axios";
 
-interface AreaItem {
+export interface AreaItem {
     boothId: number;
     xRatio: number;
     yRatio: number;
     widthRatio: number;
     heightRatio: number;
+}
+
+export interface EditorAreaItem {
+    boothId: number | null;
+    boothName?: string;
+    xRatio: number;
+    yRatio: number;
+    widthRatio: number;
+    heightRatio: number;
+    localId: string;
+}
+
+export interface BoothMapSnapshot {
+    areas: EditorAreaItem[];
 }
 
 export const boothMapApi = {
@@ -28,6 +42,13 @@ export const boothMapApi = {
         return api.put(`/v1/boothmaps/events/${eventId}/areas/bulk`, {
             eventMapId,
             areas,
+        });
+    },
+
+    updateBoothMapSnapshot: (eventId: number, eventMapId: number, snapshot: BoothMapSnapshot) => {
+        return api.put(`/v1/boothmaps/events/${eventId}/snapshot`, {
+            eventMapId,
+            mappingSnapshot: JSON.stringify(snapshot),
         });
     },
 };
