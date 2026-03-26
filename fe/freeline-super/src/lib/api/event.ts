@@ -113,4 +113,8 @@ export const eventApi = {
   // 행사 지도에 대한 부스 영역 일괄 저장
   saveMapAreas: (eventId: number | string, payload: { eventMapId: number, areas: { boothId: number, startX: number, startY: number, widthRatio: number, heightRatio: number }[] }) =>
     api.put<ApiResponse<any>>(`/v1/boothmaps/events/${eventId}/areas/bulk`, payload),
+
+  // 행사별 방문자 티켓(엔트리 코드) 목록 조회
+  getVisitorTickets: (eventId: number | string, page = 0, size = 30) =>
+    api.get<PaginatedResponse<any>>(`/v1/events/${eventId}/entry-codes?page=${page}&size=${size}`),
 };

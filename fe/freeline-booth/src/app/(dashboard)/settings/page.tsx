@@ -201,9 +201,14 @@ export default function SettingsPage() {
           setRepImageFile(null);
           // Optional: re-fetch images to get server URL instead of blob
         }
-      } catch (error) {
-        console.error("Failed to upload representative image:", error);
-        alert("대표 이미지 업로드에 실패했습니다.");
+      } catch (error: any) {
+        const errorStatus = error.response?.data?.status || error.response?.data?.error?.status;
+        if (errorStatus === "INVALID_IMAGE_FORMAT") {
+          alert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
+        } else {
+          console.error("Failed to upload representative image:", error);
+          alert("대표 이미지 업로드에 실패했습니다.");
+        }
       } finally {
         setIsUploadingRepImage(false);
       }
@@ -216,9 +221,14 @@ export default function SettingsPage() {
           setLogoImageFile(null);
           // Optional: re-fetch images to get server URL instead of blob
         }
-      } catch (error) {
-        console.error("Failed to upload image:", error);
-        alert("로고 이미지 업로드에 실패했습니다.");
+      } catch (error: any) {
+        const errorStatus = error.response?.data?.status || error.response?.data?.error?.status;
+        if (errorStatus === "INVALID_IMAGE_FORMAT") {
+          alert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
+        } else {
+          console.error("Failed to upload image:", error);
+          alert("로고 이미지 업로드에 실패했습니다.");
+        }
       } finally {
         setIsUploadingImage(false);
       }

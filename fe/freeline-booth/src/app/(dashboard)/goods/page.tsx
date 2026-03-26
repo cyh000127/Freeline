@@ -89,9 +89,14 @@ export default function GoodsPage() {
       setNewGoodsImage(null);
       setPreviewUrl("");
       fetchGoods(); // Refresh list
-    } catch (error) {
-      console.error("Failed to create goods:", error);
-      alert("굿즈 생성에 실패했습니다.");
+    } catch (error: any) {
+      const errorStatus = error.response?.data?.status || error.response?.data?.error?.status;
+      if (errorStatus === "INVALID_IMAGE_FORMAT") {
+        alert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
+      } else {
+        console.error("Failed to create goods:", error);
+        alert("굿즈 생성에 실패했습니다.");
+      }
     }
   };
 
