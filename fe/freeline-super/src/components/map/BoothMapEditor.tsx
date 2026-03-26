@@ -153,7 +153,7 @@ export function BoothMapEditor({
                                 ? "border-blue-500 bg-blue-500/20"
                                 : "border-red-400 bg-red-400/20 border-dashed"
                         } transition-colors group cursor-pointer`}
-                        onClick={(e) => {
+                        onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
                             if (isEditMode && !isDraggingRef.current) {
                                 onOpenSearchModal(area.localId);
