@@ -1,5 +1,4 @@
-import { ensureOk, unwrap } from '@/lib/api';
-import { http } from '@/lib/http';
+import { deleteOk, getData, patchData, postData, withAccessToken } from '@/lib/request';
 
 export type WaitingStatus =
   | 'WAITING'
@@ -36,48 +35,34 @@ export type WaitingMutationResponse = {
   exited_at?: string;
 };
 
-function authHeaders(accessToken: string) {
-  return {
-    Authorization: `Bearer ${accessToken}`,
-  };
-}
-
 export async function fetchMyWaitings(accessToken: string) {
-  const response = await http.get('/visitors/me/waitings', {
-    headers: authHeaders(accessToken),
-  });
-
-  return unwrap<WaitingListResponse>(response);
+  return getData<WaitingListResponse>('/visitors/me/waitings', withAccessToken(accessToken));
 }
 
 export async function createWaiting(accessToken: string, boothId: number) {
-  const response = await http.post(`/booths/${boothId}/waitings`, undefined, {
-    headers: authHeaders(accessToken),
-  });
-
-  return unwrap<WaitingMutationResponse>(response);
+  return postData<WaitingMutationResponse>(
+    `/booths/${boothId}/waitings`,
+    undefined,
+    withAccessToken(accessToken),
+  );
 }
 
 export async function cancelWaiting(accessToken: string, waitingId: number) {
-  const response = await http.delete(`/waitings/${waitingId}`, {
-    headers: authHeaders(accessToken),
-  });
-
-  ensureOk(response);
+  await deleteOk(`/waitings/${waitingId}`, withAccessToken(accessToken));
 }
 
 export async function postponeWaiting(accessToken: string, waitingId: number) {
-  const response = await http.patch(`/waitings/${waitingId}/postpone`, undefined, {
-    headers: authHeaders(accessToken),
-  });
-
-  return unwrap<WaitingMutationResponse>(response);
+  return patchData<WaitingMutationResponse>(
+    `/waitings/${waitingId}/postpone`,
+    undefined,
+    withAccessToken(accessToken),
+  );
 }
 
 export async function exitWaiting(accessToken: string, waitingId: number) {
-  const response = await http.patch(`/waitings/${waitingId}/exit`, undefined, {
-    headers: authHeaders(accessToken),
-  });
-
-  return unwrap<WaitingMutationResponse>(response);
+  return patchData<WaitingMutationResponse>(
+    `/waitings/${waitingId}/exit`,
+    undefined,
+    withAccessToken(accessToken),
+  );
 }

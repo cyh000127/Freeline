@@ -1,5 +1,4 @@
-import { http } from '@/lib/http';
-import { unwrap } from '@/lib/api';
+import { getData, withAccessToken } from '@/lib/request';
 
 export type BoothSummary = {
   boothId: number;
@@ -37,30 +36,17 @@ export type ExpectedTime = {
   avg_stay_time: number;
 };
 
-function authHeaders(accessToken?: string | null) {
-  return accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
-}
-
 export async function fetchBooths(eventId: number, accessToken?: string | null) {
-  const response = await http.get(`/booths/events/${eventId}`, {
-    headers: authHeaders(accessToken),
-  });
-
-  return unwrap<BoothSummary[]>(response);
+  return getData<BoothSummary[]>(`/booths/events/${eventId}`, withAccessToken(accessToken));
 }
 
 export async function fetchBoothDetail(boothId: number, accessToken?: string | null) {
-  const response = await http.get(`/booths/${boothId}`, {
-    headers: authHeaders(accessToken),
-  });
-
-  return unwrap<BoothDetail>(response);
+  return getData<BoothDetail>(`/booths/${boothId}`, withAccessToken(accessToken));
 }
 
 export async function fetchExpectedTime(boothId: number, accessToken?: string | null) {
-  const response = await http.get(`/booths/${boothId}/waitings/expected-time`, {
-    headers: authHeaders(accessToken),
-  });
-
-  return unwrap<ExpectedTime>(response);
+  return getData<ExpectedTime>(
+    `/booths/${boothId}/waitings/expected-time`,
+    withAccessToken(accessToken),
+  );
 }

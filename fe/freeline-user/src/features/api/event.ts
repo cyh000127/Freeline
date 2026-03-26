@@ -1,5 +1,4 @@
-import { http } from '@/lib/http';
-import { unwrap } from '@/lib/api';
+import { getData, withAccessToken } from '@/lib/request';
 
 export type VisitorEventDetail = {
   eventId: number;
@@ -15,11 +14,5 @@ export type VisitorEventDetail = {
 };
 
 export async function fetchMyEventDetail(accessToken: string) {
-  const response = await http.get('/visitors/me/event', {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-
-  return unwrap<VisitorEventDetail>(response);
+  return getData<VisitorEventDetail>('/visitors/me/event', withAccessToken(accessToken));
 }
