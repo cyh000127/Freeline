@@ -8,7 +8,13 @@ import {BoothMapEditor} from "@/components/map/BoothMapEditor";
 import {BoothSearchModal} from "@/components/map/BoothSearchModal";
 import {eventApi, Event} from "@/lib/api/event";
 import { authApi } from "@/lib/api/auth";
-import {boothMapApi} from "@/lib/api/boothMap";
+import {
+    boothMapApi,
+    BoothAreaDraftResponse,
+    BoothMapAreaResponse,
+    BoothMapResponse,
+    EditorAreaItem,
+} from "@/lib/api/boothMap";
 import { 
   Map as MapIcon, 
   Upload,
@@ -31,6 +37,94 @@ interface AreaItem {
     readonly heightRatio: number;
     readonly localId: string;
 }
+
+type SnapshotPayload = {
+    areas?: Partial<EditorAreaItem>[];
+} | Partial<EditorAreaItem>[];
+
+const isRatioNumber = (value: unknown): value is number =>
+    typeof value === "number" && Number.isFinite(value);
+
+const normalizeAreaItem = (
+    area: Partial<EditorAreaItem>,
+    fallbackPrefix: string,
+    index: number
+): AreaItem | null => {
+    if (
+        !isRatioNumber(area.xRatio)
+        || !isRatioNumber(area.yRatio)
+        || !isRatioNumber(area.widthRatio)
+        || !isRatioNumber(area.heightRatio)
+    ) {
+        return null;
+    }
+
+    return {
+        localId: typeof area.localId === "string" && area.localId.length > 0
+            ? area.localId
+            : `${fallbackPrefix}-${index}-${Date.now()}`,
+        boothId: typeof area.boothId === "number" ? area.boothId : null,
+        boothName: typeof area.boothName === "string" ? area.boothName : undefined,
+        xRatio: area.xRatio,
+        yRatio: area.yRatio,
+        widthRatio: area.widthRatio,
+        heightRatio: area.heightRatio,
+    };
+};
+
+const mapConfirmedAreas = (booths?: BoothMapAreaResponse[]): AreaItem[] => {
+    if (!booths) {
+        return [];
+    }
+
+    return booths.map((booth) => ({
+        localId: `db-${booth.areaId || booth.boothId}`,
+        boothId: booth.boothId,
+        boothName: booth.boothName,
+        xRatio: booth.xRatio,
+        yRatio: booth.yRatio,
+        widthRatio: booth.widthRatio,
+        heightRatio: booth.heightRatio,
+    }));
+};
+
+const parseSnapshotAreas = (mappingSnapshot?: string | null): AreaItem[] => {
+    if (!mappingSnapshot) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(mappingSnapshot) as SnapshotPayload;
+        const rawAreas = Array.isArray(parsed) ? parsed : parsed.areas;
+
+        if (!Array.isArray(rawAreas)) {
+            return [];
+        }
+
+        return rawAreas
+            .map((area, index) => normalizeAreaItem(area, "snapshot", index))
+            .filter((area): area is AreaItem => area !== null);
+    } catch (error) {
+        console.error("Failed to parse mapping snapshot", error);
+        return [];
+    }
+};
+
+const mapDraftAreas = (drafts?: BoothAreaDraftResponse[]): AreaItem[] => {
+    if (!drafts) {
+        return [];
+    }
+
+    return drafts
+        .map((draft, index) => normalizeAreaItem({
+            boothId: null,
+            xRatio: draft.xRatio,
+            yRatio: draft.yRatio,
+            widthRatio: draft.widthRatio,
+            heightRatio: draft.heightRatio,
+        }, "ai-draft", index))
+        .filter((area): area is AreaItem => area !== null);
+};
 
 export default function EventDetailPage() {
   const params = useParams();
@@ -99,29 +193,14 @@ export default function EventDetailPage() {
           try {
               const mapRes = await boothMapApi.getBoothMap(eventId);
               if (mapRes.data?.success && mapRes.data?.data) {
-                  setLayoutImageUrl(mapRes.data.data.mapImageUrl);
-                  setEventMapId(mapRes.data.data.eventMapId);
+                  const mapData = mapRes.data.data as BoothMapResponse;
+                  const snapshotAreas = parseSnapshotAreas(mapData.mappingSnapshot);
+                  const confirmedAreas = mapConfirmedAreas(mapData.booths);
 
-                  if (mapRes.data.data.booths) {
-                      const mappedAreas = mapRes.data.data.booths.map((b: {
-                          areaId?: number;
-                          boothId: number;
-                          boothName: string;
-                          xRatio: number;
-                          yRatio: number;
-                          widthRatio: number;
-                          heightRatio: number
-                      }) => ({
-                          localId: `db-${b.areaId || b.boothId}`,
-                          boothId: b.boothId,
-                          boothName: b.boothName,
-                          xRatio: b.xRatio,
-                          yRatio: b.yRatio,
-                          widthRatio: b.widthRatio,
-                          heightRatio: b.heightRatio,
-                      }));
-                      setAreas(mappedAreas);
-                  }
+                  setLayoutImageUrl(mapData.mapImageUrl);
+                  setEventMapId(mapData.eventMapId);
+                  setAreas(snapshotAreas.length > 0 ? snapshotAreas : confirmedAreas);
+                  setHasUnsavedChanges(false);
               }
           } catch (mapErr) {
               console.log("No map data found for this event", mapErr);
@@ -173,21 +252,8 @@ export default function EventDetailPage() {
                 setLayoutImageUrl(res.data.data.imagePath);
                 setEventMapId(res.data.data.eventMapId);
 
-                // AI Drafts processing
-                if (res.data.data.drafts && res.data.data.drafts.length > 0) {
-                    const newDrafts = res.data.data.drafts.map((d: {
-                        xRatio: number;
-                        yRatio: number;
-                        widthRatio: number;
-                        heightRatio: number
-                    }, idx: number) => ({
-                        localId: `ai-draft-${idx}-${Date.now()}`,
-                        boothId: null,
-                        xRatio: d.xRatio,
-                        yRatio: d.yRatio,
-                        widthRatio: d.widthRatio,
-                        heightRatio: d.heightRatio,
-                    }));
+                const newDrafts = mapDraftAreas(res.data.data.drafts);
+                if (newDrafts.length > 0) {
                     setAreas(newDrafts);
                     setHasUnsavedChanges(true);
                     setIsEditMode(true); // Automatically enter edit mode

@@ -12,6 +12,8 @@ public interface BoothRepository extends JpaRepository<Booth, Long> {
 
     List<Booth> findAllByEventIdOrderByIdAsc(final Long eventId);
 
+    long countByIdInAndEventId(final List<Long> boothIds, final Long eventId);
+
     @Query("""
             SELECT COUNT(b) > 0
             FROM Booth b

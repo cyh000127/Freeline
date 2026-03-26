@@ -18,7 +18,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import com.freeline.common.error.ErrorCode;
+import com.freeline.common.error.exception.BusinessException;
 import com.freeline.common.file.service.FileService;
+import com.freeline.domain.auth.exception.AuthException;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.exception.BoothException;
@@ -35,13 +38,17 @@ import com.freeline.domain.boothmap.repository.EventMapRepository;
 import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.exception.EventException;
 import com.freeline.domain.event.repository.EventRepository;
-
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.type.CollectionType;
 import tools.jackson.databind.type.TypeFactory;
 
+import tools.jackson.databind.ObjectMapper;
+
 @ExtendWith(MockitoExtension.class)
 class BoothMapServiceTest {
+
+    private static final Long EVENT_ADMIN_ID = 1L;
+    private static final Long EVENT_ID = 5L;
+    private static final Long EVENT_MAP_ID = 10L;
 
     @Mock
     private EventRepository eventRepository;
@@ -85,16 +92,129 @@ class BoothMapServiceTest {
     }
 
     @Test
-    void 부스_지도_영역_일괄_저장_성공() {
+    void 부스_지도_영역_일괄_저장이_소유권과_부스소속을_검증한_후_성공한다() {
         final EventMap eventMap = EventMap.builder()
-                .id(10L)
-                .eventId(5L)
+                .id(EVENT_MAP_ID)
+                .eventId(EVENT_ID)
                 .imagePath("https://storage.example.com/map_v1.png")
                 .visible(false)
+                .mappingSnapshot("{\"areas\":[{\"xRatio\":0.1}]}")
                 .build();
 
-        final BoothMapAreaBulkUpsertReqDto request = BoothMapAreaBulkUpsertReqDto.builder()
-                .eventMapId(10L)
+        final EventMap existingVisibleMap = EventMap.builder()
+                .id(9L)
+                .eventId(EVENT_ID)
+                .visible(true)
+                .build();
+
+        final BoothMapAreaBulkUpsertReqDto request = createBulkRequest();
+
+        Mockito.when(eventRepository.findById(EVENT_ID)).thenReturn(Optional.of(createEvent(EVENT_ADMIN_ID)));
+        Mockito.when(eventMapRepository.findById(EVENT_MAP_ID)).thenReturn(Optional.of(eventMap));
+        Mockito.when(boothRepository.countByIdInAndEventId(List.of(101L, 102L), EVENT_ID)).thenReturn(2L);
+        Mockito.when(eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(EVENT_ID))
+                .thenReturn(Optional.of(existingVisibleMap));
+
+        boothMapService.bulkUpsertBoothMapAreas(EVENT_ADMIN_ID, EVENT_ID, request);
+
+        Mockito.verify(boothMapAreaRepository).deleteAllByEventMapId(EVENT_MAP_ID);
+        Mockito.verify(boothMapAreaRepository).saveAll(ArgumentMatchers.anyList());
+        Assertions.assertThat(existingVisibleMap.isVisible()).isFalse();
+        Assertions.assertThat(eventMap.isVisible()).isTrue();
+        Assertions.assertThat(eventMap.getMappingSnapshot()).isNull();
+    }
+
+    @Test
+    void 부스_지도_영역_일괄_저장은_행사_소유자가_아니면_실패한다() {
+        final BoothMapAreaBulkUpsertReqDto request = createBulkRequest();
+
+        Mockito.when(eventRepository.findById(EVENT_ID)).thenReturn(Optional.of(createEvent(999L)));
+
+        Assertions.assertThatThrownBy(() -> boothMapService.bulkUpsertBoothMapAreas(EVENT_ADMIN_ID, EVENT_ID, request))
+                .isInstanceOf(AuthException.class)
+                .satisfies(exception -> assertErrorCode(exception, ErrorCode.ACCESS_DENIED));
+    }
+
+    @Test
+    void 부스_지도_영역_일괄_저장은_다른_행사_부스가_포함되면_실패한다() {
+        final EventMap eventMap = EventMap.builder()
+                .id(EVENT_MAP_ID)
+                .eventId(EVENT_ID)
+                .imagePath("https://storage.example.com/map_v1.png")
+                .visible(true)
+                .build();
+
+        final BoothMapAreaBulkUpsertReqDto request = createBulkRequest();
+
+        Mockito.when(eventRepository.findById(EVENT_ID)).thenReturn(Optional.of(createEvent(EVENT_ADMIN_ID)));
+        Mockito.when(eventMapRepository.findById(EVENT_MAP_ID)).thenReturn(Optional.of(eventMap));
+        Mockito.when(boothRepository.countByIdInAndEventId(List.of(101L, 102L), EVENT_ID)).thenReturn(1L);
+
+        Assertions.assertThatThrownBy(() -> boothMapService.bulkUpsertBoothMapAreas(EVENT_ADMIN_ID, EVENT_ID, request))
+                .isInstanceOf(BoothException.class)
+                .satisfies(exception -> assertErrorCode(exception, ErrorCode.BOOTH_EVENT_MISMATCH));
+    }
+
+    @Test
+    void 부스_지도_조회는_스냅샷을_함께_반환한다() {
+        final EventMap eventMap = EventMap.builder()
+                .id(EVENT_MAP_ID)
+                .eventId(EVENT_ID)
+                .imagePath("https://storage.example.com/map_v1.png")
+                .visible(true)
+                .mappingSnapshot("{\"areas\":[{\"xRatio\":0.1}]}")
+                .build();
+
+        final Booth booth = Booth.builder()
+                .id(101L)
+                .eventId(EVENT_ID)
+                .name("A-1 미술관")
+                .locationCode("A-03")
+                .openTime(LocalTime.of(10, 0))
+                .closeTime(LocalTime.of(18, 0))
+                .emergencyClosed(false)
+                .build();
+
+        final BoothMapArea area = BoothMapArea.builder()
+                .id(1L)
+                .eventMapId(EVENT_MAP_ID)
+                .boothId(101L)
+                .xRatio(new BigDecimal("0.1050"))
+                .yRatio(new BigDecimal("0.2000"))
+                .widthRatio(new BigDecimal("0.1450"))
+                .heightRatio(new BigDecimal("0.1550"))
+                .build();
+
+        Mockito.when(eventRepository.findById(EVENT_ID)).thenReturn(Optional.of(createEvent(EVENT_ADMIN_ID)));
+        Mockito.when(eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(EVENT_ID)).thenReturn(Optional.of(eventMap));
+        Mockito.when(boothRepository.findAllByEventIdOrderByIdAsc(EVENT_ID)).thenReturn(List.of(booth));
+        Mockito.when(boothMapAreaRepository.findAllByEventMapIdOrderByIdAsc(EVENT_MAP_ID)).thenReturn(List.of(area));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(
+                101L,
+                List.of(WaitingStatus.WAITING, WaitingStatus.CALLED, WaitingStatus.REGISTERED)
+        )).thenReturn(12L);
+
+        final BoothMapResDto result = boothMapService.getBoothMap(EVENT_ADMIN_ID, EVENT_ID);
+
+        Assertions.assertThat(result.eventId()).isEqualTo(EVENT_ID);
+        Assertions.assertThat(result.eventMapId()).isEqualTo(EVENT_MAP_ID);
+        Assertions.assertThat(result.mappingSnapshot()).isEqualTo("{\"areas\":[{\"xRatio\":0.1}]}");
+        Assertions.assertThat(result.booths()).hasSize(1);
+        Assertions.assertThat(result.booths().get(0).boothId()).isEqualTo(101L);
+    }
+
+    @Test
+    void 부스_지도_조회는_행사가_없으면_실패한다() {
+        Mockito.when(eventRepository.findById(EVENT_ID)).thenReturn(Optional.empty());
+
+        Assertions.assertThatThrownBy(() -> boothMapService.getBoothMap(EVENT_ADMIN_ID, EVENT_ID))
+                .isInstanceOf(EventException.class)
+                .satisfies(exception -> assertErrorCode(exception, ErrorCode.EVENT_NOT_FOUND));
+    }
+
+    private BoothMapAreaBulkUpsertReqDto createBulkRequest() {
+        return BoothMapAreaBulkUpsertReqDto.builder()
+                .eventMapId(EVENT_MAP_ID)
                 .areas(List.of(
                         BoothMapAreaBulkUpsertReqDto.AreaItem.builder()
                                 .boothId(101L)
@@ -112,92 +232,18 @@ class BoothMapServiceTest {
                                 .build()
                 ))
                 .build();
-
-        final EventMap existingVisibleMap = EventMap.builder()
-                .id(9L)
-                .eventId(5L)
-                .visible(true)
-                .build();
-
-        Booth booth1 = Booth.builder().id(101L).build();
-        Booth booth2 = Booth.builder().id(102L).build();
-
-        Mockito.when(eventRepository.existsById(5L)).thenReturn(true);
-        Mockito.when(eventRepository.findById(5L)).thenReturn(Optional.of(event));
-        Mockito.when(eventMapRepository.findById(10L)).thenReturn(Optional.of(eventMap));
-        Mockito.when(boothRepository.findAllByEventIdOrderByIdAsc(5L)).thenReturn(List.of(booth1, booth2));
-        Mockito.when(boothMapAreaRepository.findAllByEventMapIdOrderByIdAsc(10L)).thenReturn(List.of());
-
-        Mockito.when(eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(5L))
-                .thenReturn(Optional.of(existingVisibleMap));
-
-        boothMapService.bulkUpsertBoothMapAreas(5L, request);
-
-        // 1. 기존 데이터 삭제 확인
-        Mockito.verify(boothMapAreaRepository).deleteAll(ArgumentMatchers.anyList());
-
-        // 2. 새 데이터 일괄 저장 확인
-        Mockito.verify(boothMapAreaRepository).saveAll(ArgumentMatchers.anyList());
-
-        // 3. 기존 대표 지도 딱지 떼기 확인
-        Assertions.assertThat(existingVisibleMap.isVisible()).isFalse();
-
-        // 4. 새로운 지도 대표 설정 확인
-        Assertions.assertThat(eventMap.isVisible()).isTrue();
     }
 
-    @Test
-    void 부스_지도_조회_성공() {
-        final EventMap eventMap = EventMap.builder()
-                .id(10L)
-                .eventId(5L)
-                .imagePath("https://storage.example.com/map_v1.png")
-                .visible(true)
+    private Event createEvent(final Long ownerId) {
+        return Event.builder()
+                .id(EVENT_ID)
+                .eventAdminId(ownerId)
                 .build();
-
-        final Booth booth = Booth.builder()
-                .id(101L)
-                .eventId(5L)
-                .name("A-1 민음사")
-                .locationCode("A-03")
-                .openTime(LocalTime.of(10, 0))
-                .closeTime(LocalTime.of(18, 0))
-                .emergencyClosed(false)
-                .build();
-
-        final BoothMapArea area = BoothMapArea.builder()
-                .id(1L)
-                .eventMapId(10L)
-                .boothId(101L)
-                .xRatio(new BigDecimal("0.1050"))
-                .yRatio(new BigDecimal("0.2000"))
-                .widthRatio(new BigDecimal("0.1450"))
-                .heightRatio(new BigDecimal("0.1550"))
-                .build();
-
-        Mockito.when(eventRepository.existsById(5L)).thenReturn(true);
-        Mockito.when(eventRepository.findById(5L)).thenReturn(Optional.of(event));
-        Mockito.when(eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(5L)).thenReturn(Optional.of(eventMap));
-        Mockito.when(boothRepository.findAllByEventIdOrderByIdAsc(5L)).thenReturn(List.of(booth));
-        Mockito.when(boothMapAreaRepository.findAllByEventMapIdOrderByIdAsc(10L)).thenReturn(List.of(area));
-        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(101L, List.of(WaitingStatus.WAITING, WaitingStatus.CALLED, WaitingStatus.REGISTERED)))
-                .thenReturn(12L);
-
-        final BoothMapResDto result = boothMapService.getBoothMap(5L);
-
-        Assertions.assertThat(result.eventId()).isEqualTo(5L);
-        Assertions.assertThat(result.eventMapId()).isEqualTo(10L);
-        Assertions.assertThat(result.booths()).hasSize(1);
-        Assertions.assertThat(result.booths().get(0).boothId()).isEqualTo(101L);
     }
 
-    @Test
-    void 부스_지도_조회_실패_행사_없음() {
-        Mockito.when(eventRepository.existsById(5L)).thenReturn(false);
-
-        Assertions.assertThatThrownBy(() -> boothMapService.getBoothMap(5L))
-                .isInstanceOf(EventException.class)
-                .hasMessage("존재하지 않는 행사입니다.");
+    private void assertErrorCode(final Throwable exception, final ErrorCode errorCode) {
+        Assertions.assertThat(exception).isInstanceOf(BusinessException.class);
+        Assertions.assertThat(((BusinessException) exception).getErrorCode()).isEqualTo(errorCode);
     }
 
     @Test
@@ -209,7 +255,7 @@ class BoothMapServiceTest {
         Mockito.when(eventRepository.existsById(5L)).thenReturn(true);
         Mockito.when(eventRepository.findById(5L)).thenReturn(Optional.of(event));
 
-        Assertions.assertThatThrownBy(() -> boothMapService.getBoothMap(5L))
+        Assertions.assertThatThrownBy(() -> boothMapService.getBoothMap(1L, 5L))
                 .isInstanceOf(EventException.class)
                 .hasMessage("요청한 리소스에 접근할 권한이 없습니다.");
     }
@@ -239,7 +285,7 @@ class BoothMapServiceTest {
         Mockito.when(objectMapper.readValue(ArgumentMatchers.anyString(), ArgumentMatchers.eq(listType)))
                 .thenReturn(List.of(BoothAreaDraftDto.builder().xRatio(new BigDecimal("0.1")).build()));
 
-        final BoothMapResDto result = boothMapService.getBoothMap(5L);
+        final BoothMapResDto result = boothMapService.getBoothMap(1L, 5L);
 
         Assertions.assertThat(result.booths()).isEmpty();
         Assertions.assertThat(result.drafts()).hasSize(1);

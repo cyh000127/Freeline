@@ -18,6 +18,9 @@ public record BoothMapResDto(
         @Schema(description = "행사 지도 이미지 URL", example = "https://storage.example.com/map_v1.png")
         String mapImageUrl,
 
+        @Schema(description = "지도 임시 매핑 스냅샷 JSON", example = "{\"areas\":[]}")
+        String mappingSnapshot,
+
         @Schema(description = "부스 영역 목록")
         List<BoothMapAreaResDto> booths,
 
