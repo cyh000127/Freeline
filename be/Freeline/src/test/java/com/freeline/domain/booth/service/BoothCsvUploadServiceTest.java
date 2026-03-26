@@ -13,6 +13,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.freeline.common.error.ErrorCode;
+import com.freeline.common.error.exception.BusinessException;
 import com.freeline.common.file.service.FileService;
 import com.freeline.domain.auth.repository.BoothAdminRepository;
 import com.freeline.domain.booth.dto.response.BoothCsvUploadResDto;
@@ -126,8 +128,9 @@ class BoothCsvUploadServiceTest {
         Mockito.when(eventRepository.existsById(5L)).thenReturn(true);
 
         Assertions.assertThatThrownBy(() -> boothService.uploadBoothsByCsv(5L, file))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("2번째 줄의 openTime 형식이 올바르지 않습니다.");
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> Assertions.assertThat(((BusinessException) exception).getErrorCode())
+                        .isEqualTo(ErrorCode.INVALID_CSV_FORMAT));
         Mockito.verify(boothRepository, Mockito.never()).saveAll(ArgumentMatchers.anyList());
         Mockito.verify(boothAdminRepository, Mockito.never()).saveAll(ArgumentMatchers.anyList());
     }
@@ -145,8 +148,28 @@ class BoothCsvUploadServiceTest {
         Mockito.when(eventRepository.existsById(5L)).thenReturn(true);
 
         Assertions.assertThatThrownBy(() -> boothService.uploadBoothsByCsv(5L, file))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("2번째 줄의 adminEmail 값이 비어 있습니다.");
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> Assertions.assertThat(((BusinessException) exception).getErrorCode())
+                        .isEqualTo(ErrorCode.INVALID_CSV_FORMAT));
+        Mockito.verify(boothRepository, Mockito.never()).saveAll(ArgumentMatchers.anyList());
+        Mockito.verify(boothAdminRepository, Mockito.never()).saveAll(ArgumentMatchers.anyList());
+    }
+
+    @Test
+    void uploadBoothsByCsv_failWhenSpoofedBinaryFileIsUploaded() {
+        final MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "spoofed.csv",
+                "text/csv",
+                new byte[]{(byte) 0xC3, 0x28, 0x00, 0x01}
+        );
+
+        Mockito.when(eventRepository.existsById(5L)).thenReturn(true);
+
+        Assertions.assertThatThrownBy(() -> boothService.uploadBoothsByCsv(5L, file))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> Assertions.assertThat(((BusinessException) exception).getErrorCode())
+                        .isEqualTo(ErrorCode.INVALID_CSV_FORMAT));
         Mockito.verify(boothRepository, Mockito.never()).saveAll(ArgumentMatchers.anyList());
         Mockito.verify(boothAdminRepository, Mockito.never()).saveAll(ArgumentMatchers.anyList());
     }
