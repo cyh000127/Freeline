@@ -69,7 +69,7 @@ pipeline {
                         env.BUILD_BOOTH = 'true'
                         env.BUILD_SUPER = 'true'
                     } else {
-                        if (changes.contains('fe/freeline_user/'))  { env.BUILD_USER  = 'true' }
+                        if (changes.contains('fe/freeline-user/'))  { env.BUILD_USER  = 'true' }
                         if (changes.contains('fe/freeline-booth/')) { env.BUILD_BOOTH = 'true' }
                         if (changes.contains('fe/freeline-super/')) { env.BUILD_SUPER = 'true' }
                     }
@@ -88,10 +88,10 @@ pipeline {
 
         stage('Build') {
             parallel {
-                stage('Build freeline_user') {
+                stage('Build freeline-user') {
                     when { expression { env.BUILD_USER == 'true' } }
                     steps {
-                        dir('fe/freeline_user') {
+                        dir('fe/freeline-user') {
                             sh '''set +x
                                 export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
                                     --client-id=$INFISICAL_CLIENT_ID \
@@ -187,7 +187,7 @@ pipeline {
                 }
             }
             steps {
-                dir('fe/freeline_user') {
+                dir('fe/freeline-user') {
                     sh '''set +x
                         export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
                             --client-id=$INFISICAL_CLIENT_ID \

@@ -24,7 +24,7 @@ cd be/Freeline/
 
 ### Frontend — Mobile (Expo React Native)
 ```bash
-cd fe/freeline_user/
+cd fe/freeline-user/
 npm install
 npm run start                  # Expo dev server
 npm run web                    # Web export
@@ -55,7 +55,7 @@ cd infra/nginx/ && docker-compose up -d
 
 ### Repository Structure
 - `be/Freeline/` — Spring Boot backend (Java 21, Gradle)
-- `fe/freeline_user/` — Mobile app (Expo 54 / React Native 0.81)
+- `fe/freeline-user/` — Mobile app (Expo 54 / React Native 0.81)
 - `fe/freeline-booth/` — Booth manager web app (Next.js 16)
 - `fe/freeline-super/` — Admin web app (Next.js 16)
 - `fe/types/` — Shared TypeScript types (changes here trigger rebuild of ALL FE apps in CI)
