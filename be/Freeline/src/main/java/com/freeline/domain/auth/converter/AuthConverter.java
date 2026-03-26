@@ -71,6 +71,7 @@ public class AuthConverter {
                 .name(boothAdmin.getName())
                 .company(boothAdmin.getCompany())
                 .status(boothAdmin.getStatus())
+                .isChanged(boothAdmin.isPasswordChanged())
                 .isActive(boothAdmin.isActive())
                 .lastLoginAt(boothAdmin.getLastLoginAt())
                 .build();
