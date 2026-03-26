@@ -171,26 +171,29 @@ export function BoothMapEditor({
                             backgroundColor: area.color ? `${area.color}33` : undefined,
                             borderColor: area.color || undefined,
                         }}
-                        onClick={(e: React.MouseEvent) => {
+                        onDoubleClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
-                            if (isEditMode && !isDraggingRef.current) {
+                            if (isEditMode) {
                                 onOpenSearchModal(area.localId);
                             }
                         }}
                     >
-                        {/* View Mode (Read Only) */}
-                        {!isEditMode && area.boothName && (
+                        {/* Booth Info Display (Centered) */}
+                        {area.boothName && (
                             <div
-                                className="bg-white/90 text-gray-800 text-xs font-bold px-2 py-1 rounded shadow-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
-                                {area.boothName}
-                            </div>
-                        )}
-
-                        {/* Edit Mode (Booth Name Display) */}
-                        {isEditMode && area.boothName && (
-                            <div
-                                className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-0.5 rounded shadow whitespace-nowrap pointer-events-none">
-                                {area.boothName}
+                                className="flex flex-col items-center justify-center bg-white/90 text-gray-800 px-2 py-1 rounded shadow-sm overflow-hidden max-w-full pointer-events-none"
+                                style={{pointerEvents: 'none'}} // 드래그/리사이즈 방해 방지
+                            >
+                                {area.locationCode && (
+                                    <span
+                                        className="text-[9px] font-semibold text-gray-500 mb-0.5 whitespace-nowrap text-ellipsis overflow-hidden max-w-full">
+                                        {area.locationCode}
+                                    </span>
+                                )}
+                                <span
+                                    className="text-xs font-bold whitespace-nowrap text-ellipsis overflow-hidden max-w-full">
+                                    {area.boothName}
+                                </span>
                             </div>
                         )}
                     </Rnd>

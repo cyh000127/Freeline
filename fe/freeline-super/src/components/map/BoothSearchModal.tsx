@@ -74,15 +74,28 @@ export function BoothSearchModal({
                 const details = detailsRes.data.data;
                 const admins = adminsRes.data.data;
 
-                const merged: BoothInfo[] = details.map((d: any) => {
-                    const admin = admins.find((a: any) => a.boothId === d.boothId);
+                interface BoothDetail {
+                    boothId: number;
+                    name: string;
+                    locationCode: string;
+                }
+
+                interface AdminDetail {
+                    boothId: number;
+                    name: string;
+                    company: string;
+                    email: string;
+                }
+
+                const merged: BoothInfo[] = details.map((d: BoothDetail) => {
+                    const admin = admins.find((a: AdminDetail) => a.boothId === d.boothId);
                     return {
                         boothId: d.boothId,
-                        boothName: d.name,
-                        locationCode: d.locationCode,
-                        adminName: admin ? admin.name : "",
-                        company: admin ? admin.company : "",
-                        contact: admin ? admin.email : "",
+                        boothName: d.name || "",
+                        locationCode: d.locationCode || "",
+                        adminName: admin?.name || "",
+                        company: admin?.company || "",
+                        contact: admin?.email || "",
                     };
                 });
 
@@ -95,17 +108,33 @@ export function BoothSearchModal({
     useEffect(() => {
         if (isOpen) {
             fetchAllData();
-            setFormData({
-                boothId: currentBoothId || null,
-                boothName: currentData?.boothName || "",
-                locationCode: currentData?.locationCode || "",
-                adminName: currentData?.adminName || "",
-                contact: currentData?.contact || "",
-                color: currentData?.color || "#3B82F6",
-            });
-        }
-    }, [isOpen, fetchAllData, currentBoothId, currentData]);
 
+            const newBoothId = currentBoothId || null;
+            const newBoothName = currentData?.boothName || "";
+            const newLocationCode = currentData?.locationCode || "";
+            const newAdminName = currentData?.adminName || "";
+            const newContact = currentData?.contact || "";
+            const newColor = currentData?.color || "#3B82F6";
+
+            if (
+                formData.boothId !== newBoothId ||
+                formData.boothName !== newBoothName ||
+                formData.locationCode !== newLocationCode ||
+                formData.adminName !== newAdminName ||
+                formData.contact !== newContact ||
+                formData.color !== newColor
+            ) {
+                setFormData({
+                    boothId: newBoothId,
+                    boothName: newBoothName,
+                    locationCode: newLocationCode,
+                    adminName: newAdminName,
+                    contact: newContact,
+                    color: newColor,
+                });
+            }
+        }
+    }, [isOpen, fetchAllData, currentBoothId, currentData, formData]);
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -123,8 +152,8 @@ export function BoothSearchModal({
             setFilteredBooths(allBooths.filter(b => !alreadyMappedBoothIds.includes(b.boothId) || b.boothId === currentBoothId));
         } else {
             const filtered = allBooths.filter(b =>
-                (b.boothName.toLowerCase().includes(val.toLowerCase()) ||
-                    b.company.toLowerCase().includes(val.toLowerCase())) &&
+                (b.boothName?.toLowerCase().includes(val.toLowerCase()) ||
+                    b.company?.toLowerCase().includes(val.toLowerCase())) &&
                 (!alreadyMappedBoothIds.includes(b.boothId) || b.boothId === currentBoothId)
             );
             setFilteredBooths(filtered);
