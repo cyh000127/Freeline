@@ -173,7 +173,7 @@ public class AuthController {
         return ResponseUtils.ok(null);
     }
 
-    @Operation(summary = "Initial booth admin password change")
+    @Operation(summary = "부스 관리자 최초 비밀번호 변경", description = "임시 비밀번호로 최초 로그인 시 비밀번호를 강제 변경합니다.")
     @PatchMapping("/booth-admins/password/initial")
     public ResponseEntity<BaseResponse<Void>> changeInitialBoothAdminPassword(
             @Valid @RequestBody final BoothAdminInitialPasswordChangeReqDto request
