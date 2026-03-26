@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,6 +33,7 @@ import com.freeline.domain.boothmap.entity.BoothMapArea;
 import com.freeline.domain.boothmap.entity.EventMap;
 import com.freeline.domain.boothmap.repository.BoothMapAreaRepository;
 import com.freeline.domain.boothmap.repository.EventMapRepository;
+import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.exception.EventException;
 import com.freeline.domain.event.repository.EventRepository;
 
@@ -62,7 +64,7 @@ public class BoothMapService {
 
     @Transactional
     public void bulkUpsertBoothMapAreas(final Long eventId, final BoothMapAreaBulkUpsertReqDto request) {
-        validateEventExists(eventId);
+        validateEventOwnership(eventId);
 
         final EventMap eventMap = eventMapRepository.findById(request.eventMapId())
                 .orElseThrow(() -> new EventException(ErrorCode.EVENT_MAP_NOT_FOUND));
@@ -71,21 +73,45 @@ public class BoothMapService {
             throw new BoothException(ErrorCode.BOOTH_EVENT_MISMATCH);
         }
 
-        // 1. 기존의 해당 eventMapId에 연결된 Area들을 전부 날립니다 (Sync의 용이성)
-        boothMapAreaRepository.deleteAllByEventMapId(eventMap.getId());
+        // Validate boothIds belong to event
+        List<Long> requestedBoothIds = request.areas().stream()
+                .map(BoothMapAreaBulkUpsertReqDto.AreaItem::boothId)
+                .toList();
+        List<Booth> validBooths = boothRepository.findAllByEventIdOrderByIdAsc(eventId);
+        List<Long> validBoothIds = validBooths.stream().map(Booth::getId).toList();
 
-        // 2. 클라이언트가 보내온 새로운 리스트를 DB 엔티티로 변환하여 벌크 Insert
-        final List<BoothMapArea> newAreas = request.areas().stream()
-                .map(item -> BoothMapArea.builder()
+        boolean allValid = new java.util.HashSet<>(validBoothIds).containsAll(requestedBoothIds);
+        if (!allValid) {
+            throw new BoothException(ErrorCode.BOOTH_NOT_FOUND);
+        }
+
+        // Sync Logic
+        List<BoothMapArea> existingAreas = boothMapAreaRepository.findAllByEventMapIdOrderByIdAsc(eventMap.getId());
+        Map<Long, BoothMapArea> existingAreaMap = existingAreas.stream()
+                .collect(Collectors.toMap(BoothMapArea::getBoothId, Function.identity()));
+
+        List<BoothMapArea> newAreas = new java.util.ArrayList<>();
+        List<BoothMapArea> areasToDelete = new java.util.ArrayList<>();
+
+        for (BoothMapAreaBulkUpsertReqDto.AreaItem item : request.areas()) {
+            BoothMapArea existing = existingAreaMap.remove(item.boothId());
+            if (existing != null) {
+                existing.updateRect(item.xRatio(), item.yRatio(), item.widthRatio(), item.heightRatio());
+                newAreas.add(existing);
+            } else {
+                newAreas.add(BoothMapArea.builder()
                         .eventMapId(eventMap.getId())
                         .boothId(item.boothId())
                         .xRatio(item.xRatio())
                         .yRatio(item.yRatio())
                         .widthRatio(item.widthRatio())
                         .heightRatio(item.heightRatio())
-                        .build())
-                .toList();
+                        .build());
+            }
+        }
 
+        areasToDelete.addAll(existingAreaMap.values());
+        boothMapAreaRepository.deleteAll(areasToDelete);
         boothMapAreaRepository.saveAll(newAreas);
 
         // 3. 대표 지도 설정 로직 (기존 딱지 떼기)
@@ -101,7 +127,7 @@ public class BoothMapService {
 
     @Transactional
     public void updateMappingSnapshot(final Long eventId, final com.freeline.domain.boothmap.dto.request.MappingSnapshotUpdateReqDto request) {
-        validateEventExists(eventId);
+        validateEventOwnership(eventId);
 
         final EventMap eventMap = eventMapRepository.findById(request.eventMapId())
                 .orElseThrow(() -> new EventException(ErrorCode.EVENT_MAP_NOT_FOUND));
@@ -110,13 +136,19 @@ public class BoothMapService {
             throw new BoothException(ErrorCode.BOOTH_EVENT_MISMATCH);
         }
 
+        try {
+            objectMapper.readTree(request.mappingSnapshot());
+        } catch (Exception e) {
+            throw new EventException(ErrorCode.JSON_PARSING_ERROR);
+        }
+
         eventMap.updateMappingSnapshot(request.mappingSnapshot());
         log.info("[BoothMap] 임시 스냅샷 저장 완료 {eventId: {}, eventMapId: {}}", eventId, eventMap.getId());
     }
 
     @Transactional(readOnly = true)
     public BoothMapResDto getBoothMap(final Long eventId) {
-        validateEventExists(eventId);
+        validateEventOwnership(eventId);
 
         final EventMap eventMap = eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(eventId)
                 .or(() -> eventMapRepository.findFirstByEventIdOrderByIdDesc(eventId))
@@ -131,16 +163,29 @@ public class BoothMapService {
                 .map(area -> toBoothMapAreaResDto(area, boothsById.get(area.getBoothId())))
                 .toList();
 
+        List<BoothAreaDraftDto> drafts = Collections.emptyList();
+        if (booths.isEmpty() && eventMap.getMappingSnapshot() != null && !eventMap.getMappingSnapshot().isBlank()) {
+            try {
+                drafts = objectMapper.readValue(
+                        eventMap.getMappingSnapshot(),
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, BoothAreaDraftDto.class)
+                );
+            } catch (Exception e) {
+                log.warn("[BoothMap] 스냅샷 파싱 실패 {eventMapId: {}}", eventMap.getId(), e);
+            }
+        }
+
         return BoothMapResDto.builder()
                 .eventId(eventId)
                 .eventMapId(eventMap.getId())
                 .mapImageUrl(eventMap.getImagePath())
                 .booths(booths)
+                .drafts(drafts)
                 .build();
     }
 
     public EventMapUploadResDto upsertEventMap(final Long eventId, final MultipartFile file, final boolean visible) {
-        validateEventExists(eventId);
+        validateEventOwnership(eventId);
         final FileInfo uploadedFile = fileService.uploadFile(file, MAP_DIRECTORY);
 
         // 1. 기존 로직 (DB에 이미지 정보 저장 및 대표지도 체크 떼기)
@@ -243,6 +288,26 @@ public class BoothMapService {
     private void validateEventExists(final Long eventId) {
         if (!eventRepository.existsById(eventId)) {
             throw new EventException(ErrorCode.EVENT_NOT_FOUND);
+        }
+    }
+
+    private void validateEventOwnership(final Long eventId) {
+        validateEventExists(eventId);
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new EventException(ErrorCode.EVENT_NOT_FOUND));
+
+        org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null || auth.getName().equals("anonymousUser")) {
+            throw new EventException(ErrorCode.ACCESS_DENIED);
+        }
+
+        try {
+            Long currentUserId = Long.parseLong(auth.getName());
+            if (!event.getEventAdminId().equals(currentUserId)) {
+                throw new EventException(ErrorCode.ACCESS_DENIED);
+            }
+        } catch (NumberFormatException e) {
+            throw new EventException(ErrorCode.ACCESS_DENIED);
         }
     }
 }
