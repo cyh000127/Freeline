@@ -128,10 +128,10 @@ export default function ReservationCardExpandable({
           </View>
 
           {isRegistered ? (
-            <Pressable style={styles.fullGreenButton} onPress={onQrPress}>
+            <View style={styles.fullGreenButton}>
               <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
               <Text style={styles.fullGreenButtonText}>도착 인증 완료</Text>
-            </Pressable>
+            </View>
           ) : isEntered ? (
             <Pressable style={styles.fullGreenButton} onPress={onExitPress}>
               <Ionicons name="exit-outline" size={18} color="#FFFFFF" />

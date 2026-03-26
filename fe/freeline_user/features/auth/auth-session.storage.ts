@@ -8,11 +8,10 @@ export type PersistedAuthSession = {
   eventId: number | null;
   visitorId: number | null;
   accessToken: string | null;
+  refreshToken: string | null;
   nickname: string | null;
   requiredAgreed: boolean;
   marketingAgreed: boolean;
-  accountStatus: string | null;
-  queueStatus: string | null;
 };
 
 export async function saveAuthSession(session: PersistedAuthSession) {

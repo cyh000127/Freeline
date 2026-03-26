@@ -1,5 +1,5 @@
 import { Checkbox } from 'expo-checkbox';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 
 type RegisterCheckboxRowProps = {
   value: boolean;

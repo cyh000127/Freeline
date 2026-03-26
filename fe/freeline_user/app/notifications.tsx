@@ -39,7 +39,7 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const { refreshKey } = useNotificationLive();
 
-  const [items, setItems] = useState<ApiNotification[]>([]);
+  const [items] = useState<ApiNotification[]>([]);
   const [loading, setLoading] = useState(true);
 
   const hasUnread = items.some((item) => !item.isRead);
@@ -63,7 +63,7 @@ export default function NotificationsScreen() {
     fetchNotifications();
   }, [fetchNotifications, refreshKey]);
 
-  const handlePressItem = async (notificationId: number) => {
+  const handlePressItem = async (_notificationId: number) => {
     /*
     try {
       await markNotificationAsRead(notificationId);

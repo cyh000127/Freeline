@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Modal, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+} from 'react-native';
+import {
+  isValidNickname,
+  NICKNAME_GUIDE_TEXT,
+} from '@/features/auth/nickname';
 
 type Props = {
   visible: boolean;
@@ -17,6 +31,10 @@ export default function NicknameEditModal({ visible, initialNickname, onClose, o
     }
   }, [visible, initialNickname]);
 
+  const trimmed = nickname.trim();
+  const showError = trimmed.length > 0 && !isValidNickname(trimmed);
+  const disabled = trimmed.length === 0 || showError;
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <TouchableWithoutFeedback onPress={onClose}>
@@ -29,14 +47,20 @@ export default function NicknameEditModal({ visible, initialNickname, onClose, o
               <Text style={styles.title}>닉네임 변경</Text>
               
               <TextInput
-                style={styles.input}
+                style={[styles.input, showError && styles.inputError]}
                 value={nickname}
                 onChangeText={setNickname}
                 placeholder="새 닉네임 입력"
                 placeholderTextColor="#A6A1AE"
                 autoFocus
-                maxLength={20}
+                maxLength={8}
+                autoCorrect={false}
+                autoCapitalize="none"
               />
+
+              <Text style={[styles.helperText, showError && styles.helperError]}>
+                {showError ? NICKNAME_GUIDE_TEXT : '한글만 가능, 최대 8자'}
+              </Text>
               
               <View style={styles.buttonRow}>
                 <Pressable style={styles.cancelButton} onPress={onClose}>
@@ -46,11 +70,11 @@ export default function NicknameEditModal({ visible, initialNickname, onClose, o
                 <Pressable 
                   style={[
                     styles.saveButton, 
-                    nickname.trim().length === 0 && styles.saveButtonDisabled
+                    disabled && styles.saveButtonDisabled
                   ]} 
-                  disabled={nickname.trim().length === 0}
+                  disabled={disabled}
                   onPress={() => {
-                    onSave(nickname.trim());
+                    onSave(trimmed);
                     onClose();
                   }}
                 >
@@ -100,6 +124,19 @@ const styles = StyleSheet.create({
     color: '#111111',
     marginBottom: 24,
     backgroundColor: '#F7F7F8',
+  },
+  inputError: {
+    borderColor: '#D9534F',
+  },
+  helperText: {
+    marginTop: -14,
+    marginBottom: 20,
+    fontSize: 12,
+    color: '#A6A1AE',
+    fontWeight: '600',
+  },
+  helperError: {
+    color: '#D9534F',
   },
   buttonRow: {
     flexDirection: 'row',

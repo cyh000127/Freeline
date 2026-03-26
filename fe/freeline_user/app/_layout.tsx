@@ -11,6 +11,7 @@ import {
   useAuthSession,
 } from '@/features/auth/auth-session.context';
 import { AuthGuard } from '@/components/auth/AuthGuard';
+import { usePushTokenRegistration } from '@/features/notification/usePushTokenRegistration';
 
 function NotificationSubscriptionBridge() {
   const { accessToken } = useAuthSession();
@@ -28,7 +29,9 @@ function NotificationSubscriptionBridge() {
 }
 
 function AppProviders() {
-  const { accessToken } = useAuthSession();
+  const { accessToken, visitorId } = useAuthSession();
+
+  usePushTokenRegistration({ visitorId, accessToken });
 
   return (
     <TrackingProvider accessToken={accessToken}>
