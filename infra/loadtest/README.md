@@ -51,6 +51,19 @@ docker exec k6-manager k6 run \
 - 20 VU까지 ramp-up, 5분 실행
 - 주요 API 엔드포인트 대상
 
+### 시연 데이터 준비 (`run.sh demo`)
+
+```bash
+cd infra/loadtest
+./run.sh demo --ready-pack
+```
+
+- `--ready-pack`은 아래를 한 번에 수행합니다.
+- 행사/부스/방문자 데이터 생성
+- 부스 관리자 계정 일괄 생성 및 고정 비밀번호 설정
+- 행사 CLOSED + 리포트 생성(폴링 확인)
+- 실행 결과를 `output/demo-profile-event-<eventId>.md`로 저장
+
 ### Queue Lifecycle Stress 테스트 (`./run.sh stress`)
 
 ```bash
