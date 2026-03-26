@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import DaumPostcode from "react-daum-postcode";
 import { api } from "@/lib/api";
 import { eventApi } from "@/lib/api/event";
@@ -10,25 +10,45 @@ interface AddEventModalProps {
   onClose: () => void;
 }
 
+const createInitialFormData = () => ({
+  name: "",
+  description: "",
+  startDate: "",
+  endDate: "",
+  openTime: "",
+  closeTime: "",
+  locationAddress: "",
+  thumbnailImageUrl: "",
+  default_stay_sec: 600,
+  default_max_waiting: 30,
+  default_call_count: 5,
+  default_call_ttl: 300,
+  default_defer_limit: 2,
+});
+
 export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    startDate: "",
-    endDate: "",
-    openTime: "",
-    closeTime: "",
-    locationAddress: "",
-    thumbnailImageUrl: "", // 초기값을 빈 문자열로 변경
-    default_stay_sec: 600,
-    default_max_waiting: 30,
-    default_call_count: 5,
-    default_call_ttl: 300,
-    default_defer_limit: 2,
-  });
+  const [formData, setFormData] = useState(createInitialFormData);
   const [isLoading, setIsLoading] = useState(false);
   const [isPostcodeOpen, setIsPostcodeOpen] = useState(false);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+
+  const resetModalState = () => {
+    setFormData(createInitialFormData());
+    setIsLoading(false);
+    setIsPostcodeOpen(false);
+    setThumbnailFile(null);
+  };
+
+  const handleClose = () => {
+    resetModalState();
+    onClose();
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetModalState();
+    }
+  }, [isOpen]);
 
   const handleComplete = (data: any) => {
     let fullAddress = data.address;
@@ -130,7 +150,7 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
       }
 
       alert("행사가 성공적으로 추가되었습니다.");
-      onClose();
+      handleClose();
       // 추가적으로 부모 컴포넌트(리스트)에 새로고침 요청을 보낼 수 있습니다.
     } catch (error: any) {
       console.error("행사 생성 중 오류 발생:", error);
@@ -161,7 +181,7 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
         <div className="flex items-center justify-between px-8 pt-8 pb-4 shrink-0">
           <div className="w-8" /> {/* Spacer for flex centering */}
           <h2 className="text-[22px] font-bold text-gray-900 mx-auto">행사 추가</h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors">
+          <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>

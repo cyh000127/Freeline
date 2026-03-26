@@ -11,32 +11,62 @@ interface EditEventModalProps {
   event: any | null; // The event object to edit
 }
 
-export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) {
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    status: "DRAFT",
-    startDate: "",
-    endDate: "",
-    openTime: "",
-    closeTime: "",
-    locationAddress: "",
-    thumbnailImageUrl: "",
-  });
+const createInitialFormData = () => ({
+  name: "",
+  description: "",
+  status: "DRAFT",
+  startDate: "",
+  endDate: "",
+  openTime: "",
+  closeTime: "",
+  locationAddress: "",
+  thumbnailImageUrl: "",
+});
 
-  const [policyData, setPolicyData] = useState({
-    default_stay_sec: 600,
-    default_max_waiting: 30,
-    default_call_count: 5,
-    default_call_ttl: 300,
-    default_defer_limit: 2,
-  });
+const createInitialPolicyData = () => ({
+  default_stay_sec: 600,
+  default_max_waiting: 30,
+  default_call_count: 5,
+  default_call_ttl: 300,
+  default_defer_limit: 2,
+});
+
+const createFormDataFromEvent = (event: any | null) => ({
+  name: event?.name || "",
+  description: event?.description || "",
+  status: event?.status || "DRAFT",
+  startDate: event?.startDate || "",
+  endDate: event?.endDate || "",
+  openTime: event?.openTime || "",
+  closeTime: event?.closeTime || "",
+  locationAddress: event?.locationAddress || "",
+  thumbnailImageUrl: event?.thumbnailImageUrl || "",
+});
+
+export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) {
+  const [formData, setFormData] = useState(createInitialFormData);
+
+  const [policyData, setPolicyData] = useState(createInitialPolicyData);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isPostcodeOpen, setIsPostcodeOpen] = useState(false);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const statusRef = useRef<HTMLDivElement>(null);
+
+  const resetModalState = () => {
+    setFormData(createInitialFormData());
+    setPolicyData(createInitialPolicyData());
+    setIsLoading(false);
+    setIsPostcodeOpen(false);
+    setThumbnailFile(null);
+    setIsStatusOpen(false);
+  };
+
+  const handleClose = () => {
+    resetModalState();
+    onClose();
+  };
 
   // 상태 레이블 매핑
   const STATUS_LABELS: Record<string, string> = {
@@ -81,9 +111,22 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
 
   // Load event data when modal opens
   useEffect(() => {
+    if (!isOpen) {
+      resetModalState();
+      return;
+    }
+
+    setFormData(createFormDataFromEvent(event));
+    setPolicyData(createInitialPolicyData());
+    setThumbnailFile(null);
+    setIsPostcodeOpen(false);
+    setIsStatusOpen(false);
+
+    let cancelled = false;
+
     const fetchEventDetail = async () => {
       if (!isOpen || !event) return;
-      
+
       const eventId = event.eventId || event.id;
       if (!eventId) return;
 
@@ -103,24 +146,16 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
 
         if (detail) {
           const d = detail as any;
-          setFormData({
-            name: d.name || "",
-            description: d.description || "",
-            status: d.status || "DRAFT",
-            startDate: d.startDate || "",
-            endDate: d.endDate || "",
-            openTime: d.openTime || "",
-            closeTime: d.closeTime || "",
-            locationAddress: d.locationAddress || "",
-            thumbnailImageUrl: d.thumbnailImageUrl || "",
-          });
+          if (!cancelled) {
+            setFormData(createFormDataFromEvent(d));
+          }
         }
 
         // 행사 정책 조회
         try {
           const policyRes = await eventApi.getPolicy(eventId);
           const p = policyRes.data?.data || policyRes.data;
-          if (p) {
+          if (!cancelled && p) {
             setPolicyData({
               default_stay_sec: p.default_stay_sec ?? 600,
               default_max_waiting: p.default_max_waiting ?? 30,
@@ -135,23 +170,21 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
       } catch (error) {
         console.error("Failed to fetch event detail:", error);
         // 상세 조회 실패 시 목록에서 받은 데이터라도 최소한으로 채움
-        setFormData({
-          name: event.name || "",
-          description: event.description || "",
-          status: event.status || "DRAFT",
-          startDate: event.startDate || "",
-          endDate: event.endDate || "",
-          openTime: event.openTime || "",
-          closeTime: event.closeTime || "",
-          locationAddress: event.locationAddress || "",
-          thumbnailImageUrl: event.thumbnailImageUrl || "",
-        });
+        if (!cancelled) {
+          setFormData(createFormDataFromEvent(event));
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchEventDetail();
+    void fetchEventDetail();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, event]);
 
   const handleComplete = (data: any) => {
@@ -238,7 +271,7 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
       }
 
       alert("행사 정보가 성공적으로 수정되었습니다.");
-      onClose();
+      handleClose();
     } catch (error: any) {
       console.error("행사 수정 중 오류 발생:", error);
       const serverData = error.response?.data;
@@ -266,7 +299,7 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
         <div className="px-8 py-6 flex justify-between items-center bg-white sticky top-0 z-10 rounded-t-[32px] shrink-0">
           <h2 className="text-2xl font-bold text-gray-900 tracking-tight">행사 정보 및 상태 수정</h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 rounded-full hover:bg-gray-100 transition-colors"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
