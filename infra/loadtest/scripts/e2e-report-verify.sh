@@ -247,21 +247,45 @@ run_sql() {
   fi
 }
 
+run_sql_file() {
+  local file="$1"
+  if [ "$USE_DOCKER_PSQL" = "true" ]; then
+    docker cp "$file" freeline-db:/tmp/_bulk_insert.sql && \
+    docker exec -e PGPASSWORD="${DB_PASSWORD}" freeline-db \
+      psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -t -A -f /tmp/_bulk_insert.sql 2>/dev/null
+  else
+    PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -A -f "$file" 2>/dev/null
+  fi
+}
+
 TOTAL_VISITORS=$((VU_COUNT * ITERATIONS))
 log_info "방문자 ${TOTAL_VISITORS}명 (${VU_COUNT} VUs × ${ITERATIONS} iterations) 생성 중..."
 
 ENTRY_PREFIX="E${EVENT_ID}_"
+BATCH_SIZE=500
+SQL_FILE="/tmp/e2e_visitors_${EVENT_ID}.sql"
+> "$SQL_FILE"
 
-SQL="INSERT INTO visitors (event_id, entry_code, name, is_active, created_at, updated_at) VALUES "
-VALUES=""
+BATCH_VALUES=""
+BATCH_N=0
 for i in $(seq 1 "${TOTAL_VISITORS}"); do
   CODE=$(printf "${ENTRY_PREFIX}%03d" "$i")
-  if [ -n "$VALUES" ]; then VALUES="${VALUES},"; fi
-  VALUES="${VALUES}(${EVENT_ID}, '${CODE}', 'E2E Visitor ${i}', true, NOW(), NOW())"
-done
-SQL="${SQL}${VALUES} ON CONFLICT (entry_code) DO NOTHING;"
+  if [ -n "$BATCH_VALUES" ]; then BATCH_VALUES="${BATCH_VALUES},"; fi
+  BATCH_VALUES="${BATCH_VALUES}(${EVENT_ID},'${CODE}','E2E Visitor ${i}',true,NOW(),NOW())"
+  BATCH_N=$((BATCH_N + 1))
 
-INSERT_RESULT=$(run_sql "$SQL" 2>&1) || true
+  if [ "$BATCH_N" -ge "$BATCH_SIZE" ]; then
+    echo "INSERT INTO visitors (event_id,entry_code,name,is_active,created_at,updated_at) VALUES ${BATCH_VALUES} ON CONFLICT (entry_code) DO NOTHING;" >> "$SQL_FILE"
+    BATCH_VALUES=""
+    BATCH_N=0
+  fi
+done
+if [ -n "$BATCH_VALUES" ]; then
+  echo "INSERT INTO visitors (event_id,entry_code,name,is_active,created_at,updated_at) VALUES ${BATCH_VALUES} ON CONFLICT (entry_code) DO NOTHING;" >> "$SQL_FILE"
+fi
+
+INSERT_RESULT=$(run_sql_file "$SQL_FILE" 2>&1) || true
+rm -f "$SQL_FILE"
 
 # 검증
 AFTER_COUNT=$(run_sql "SELECT COUNT(*) FROM visitors WHERE entry_code LIKE '${ENTRY_PREFIX}%' AND event_id = ${EVENT_ID};" 2>/dev/null || echo "0")
@@ -339,12 +363,13 @@ if [ "$SKIP_K6" = "true" ]; then
   record_pass "k6 (건너뜀)"
 else
   K6_ENV_ARGS="-e TARGET_URL=${TARGET_URL} -e ADMIN_ID=${ADMIN_ID} -e ADMIN_PW=${ADMIN_PW} -e VU_COUNT=${VU_COUNT} -e ITERATIONS=${ITERATIONS} -e PRESET_EVENT_ID=${EVENT_ID} -e PRESET_BOOTH_IDS=${BOOTH_IDS_CSV} -e ENTRY_PREFIX=${ENTRY_PREFIX}"
+  K6_OUT="--out experimental-prometheus-rw"
 
   K6_SERVER="${K6_SERVER:-172.26.15.39}"
 
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^k6-manager$'; then
     log_info "로컬 k6-manager 컨테이너에서 실행"
-    K6_RESULT=$(docker exec k6-manager k6 run ${K6_ENV_ARGS} \
+    K6_RESULT=$(docker exec k6-manager k6 run ${K6_OUT} ${K6_ENV_ARGS} \
       /scripts/e2e-report-test.js 2>&1) || true
   elif command -v k6 &>/dev/null; then
     log_info "로컬 k6로 실행"
@@ -352,7 +377,7 @@ else
       "${SCRIPT_DIR}/e2e-report-test.js" 2>&1) || true
   elif ssh -o ConnectTimeout=5 "${K6_SERVER}" "docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^k6-manager$'" 2>/dev/null; then
     log_info "Server B (${K6_SERVER}) k6-manager에서 원격 실행"
-    K6_RESULT=$(ssh "${K6_SERVER}" "docker exec k6-manager k6 run ${K6_ENV_ARGS} \
+    K6_RESULT=$(ssh "${K6_SERVER}" "docker exec k6-manager k6 run ${K6_OUT} ${K6_ENV_ARGS} \
       /scripts/e2e-report-test.js" 2>&1) || true
   else
     log_fail "k6 실행 환경을 찾을 수 없습니다 (로컬/Server B 모두 실패)"
@@ -522,19 +547,19 @@ else
     log_ok "리포트 조회 성공"
 
     # summary 검증
-    TOTAL_VISITORS=$(extract_json_field "$RESP_BODY" "totalVisitors")
-    TOTAL_REGISTRATIONS=$(extract_json_field "$RESP_BODY" "totalRegistrations")
+    REPORT_TOTAL_VISITORS=$(extract_json_field "$RESP_BODY" "totalVisitors")
+    REPORT_TOTAL_REGISTRATIONS=$(extract_json_field "$RESP_BODY" "totalRegistrations")
 
-    if [ -n "$TOTAL_VISITORS" ] && [ "$TOTAL_VISITORS" != "null" ] && [ "$TOTAL_VISITORS" != "0" ]; then
-      log_ok "summary.totalVisitors = ${TOTAL_VISITORS}"
+    if [ -n "$REPORT_TOTAL_VISITORS" ] && [ "$REPORT_TOTAL_VISITORS" != "null" ] && [ "$REPORT_TOTAL_VISITORS" != "0" ]; then
+      log_ok "summary.totalVisitors = ${REPORT_TOTAL_VISITORS}"
       record_pass "총 방문자 수 검증"
     else
-      log_warn "summary.totalVisitors가 비어있거나 0 (${TOTAL_VISITORS})"
+      log_warn "summary.totalVisitors가 비어있거나 0 (${REPORT_TOTAL_VISITORS})"
       record_fail "총 방문자 수 = 0 또는 없음"
     fi
 
-    if [ -n "$TOTAL_REGISTRATIONS" ] && [ "$TOTAL_REGISTRATIONS" != "null" ]; then
-      log_ok "summary.totalRegistrations = ${TOTAL_REGISTRATIONS}"
+    if [ -n "$REPORT_TOTAL_REGISTRATIONS" ] && [ "$REPORT_TOTAL_REGISTRATIONS" != "null" ]; then
+      log_ok "summary.totalRegistrations = ${REPORT_TOTAL_REGISTRATIONS}"
       record_pass "총 등록 수 검증"
     else
       log_warn "summary.totalRegistrations 없음"

@@ -9,8 +9,10 @@
 #   ./run.sh                          # E2E 리포트 파이프라인 전체 검증
 #   ./run.sh demo                     # 시연용 데이터 셋업
 #   ./run.sh demo --auto-close        # 시연용 + 행사 자동 CLOSED
+#   ./run.sh stress                   # 고도화 부하 테스트 (ramping + spike)
 #
-#   VU_COUNT=1000 ITERATIONS=5 ./run.sh   # 대규모 부하테스트
+#   VU_COUNT=1000 ITERATIONS=5 ./run.sh           # 대규모 E2E 테스트
+#   PEAK_VUS=200 SPIKE_VUS=500 ./run.sh stress    # 고부하 스트레스 테스트
 #
 # Infisical 접속 정보:
 #   INFISICAL_URL, INFISICAL_PROJECT_ID, INFISICAL_CLIENT_ID,
@@ -47,10 +49,14 @@ case "$MODE" in
   e2e|verify)
     TARGET_SCRIPT="${SCRIPT_DIR}/scripts/e2e-report-verify.sh"
     ;;
+  stress)
+    TARGET_SCRIPT="${SCRIPT_DIR}/scripts/stress-setup.sh"
+    ;;
   *)
-    echo "사용법: $0 [e2e|demo] [추가 옵션]"
-    echo "  e2e   — E2E 리포트 파이프라인 전체 검증 (기본)"
-    echo "  demo  — 시연용 데이터 셋업 (--auto-close 옵션 가능)"
+    echo "사용법: $0 [e2e|demo|stress] [추가 옵션]"
+    echo "  e2e    — E2E 리포트 파이프라인 전체 검증 (기본)"
+    echo "  demo   — 시연용 데이터 셋업 (--auto-close 옵션 가능)"
+    echo "  stress — 고도화 부하 테스트 (ramping VU + spike 시나리오)"
     exit 1
     ;;
 esac
