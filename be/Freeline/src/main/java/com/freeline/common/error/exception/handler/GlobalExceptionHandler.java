@@ -19,15 +19,12 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import lombok.extern.slf4j.Slf4j;
-
 import com.freeline.common.error.ErrorCode;
 import com.freeline.common.error.exception.BusinessException;
 import com.freeline.common.response.BaseResponse;
 import com.freeline.common.response.ErrorResponse;
 import com.freeline.common.util.LoggingUtils;
 
-@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -38,7 +35,7 @@ public class GlobalExceptionHandler {
             final Exception ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("정의되지 않은 예외 발생", ex, request);
+        LoggingUtils.logUnhandledException("정의되지 않은 예외 발생", ex, request);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.INTERNAL_SERVER_ERROR, request);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(BaseResponse.fail(response, HttpStatus.INTERNAL_SERVER_ERROR));
@@ -49,7 +46,7 @@ public class GlobalExceptionHandler {
             final BusinessException ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("BusinessException 발생", ex, request);
+        LoggingUtils.logHandledException("BusinessException 발생", ex, request, ex.getErrorCode().getHttpStatus());
         final ErrorResponse response = ErrorResponse.of(ex.getErrorCode(), request);
         return ResponseEntity.status(ex.getErrorCode().getHttpStatus())
                 .body(BaseResponse.fail(response, ex.getErrorCode().getHttpStatus()));
@@ -60,7 +57,7 @@ public class GlobalExceptionHandler {
             final IllegalArgumentException ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("IllegalArgumentException 발생", ex, request);
+        LoggingUtils.logHandledException("IllegalArgumentException 발생", ex, request, HttpStatus.BAD_REQUEST);
         final ErrorResponse response = ErrorResponse.of(request, ErrorCode.INVALID_INPUT, ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(BaseResponse.fail(response, HttpStatus.BAD_REQUEST));
@@ -84,7 +81,7 @@ public class GlobalExceptionHandler {
             final ConstraintViolationException ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("ConstraintViolationException 발생", ex, request);
+        LoggingUtils.logHandledException("ConstraintViolationException 발생", ex, request, HttpStatus.BAD_REQUEST);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.INVALID_INPUT, request);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(BaseResponse.fail(response, HttpStatus.BAD_REQUEST));
     }
@@ -94,7 +91,7 @@ public class GlobalExceptionHandler {
             final HttpMessageNotReadableException ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("HttpMessageNotReadableException 발생", ex, request);
+        LoggingUtils.logHandledException("HttpMessageNotReadableException 발생", ex, request, HttpStatus.BAD_REQUEST);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.BAD_REQUEST, request);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(BaseResponse.fail(response, HttpStatus.BAD_REQUEST));
     }
@@ -104,7 +101,8 @@ public class GlobalExceptionHandler {
             final HttpRequestMethodNotSupportedException ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("HttpRequestMethodNotSupportedException 발생", ex, request);
+        LoggingUtils.logHandledException("HttpRequestMethodNotSupportedException 발생",
+                ex, request, HttpStatus.METHOD_NOT_ALLOWED);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED, request);
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
                 .body(BaseResponse.fail(response, HttpStatus.METHOD_NOT_ALLOWED));
@@ -115,7 +113,8 @@ public class GlobalExceptionHandler {
             final HttpMediaTypeNotSupportedException ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("HttpMediaTypeNotSupportedException 발생", ex, request);
+        LoggingUtils.logHandledException("HttpMediaTypeNotSupportedException 발생",
+                ex, request, HttpStatus.UNSUPPORTED_MEDIA_TYPE);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.UNSUPPORTED_MEDIA_TYPE, request);
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                 .body(BaseResponse.fail(response, HttpStatus.UNSUPPORTED_MEDIA_TYPE));
@@ -126,7 +125,7 @@ public class GlobalExceptionHandler {
             final NoResourceFoundException ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("NoResourceFoundException 발생", ex, request);
+        LoggingUtils.logHandledException("NoResourceFoundException 발생", ex, request, HttpStatus.NOT_FOUND);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.NOT_FOUND, request);
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(BaseResponse.fail(response, HttpStatus.NOT_FOUND));
     }
@@ -136,7 +135,7 @@ public class GlobalExceptionHandler {
             final MethodArgumentTypeMismatchException ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("MethodArgumentTypeMismatchException 발생", ex, request);
+        LoggingUtils.logHandledException("MethodArgumentTypeMismatchException 발생", ex, request, HttpStatus.BAD_REQUEST);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.INVALID_INPUT, request);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(BaseResponse.fail(response, HttpStatus.BAD_REQUEST));
     }
@@ -146,7 +145,7 @@ public class GlobalExceptionHandler {
             final MissingServletRequestParameterException ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("MissingServletRequestParameterException 발생", ex, request);
+        LoggingUtils.logHandledException("MissingServletRequestParameterException 발생", ex, request, HttpStatus.BAD_REQUEST);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.BAD_REQUEST, request);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(BaseResponse.fail(response, HttpStatus.BAD_REQUEST));
     }
@@ -156,7 +155,7 @@ public class GlobalExceptionHandler {
             final DataIntegrityViolationException ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("DataIntegrityViolationException 발생", ex, request);
+        LoggingUtils.logHandledException("DataIntegrityViolationException 발생", ex, request, HttpStatus.CONFLICT);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.DATA_INTEGRITY_VIOLATION, request);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(BaseResponse.fail(response, HttpStatus.CONFLICT));
     }
@@ -166,7 +165,7 @@ public class GlobalExceptionHandler {
             final MaxUploadSizeExceededException ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("MaxUploadSizeExceededException 발생", ex, request);
+        LoggingUtils.logHandledException("MaxUploadSizeExceededException 발생", ex, request, REQUEST_ENTITY_TOO_LARGE);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.FILE_SIZE_EXCEEDED, request);
         return ResponseEntity.status(REQUEST_ENTITY_TOO_LARGE)
                 .body(BaseResponse.fail(response, REQUEST_ENTITY_TOO_LARGE));
@@ -177,7 +176,7 @@ public class GlobalExceptionHandler {
             final DataAccessException ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("DataAccessException 발생", ex, request);
+        LoggingUtils.logHandledException("DataAccessException 발생", ex, request, HttpStatus.INTERNAL_SERVER_ERROR);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.INTERNAL_SERVER_ERROR, request);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(BaseResponse.fail(response, HttpStatus.INTERNAL_SERVER_ERROR));
@@ -188,7 +187,7 @@ public class GlobalExceptionHandler {
             final AccessDeniedException ex,
             final HttpServletRequest request
     ) {
-        LoggingUtils.logException("AccessDeniedException 발생", ex, request);
+        LoggingUtils.logHandledException("AccessDeniedException 발생", ex, request, HttpStatus.FORBIDDEN);
         final ErrorResponse response = ErrorResponse.of(ErrorCode.ACCESS_DENIED, request);
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(BaseResponse.fail(response, HttpStatus.FORBIDDEN));
     }
