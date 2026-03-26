@@ -212,35 +212,58 @@ pipeline {
                             -- bash -s -- <<'EOF'
                                 set -euo pipefail
 
-                                command -v npm >/dev/null 2>&1 || { echo "ERROR: npm not found on Jenkins agent"; exit 1; }
-                                command -v npx >/dev/null 2>&1 || { echo "ERROR: npx not found on Jenkins agent"; exit 1; }
+                                command -v docker >/dev/null 2>&1 || { echo "ERROR: docker not found on Jenkins agent"; exit 1; }
 
                                 : "${EXPO_TOKEN:?ERROR: EXPO_TOKEN is missing from Infisical /fe}"
                                 : "${EAS_PROJECT_ID:?ERROR: EAS_PROJECT_ID is missing from Infisical /fe}"
 
-                                npm ci
-
                                 action="${USER_RELEASE_ACTION:-build}"
+                                case "$action" in
+                                    update|build) ;;
+                                    *)
+                                        echo "ERROR: invalid USER_RELEASE_ACTION='$action'"
+                                        exit 1
+                                        ;;
+                                esac
+
+                                # Agent에 npm/npx가 없어도 동작하도록 Node 컨테이너에서 EAS 명령 실행
+                                docker run --rm \
+                                    -e EXPO_TOKEN \
+                                    -e EAS_PROJECT_ID \
+                                    -e USER_RELEASE_ACTION="$action" \
+                                    -e BUILD_ID="${BUILD_ID:-0}" \
+                                    -v "$PWD:/app" \
+                                    -w /app \
+                                    node:20-bullseye \
+                                    bash -lc '
+                                        set -euo pipefail
+                                        npm ci
+                                        if [ "$USER_RELEASE_ACTION" = "update" ]; then
+                                            npx eas-cli update \
+                                                --channel production \
+                                                --platform android \
+                                                --non-interactive \
+                                                --message "jenkins-${BUILD_ID}"
+                                        else
+                                            mkdir -p ./build
+                                            npx eas-cli build -p android \
+                                                --profile production \
+                                                --non-interactive \
+                                                --wait \
+                                                --output ./build/freeline.apk
+                                        fi
+                                    '
+
                                 if [ "$action" = "update" ]; then
-                                    npx eas-cli update \
-                                        --channel production \
-                                        --platform android \
-                                        --non-interactive \
-                                        --message "jenkins-${BUILD_ID}"
                                     echo "EAS update published (channel=production, platform=android)"
-                                elif [ "$action" = "build" ]; then
-                                    mkdir -p ./build
-                                    npx eas-cli build -p android \
-                                        --profile production \
-                                        --non-interactive \
-                                        --wait \
-                                        --output ./build/freeline.apk
-                                    mkdir -p "$APK_DIR"
-                                    cp ./build/freeline.apk "$APK_DIR/freeline.apk"
-                                    echo "APK deployed: https://j14a207.p.ssafy.io/app/freeline.apk"
                                 else
-                                    echo "ERROR: invalid USER_RELEASE_ACTION='$action'"
-                                    exit 1
+                                    # /opt 경로 권한 이슈를 피하기 위해 Docker root 권한으로 복사
+                                    docker run --rm \
+                                        -v "$PWD/build:/src:ro" \
+                                        -v "$APK_DIR:/dest" \
+                                        alpine:3.20 \
+                                        sh -c 'set -eu; test -f /src/freeline.apk; cp /src/freeline.apk /dest/freeline.apk'
+                                    echo "APK deployed: https://j14a207.p.ssafy.io/app/freeline.apk"
                                 fi
 EOF
                     '''
