@@ -1,13 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+  Image,
+} from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-
 import { useAuthSession } from '@/features/auth/auth-session.context';
-import { getBoothDetail } from '@/features/booth/booth.api';
+import { getBoothDetail, getBoothGoods } from '@/features/booth/booth.api';
 import { getExpectedWaitingTime, createWaiting } from '@/features/waiting/waiting.api';
-import type { BoothDetailData } from '@/features/booth/types';
+import type { BoothDetailData, BoothGoodsItem } from '@/features/booth/types';
 import type { WaitingExpectedTimeData } from '@/features/waiting/types';
+
+function getDisplayImage(booth: BoothDetailData) {
+  return booth.representativeImageUrl ?? booth.boothImageUrls[0] ?? null;
+}
 
 export default function ReservationFlowDetailScreen() {
   const router = useRouter();
@@ -15,6 +27,7 @@ export default function ReservationFlowDetailScreen() {
   const { accessToken, nickname } = useAuthSession();
 
   const [booth, setBooth] = useState<BoothDetailData | null>(null);
+  const [goods, setGoods] = useState<BoothGoodsItem[]>([]);
   const [waitStatus, setWaitStatus] = useState<WaitingExpectedTimeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -22,18 +35,23 @@ export default function ReservationFlowDetailScreen() {
 
   useEffect(() => {
     async function fetchData() {
-      if (!accessToken || !boothId) return;
+      if (!accessToken || !boothId) {
+        return;
+      }
 
       try {
         setLoading(true);
-        const [boothData, waitData] = await Promise.all([
-          getBoothDetail(accessToken, Number(boothId)),
-          getExpectedWaitingTime(accessToken, Number(boothId)),
+        const numericBoothId = Number(boothId);
+        const [boothData, waitData, goodsData] = await Promise.all([
+          getBoothDetail(accessToken, numericBoothId),
+          getExpectedWaitingTime(accessToken, numericBoothId),
+          getBoothGoods(accessToken, numericBoothId),
         ]);
         setBooth(boothData);
         setWaitStatus(waitData);
-      } catch (err) {
-        console.error('부스 상세 로드 실패:', err);
+        setGoods(goodsData);
+      } catch (error) {
+        console.error('부스 상세 로드 실패:', error);
         Alert.alert('오류', '부스 정보를 불러오지 못했습니다.');
         router.back();
       } finally {
@@ -41,11 +59,13 @@ export default function ReservationFlowDetailScreen() {
       }
     }
 
-    fetchData();
+    void fetchData();
   }, [accessToken, boothId, router]);
 
   const handleSubmit = async () => {
-    if (!accessToken || !boothId) return;
+    if (!accessToken || !boothId) {
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -54,9 +74,9 @@ export default function ReservationFlowDetailScreen() {
         pathname: '/reservation_flow/complete',
         params: { boothName: booth?.name },
       });
-    } catch (err) {
-      console.error('예약 생성 실패:', err);
-      const message = err instanceof Error ? err.message : '예약에 실패했습니다.';
+    } catch (error) {
+      console.error('예약 생성 실패:', error);
+      const message = error instanceof Error ? error.message : '예약에 실패했습니다.';
       Alert.alert('예약 오류', message);
     } finally {
       setSubmitting(false);
@@ -70,6 +90,8 @@ export default function ReservationFlowDetailScreen() {
       </View>
     );
   }
+
+  const boothImage = getDisplayImage(booth);
 
   return (
     <View style={styles.screen}>
@@ -87,8 +109,15 @@ export default function ReservationFlowDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>예약 내역</Text>
 
+          {boothImage ? (
+            <Image source={{ uri: boothImage }} style={styles.boothImage} resizeMode="cover" />
+          ) : null}
+
           <Text style={styles.boothName}>{booth.name}</Text>
           <Text style={styles.boothLocation}>부스 위치: {booth.locationCode}</Text>
+          <Text style={styles.boothMeta}>
+            현재 대기 {booth.waitingCount}팀, 호출 가능 {booth.callCount}팀
+          </Text>
         </View>
 
         <View style={styles.sectionDivider} />
@@ -109,8 +138,30 @@ export default function ReservationFlowDetailScreen() {
           </View>
 
           <Text style={styles.noticeText}>
-            * 대기 시간은 현장 상황에 따라 유동적으로 변경될 수 있습니다.
+            평균 체류 시간은 약 {waitStatus.avg_stay_time}분이며, 현장 상황에 따라 변경될 수
+            있습니다.
           </Text>
+        </View>
+
+        <View style={styles.sectionDivider} />
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>굿즈 목록</Text>
+
+          {goods.length === 0 ? (
+            <Text style={styles.emptyText}>등록된 굿즈가 없습니다.</Text>
+          ) : (
+            <View style={styles.goodsList}>
+              {goods.map((item) => (
+                <View key={item.goodsId} style={styles.goodsCard}>
+                  <Text style={styles.goodsName}>{item.name}</Text>
+                  <Text style={item.isSoldOut ? styles.goodsSoldOut : styles.goodsAvailable}>
+                    {item.isSoldOut ? '품절' : '구매 가능'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.sectionDivider} />
@@ -141,20 +192,18 @@ export default function ReservationFlowDetailScreen() {
 
           <View style={styles.guideList}>
             <Text style={styles.guideItem}>
-              · 내 순서가 다가오면 <Text style={styles.bold}>앱 푸시 및 알림톡</Text>
-              으로 안내해 드립니다.
+              · 내 순서가 다가오면 <Text style={styles.bold}>앱 푸시</Text>로 안내해 드립니다.
             </Text>
             <Text style={styles.guideItem}>
-              · 입장 호출 알림 수신 후 <Text style={styles.bold}>5분 이내</Text>에 부스
-              입구로 와주세요.
+              · 입장 호출 알림 수신 후 <Text style={styles.bold}>5분 이내</Text>에 부스 입구로
+              와주세요.
             </Text>
             <Text style={styles.guideItem}>
-              · 시간 내 미입장 시 <Text style={styles.bold}>대기 예약이 자동 취소</Text>{' '}
+              · 시간 내 미입장 시 <Text style={styles.bold}>대기 예약이 자동 취소</Text>
               처리됩니다.
             </Text>
             <Text style={styles.guideItem}>
-              · 보다 많은 관람객의 체험을 위해 동시 대기 가능한 부스 개수는{' '}
-              <Text style={styles.bold}>최대 3개</Text>로 제한됩니다.
+              · 동시 대기 가능한 부스 개수는 <Text style={styles.bold}>최대 3개</Text>입니다.
             </Text>
           </View>
 
@@ -175,11 +224,15 @@ export default function ReservationFlowDetailScreen() {
       <View style={styles.bottomArea}>
         <Pressable
           style={[styles.submitButton, (!agreed || submitting) && styles.submitButtonDisabled]}
-          disabled={!agreed || submitting}
+          disabled={!agreed || submitting || booth.isEmergencyClosed}
           onPress={handleSubmit}
         >
           <Text style={styles.submitButtonText}>
-            {submitting ? '예약 처리 중...' : '예약하기'}
+            {booth.isEmergencyClosed
+              ? '현재 긴급 마감된 부스입니다'
+              : submitting
+                ? '예약 처리 중...'
+                : '예약하기'}
           </Text>
         </Pressable>
       </View>
@@ -233,6 +286,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#E3E4E8',
     marginBottom: 18,
   },
+  boothImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 16,
+    marginBottom: 16,
+    backgroundColor: '#E5E7EB',
+  },
   boothName: {
     fontSize: 22,
     fontWeight: '800',
@@ -244,6 +304,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#222222',
     lineHeight: 24,
+  },
+  boothMeta: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#555555',
   },
   statusCard: {
     flexDirection: 'row',
@@ -275,6 +340,37 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#444444',
     lineHeight: 20,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#777777',
+  },
+  goodsList: {
+    gap: 10,
+  },
+  goodsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  goodsName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111111',
+  },
+  goodsAvailable: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#00A66C',
+  },
+  goodsSoldOut: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#E5484D',
   },
   infoRow: {
     flexDirection: 'row',
@@ -366,7 +462,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#C8C9CF',
   },
   submitButtonText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
   },

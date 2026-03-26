@@ -22,6 +22,3 @@ export const scanQr = async (
 
   return unwrapResponse(response);
 };
-// NOTE:
-// 현재는 visitor 인증이 아직 없어 visitorId를 body로 전달한다. ((api 명세서 참조))
-// 이후 JWT 인증 적용 시 access token 기반으로 변경 예정.

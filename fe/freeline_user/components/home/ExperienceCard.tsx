@@ -4,9 +4,14 @@ import { ExperienceState } from '@/types/experience';
 interface Props {
   data: ExperienceState;
   onPrimaryPress?: () => void;
+  onSecondaryPress?: () => void;
 }
 
-export default function ExperienceCard({ data, onPrimaryPress }: Props) {
+export default function ExperienceCard({
+  data,
+  onPrimaryPress,
+  onSecondaryPress,
+}: Props) {
   if (data.status === 'idle') {
     return (
       <View style={styles.emptyContainer}>
@@ -35,9 +40,11 @@ export default function ExperienceCard({ data, onPrimaryPress }: Props) {
               <Text style={styles.btnText}>도착 인증하기</Text>
             </Pressable>
 
-            <Pressable style={styles.secondaryBtn}>
-              <Text style={styles.secondaryText}>순서 미루기</Text>
-            </Pressable>
+            {onSecondaryPress ? (
+              <Pressable style={styles.secondaryBtn} onPress={onSecondaryPress}>
+                <Text style={styles.secondaryText}>예약 관리</Text>
+              </Pressable>
+            ) : null}
           </View>
         </>
       )}
@@ -46,7 +53,7 @@ export default function ExperienceCard({ data, onPrimaryPress }: Props) {
       {data.status !== 'called' && (
         <>
           <Text style={[styles.time, { color: palette.text }]}>
-            이용시간: {data.elapsedTime}
+            진행 상태: {data.elapsedTime}
           </Text>
 
           <Pressable

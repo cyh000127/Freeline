@@ -37,7 +37,9 @@ export default function HomeBanner({ eventDetail, loading }: Props) {
     ? getEventDayCount(eventDetail.startDate, eventDetail.endDate) 
     : '-';
 
-  const bannerUri = eventDetail?.imageUrl ? { uri: eventDetail.imageUrl } : null;
+  const bannerUri = eventDetail?.thumbnailImageUrl
+    ? { uri: eventDetail.thumbnailImageUrl }
+    : null;
 
   return (
     <View style={styles.container}>

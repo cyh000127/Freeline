@@ -13,7 +13,7 @@ import NicknameEditModal from '@/components/my/NicknameEditModal';
 export default function My() {
   const router = useRouter();
   const [isNicknameModalVisible, setNicknameModalVisible] = useState(false);
-  const { nickname, setNickname, clearSession, reloadSession } = useAuthSession();
+  const { nickname, setNickname, clearSession } = useAuthSession();
 
   const displayNickname =
     typeof nickname === 'string' && nickname.trim().length > 0 ? nickname : '닉네임 없음';
@@ -60,22 +60,6 @@ export default function My() {
           <MyProfileCard
             nickname={displayNickname}
             onEditPress={() => setNicknameModalVisible(true)}
-          />
-        </MySection>
-
-        <MySection title="이용 관리">
-          <MyActionItem
-            iconName="qr-code-outline"
-            label="티켓 재스캔"
-            helperText="행사 참여 정보를 다시 불러올 수 있습니다."
-            onPress={async () => {
-              try {
-                await reloadSession();
-                Alert.alert('완료', '행사 참여 정보를 갱신했습니다.');
-              } catch {
-                Alert.alert('오류', '정보를 불러오는데 실패했습니다.');
-              }
-            }}
           />
         </MySection>
 

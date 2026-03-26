@@ -1,7 +1,3 @@
-export type AccountStatus = 'UNACTIVE' | 'ACTIVE';
-
-export type QueueStatus = 'FREE' | 'FRONT_QUEUE_OCCUPIED' | 'IN_BOOTH';
-
 export interface EntryCodeVerifyRequest {
   entryCode: string;
 }
@@ -11,4 +7,7 @@ export interface EntryCodeVerifyData {
   refreshToken: string | null;
   role: 'VISITOR' | 'BOOTH_ADMIN' | 'EVENT_ADMIN';
   boothId: number | null;
+  isPasswordChangeRequired?: boolean;
+  company?: string | null;
+  boothName?: string | null;
 }

@@ -3,6 +3,10 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import RegisterScreenLayout from '@/components/register/RegisterScreenLayout';
 import { useAuthSession } from '@/features/auth/auth-session.context';
+import {
+  isValidNickname,
+  NICKNAME_GUIDE_TEXT,
+} from '@/features/auth/nickname';
 
 export default function NicknameScreen() {
   const router = useRouter();
@@ -20,7 +24,7 @@ export default function NicknameScreen() {
   const [localNickname, setLocalNickname] = useState(nickname ?? '');
 
   const trimmed = useMemo(() => localNickname.trim(), [localNickname]);
-  const isValid = useMemo(() => /^[가-힣]{1,8}$/.test(trimmed), [trimmed]);
+  const isValid = useMemo(() => isValidNickname(trimmed), [trimmed]);
   const showError = trimmed.length > 0 && !isValid;
 
   const handleSubmit = () => {
@@ -50,7 +54,7 @@ export default function NicknameScreen() {
       <View style={styles.helperRow}>
         <Text style={styles.helperIcon}>ⓘ</Text>
         <Text style={[styles.helperText, showError && styles.helperError]}>
-          {showError ? '완성된 한글 1~8자만 사용할 수 있어요.' : '한글만 가능, 최대 8자'}
+          {showError ? NICKNAME_GUIDE_TEXT : '한글만 가능, 최대 8자'}
         </Text>
       </View>
 

@@ -1,4 +1,4 @@
-export type PlatformType = 'ANDROID';
+export type PlatformType = 'ANDROID' | 'IOS';
 
 export interface SaveFcmTokenRequest {
   visitorId: number;

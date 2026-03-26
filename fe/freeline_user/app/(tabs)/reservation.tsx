@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   Alert,
   ScrollView,
@@ -9,6 +9,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { TAB_ROUTES } from '@/constants/tabRoutes';
 import BottomTabBar, { TabKey } from '@/components/navigation/BottomTabBar';
 import ReservationCard from '@/components/reservation/ReservationCard';
@@ -18,7 +19,6 @@ import ReservationFilterTabs, {
 } from '@/components/reservation/ReservationFilterTabs';
 import {
   getMyWaitings,
-  createWaiting,
   cancelWaiting,
   postponeWaiting,
   exitWaiting,
@@ -26,28 +26,22 @@ import {
 import { useAuthSession } from '@/features/auth/auth-session.context';
 import type { WaitingItem, WaitingStatus } from '@/features/waiting/types';
 
-type ReservationStatus = WaitingStatus;
-
 type ReservationViewItem = {
   waitingId: string;
   boothName: string;
   myRank?: number;
   estimatedWaitText?: string;
-  boothLocation?: string;
-  reservedAt?: string;
   notice?: string;
   canPostpone?: boolean;
-  status: ReservationStatus;
+  status: WaitingStatus;
 };
 
-function getCompactStatusUI(status: ReservationStatus) {
+function getCompactStatusUI(status: WaitingStatus) {
   switch (status) {
     case 'CALLED':
       return {
         statusLabel: '호출됨' as const,
         statusTone: 'yellow' as const,
-        actionLabel: 'QR 인증' as const,
-        actionTone: 'yellow' as const,
       };
     case 'REGISTERED':
       return {
@@ -83,8 +77,22 @@ function getCompactStatusUI(status: ReservationStatus) {
   }
 }
 
-function isFinishedStatus(status: ReservationStatus) {
+function isFinishedStatus(status: WaitingStatus) {
   return status === 'EXITED' || status === 'CANCELED' || status === 'EXPIRED';
+}
+
+function getNotice(status: WaitingStatus) {
+  switch (status) {
+    case 'CALLED':
+      return '지금 QR 도착 인증이 가능합니다.';
+    case 'REGISTERED':
+      return '도착 인증이 완료되었습니다. 부스 관리자 확인 후 입장 처리됩니다.';
+    case 'ENTERED':
+      return '현재 체험이 진행 중입니다. 체험이 끝나면 이용 종료를 눌러 주세요.';
+    case 'WAITING':
+    default:
+      return '순번이 다가오면 푸시 알림으로 안내해 드립니다.';
+  }
 }
 
 export default function ReservationScreen() {
@@ -94,8 +102,6 @@ export default function ReservationScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ReservationFilter>('all');
-
-  const [creating, setCreating] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
 
   const { accessToken } = useAuthSession();
@@ -104,8 +110,10 @@ export default function ReservationScreen() {
     router.replace(TAB_ROUTES[tab]);
   };
 
-  const loadWaitings = async () => {
-    if (!accessToken) return;
+  const loadWaitings = useCallback(async () => {
+    if (!accessToken) {
+      return;
+    }
 
     try {
       setLoading(true);
@@ -120,29 +128,19 @@ export default function ReservationScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken]);
 
-  const handleAddReservation = async (boothId: number) => {
+  useFocusEffect(
+    useCallback(() => {
+      void loadWaitings();
+    }, [loadWaitings]),
+  );
+
+  const handleCancelReservation = async (waitingId: number) => {
     if (!accessToken) {
-      Alert.alert('오류', '로그인이 필요합니다.');
       return;
     }
 
-    try {
-      setCreating(true);
-      await createWaiting(accessToken, boothId);
-      await loadWaitings();
-      Alert.alert('예약 완료', '예약이 추가되었습니다.');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '예약 추가에 실패했습니다.';
-      Alert.alert('오류', message);
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleCancelReservation = async (waitingId: number) => {
-    if (!accessToken) return;
     try {
       setActionLoadingId(waitingId);
       await cancelWaiting(accessToken, waitingId);
@@ -157,7 +155,10 @@ export default function ReservationScreen() {
   };
 
   const handlePostponeReservation = async (waitingId: number) => {
-    if (!accessToken) return;
+    if (!accessToken) {
+      return;
+    }
+
     try {
       setActionLoadingId(waitingId);
       await postponeWaiting(accessToken, waitingId);
@@ -170,8 +171,12 @@ export default function ReservationScreen() {
       setActionLoadingId(null);
     }
   };
+
   const handleExitReservation = async (waitingId: number) => {
-    if (!accessToken) return;
+    if (!accessToken) {
+      return;
+    }
+
     try {
       setActionLoadingId(waitingId);
       await exitWaiting(accessToken, waitingId);
@@ -185,32 +190,23 @@ export default function ReservationScreen() {
     }
   };
 
-  useEffect(() => {
-    loadWaitings();
-  }, []);
-
   const currentItems = useMemo<ReservationViewItem[]>(() => {
     return waitings
       .filter((item) => !isFinishedStatus(item.status))
       .map((item) => {
-        const status = item.status;
-
         return {
           waitingId: String(item.waiting_id),
           boothName: item.booth_name,
           myRank: item.my_rank,
           estimatedWaitText:
-            status === 'REGISTERED' ? '도착 인증 완료' : undefined,
-          boothLocation: undefined,
-          reservedAt: undefined,
-          notice:
-            status === 'CALLED'
-              ? '지금 도착 인증이 가능합니다.'
-              : status === 'ENTERED'
-                ? '현재 체험이 진행 중입니다. 체험이 끝나면 이용 종료를 눌러 주세요.'
-                : '아직 도착 인증 가능 상태가 아닙니다.',
+            item.status === 'REGISTERED'
+              ? '도착 인증 완료'
+              : item.status === 'ENTERED'
+                ? '체험 진행 중'
+                : undefined,
+          notice: getNotice(item.status),
           canPostpone: item.postpone_available,
-          status,
+          status: item.status,
         };
       });
   }, [waitings]);
@@ -223,15 +219,25 @@ export default function ReservationScreen() {
           waitingId: String(item.waiting_id),
           boothName: item.booth_name,
           status: item.status,
-          estimatedWaitText: item.status === 'EXITED' ? '이용 종료' : item.status === 'CANCELED' ? '예약 취소됨' : '자동 취소됨',
-          reservedAt: undefined,
+          estimatedWaitText:
+            item.status === 'EXITED'
+              ? '이용 종료'
+              : item.status === 'CANCELED'
+                ? '예약 취소됨'
+                : '자동 취소됨',
         };
       });
   }, [waitings]);
 
   const mergedItems = useMemo(() => {
-    if (filter === 'current') return currentItems;
-    if (filter === 'finished') return finishedItems;
+    if (filter === 'current') {
+      return currentItems;
+    }
+
+    if (filter === 'finished') {
+      return finishedItems;
+    }
+
     return [...currentItems, ...finishedItems];
   }, [filter, currentItems, finishedItems]);
 
@@ -274,7 +280,9 @@ export default function ReservationScreen() {
             { text: '닫기', style: 'cancel' },
             {
               text: '미루기',
-              onPress: () => handlePostponeReservation(waitingIdNumber),
+              onPress: () => {
+                void handlePostponeReservation(waitingIdNumber);
+              },
             },
           ]);
         }}
@@ -284,7 +292,9 @@ export default function ReservationScreen() {
             {
               text: '취소하기',
               style: 'destructive',
-              onPress: () => handleCancelReservation(waitingIdNumber),
+              onPress: () => {
+                void handleCancelReservation(waitingIdNumber);
+              },
             },
           ]);
         }}
@@ -293,7 +303,9 @@ export default function ReservationScreen() {
             { text: '닫기', style: 'cancel' },
             {
               text: '종료하기',
-              onPress: () => handleExitReservation(waitingIdNumber),
+              onPress: () => {
+                void handleExitReservation(waitingIdNumber);
+              },
             },
           ]);
         }}
@@ -337,14 +349,8 @@ export default function ReservationScreen() {
           <View style={styles.emptyBox}>
             <Text style={styles.emptyText}>현재 예약된 부스가 없습니다.</Text>
 
-            <Pressable
-              style={[styles.mockAddButton, creating && styles.disabledButton]}
-              onPress={() => handleAddReservation(1)}
-              disabled={creating}
-            >
-              <Text style={styles.mockAddButtonText}>
-                {creating ? '추가 중...' : '임시 예약 추가'}
-              </Text>
+            <Pressable style={styles.navigateButton} onPress={() => router.push('/maps')}>
+              <Text style={styles.navigateButtonText}>배치도에서 부스 보기</Text>
             </Pressable>
           </View>
         ) : (
@@ -417,19 +423,16 @@ const styles = StyleSheet.create({
     color: '#888888',
     textAlign: 'center',
   },
-  mockAddButton: {
+  navigateButton: {
     marginTop: 14,
-    backgroundColor: '#6C63FF',
+    backgroundColor: '#34314C',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  mockAddButtonText: {
+  navigateButtonText: {
     fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
-  },
-  disabledButton: {
-    opacity: 0.6,
   },
 });
