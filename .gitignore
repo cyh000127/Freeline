@@ -577,7 +577,7 @@ $RECYCLE.BIN/
 
 .env.*
 ai/draft
-#be/Freeline/docs/
+be/Freeline/docs/
 /tree.txt
 docker-compose-local.yml
 fe/sample_app/package-lock.json
