@@ -27,6 +27,7 @@ pipeline {
         DOCKER_TAG = "${env.BUILD_ID}"
 
         APK_DIR = '/opt/freeline/apk'
+        USER_RELEASE_ACTION = 'none'
 
         INFISICAL_URL = 'https://j14a207.p.ssafy.io:8443'
         INFISICAL_PROJECT_ID = credentials('infisical-project-id')
@@ -55,6 +56,7 @@ pipeline {
                         env.BUILD_USER  = 'true'
                         env.BUILD_BOOTH = 'true'
                         env.BUILD_SUPER = 'true'
+                        env.USER_RELEASE_ACTION = 'build'
                         return
                     }
 
@@ -80,7 +82,12 @@ pipeline {
                         error('No relevant changes in fe/')
                     }
 
+                    env.USER_RELEASE_ACTION = env.BUILD_USER == 'true'
+                        ? (hasUserNativeChanges(changes) ? 'build' : 'update')
+                        : 'none'
+
                     echo "Build User: ${env.BUILD_USER}, Build Booth: ${env.BUILD_BOOTH}, Build Super: ${env.BUILD_SUPER}"
+                    echo "User Release Action: ${env.USER_RELEASE_ACTION}"
                     echo "Changed files:\n${changes}"
                 }
             }
@@ -179,7 +186,7 @@ pipeline {
             }
         }
 
-        stage('Build APK') {
+        stage('Release User App') {
             when {
                 allOf {
                     expression { isMainBranch() }
@@ -188,7 +195,8 @@ pipeline {
             }
             steps {
                 dir('fe/freeline-user') {
-                    sh '''set +x
+                    sh '''set -euo pipefail
+                        set +x
                         export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
                             --client-id=$INFISICAL_CLIENT_ID \
                             --client-secret=$INFISICAL_CLIENT_SECRET \
@@ -201,19 +209,40 @@ pipeline {
                             --domain=$INFISICAL_URL/api \
                             --projectId=$INFISICAL_PROJECT_ID \
                             --env=prod --path=/fe \
-                            -- bash -c '
-                                npm ci
-                                npx eas-cli build -p android \
-                                    --profile production \
-                                    --non-interactive \
-                                    --wait \
-                                    --output ./build/freeline.apk
+                            -- bash -s -- <<'EOF'
+                                set -euo pipefail
 
-                                # APK를 Nginx 서빙 디렉토리에 복사
-                                mkdir -p $APK_DIR
-                                cp ./build/freeline.apk $APK_DIR/freeline.apk
-                                echo "APK deployed: https://j14a207.p.ssafy.io/app/freeline.apk"
-                            '
+                                command -v npm >/dev/null 2>&1 || { echo "ERROR: npm not found on Jenkins agent"; exit 1; }
+                                command -v npx >/dev/null 2>&1 || { echo "ERROR: npx not found on Jenkins agent"; exit 1; }
+
+                                : "${EXPO_TOKEN:?ERROR: EXPO_TOKEN is missing from Infisical /fe}"
+                                : "${EAS_PROJECT_ID:?ERROR: EAS_PROJECT_ID is missing from Infisical /fe}"
+
+                                npm ci
+
+                                action="${USER_RELEASE_ACTION:-build}"
+                                if [ "$action" = "update" ]; then
+                                    npx eas-cli update \
+                                        --channel production \
+                                        --platform android \
+                                        --non-interactive \
+                                        --message "jenkins-${BUILD_ID}"
+                                    echo "EAS update published (channel=production, platform=android)"
+                                elif [ "$action" = "build" ]; then
+                                    mkdir -p ./build
+                                    npx eas-cli build -p android \
+                                        --profile production \
+                                        --non-interactive \
+                                        --wait \
+                                        --output ./build/freeline.apk
+                                    mkdir -p "$APK_DIR"
+                                    cp ./build/freeline.apk "$APK_DIR/freeline.apk"
+                                    echo "APK deployed: https://j14a207.p.ssafy.io/app/freeline.apk"
+                                else
+                                    echo "ERROR: invalid USER_RELEASE_ACTION='$action'"
+                                    exit 1
+                                fi
+EOF
                     '''
                 }
             }
@@ -259,6 +288,24 @@ def getChangedFiles() {
         script: 'git diff --name-only HEAD~1 HEAD 2>/dev/null || git log --name-only --pretty=format: -1 HEAD',
         returnStdout: true
     ).trim()
+}
+
+def hasUserNativeChanges(final String changes) {
+    if (!changes) {
+        return false
+    }
+
+    def nativeSensitivePaths = [
+        'fe/freeline-user/app.json',
+        'fe/freeline-user/app.config.ts',
+        'fe/freeline-user/eas.json',
+        'fe/freeline-user/package.json',
+        'fe/freeline-user/package-lock.json',
+        'fe/freeline-user/android/',
+        'fe/freeline-user/ios/'
+    ]
+
+    return nativeSensitivePaths.any { path -> changes.contains(path) }
 }
 
 // main 브랜치 push 또는 수동 실행일 때 true (MR 이벤트 제외)
