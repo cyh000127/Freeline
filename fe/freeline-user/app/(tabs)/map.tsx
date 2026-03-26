@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BoothTile } from '@/components/BoothTile';
 import { BoothBottomSheet } from '@/components/BoothBottomSheet';
 import { EmptyState } from '@/components/EmptyState';
@@ -70,67 +70,76 @@ export default function MapScreen() {
   }
 
   return (
-    <Screen>
-      <View style={styles.content}>
-        <SectionTitle caption="운영 중인 부스를 빠르게 찾아보세요" title="부스 배치도" />
+    <Screen padded={false} scroll={false}>
+      <View style={styles.flex}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <SectionTitle caption="운영 중인 부스를 빠르게 찾아보세요" title="부스 배치도" />
 
-        <View style={styles.mapIntro}>
-          <Text style={styles.mapIntroTitle}>원하는 부스를 터치해 상세 정보를 펼쳐보세요.</Text>
-          <Text style={styles.mapIntroBody}>
-            아래에서 시트가 올라오고, 더 펼치면 소개와 굿즈 현황까지 한 화면에서 확인할 수 있습니다.
-          </Text>
-        </View>
-
-        {lastError ? <ErrorBanner message={lastError} /> : null}
-
-        {booths.length ? <View style={styles.mapBoard}> 
-          <View style={styles.mapBoardHeader}>
-            <Text style={styles.mapBoardTitle}>Hall A Booths</Text>
-            <Text style={styles.mapBoardMeta}>{booths.length}개 부스</Text>
+          <View style={styles.mapIntro}>
+            <Text style={styles.mapIntroTitle}>원하는 부스를 터치해 상세 정보를 펼쳐보세요.</Text>
+            <Text style={styles.mapIntroBody}>
+              아래에서 시트가 올라오고, 더 펼치면 소개와 굿즈 현황까지 한 화면에서 확인할 수 있습니다.
+            </Text>
           </View>
 
-          <View style={styles.grid}>
-          {booths.map((booth) => (
-            <BoothTile
-              booth={booth}
-              key={booth.boothId}
-              onPress={() => {
-                void openBoothSheet(booth);
-              }}
-              selected={selectedBooth?.boothId === booth.boothId}
-            />
-          ))}
-          </View>
-        </View> : (
-          <EmptyState caption="현재 불러온 부스가 없습니다." title="배치도 데이터 없음" />
-        )}
+          {lastError ? <ErrorBanner message={lastError} /> : null}
+
+          {booths.length ? (
+            <View style={styles.mapBoard}>
+              <View style={styles.mapBoardHeader}>
+                <Text style={styles.mapBoardTitle}>Hall A Booths</Text>
+                <Text style={styles.mapBoardMeta}>{booths.length}개 부스</Text>
+              </View>
+
+              <View style={styles.grid}>
+                {booths.map((booth) => (
+                  <BoothTile
+                    booth={booth}
+                    key={booth.boothId}
+                    onPress={() => {
+                      void openBoothSheet(booth);
+                    }}
+                    selected={selectedBooth?.boothId === booth.boothId}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : (
+            <EmptyState caption="현재 불러온 부스가 없습니다." title="배치도 데이터 없음" />
+          )}
+        </ScrollView>
+
+        <BoothBottomSheet
+          booth={selectedBooth}
+          detail={sheetDetail}
+          estimatedMinutes={sheetEstimatedMinutes}
+          expanded={expanded}
+          loading={loadingSheet}
+          onClose={() => setSheetVisible(false)}
+          onExpandToggle={() => setExpanded((current) => !current)}
+          onReserve={() => {
+            if (selectedBooth) {
+              void createWaiting(selectedBooth.boothId);
+            }
+          }}
+          visible={sheetVisible && !!selectedBooth}
+        />
+
+        <FloatingTabBar />
       </View>
-
-      <BoothBottomSheet
-        booth={selectedBooth}
-        detail={sheetDetail}
-        estimatedMinutes={sheetEstimatedMinutes}
-        expanded={expanded}
-        loading={loadingSheet}
-        onClose={() => setSheetVisible(false)}
-        onExpandToggle={() => setExpanded((current) => !current)}
-        onReserve={() => {
-          if (selectedBooth) {
-            void createWaiting(selectedBooth.boothId);
-          }
-        }}
-        visible={sheetVisible && !!selectedBooth}
-      />
-
-      <FloatingTabBar />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   content: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
     gap: 20,
-    paddingBottom: 120,
+    paddingBottom: 148,
   },
   mapIntro: {
     backgroundColor: palette.surface,

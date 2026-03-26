@@ -47,6 +47,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    paddingTop: spacing.screenTop,
     paddingBottom: 120,
   },
   body: {
@@ -54,5 +55,6 @@ const styles = StyleSheet.create({
   },
   padded: {
     paddingHorizontal: spacing.page,
+    paddingTop: spacing.screenTop,
   },
 });

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ActionButton';
 import { FloatingTabBar } from '@/components/FloatingTabBar';
 import { Screen } from '@/components/Screen';
@@ -17,63 +17,70 @@ export default function MyScreen() {
   const [nickname, setNickname] = useState(session.nickname);
 
   return (
-    <Screen>
-      <View style={styles.content}>
-        <SectionTitle caption="환경설정과 개인 상태를 관리하세요" title="MY" />
+    <Screen padded={false} scroll={false}>
+      <View style={styles.flex}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <SectionTitle caption="환경설정과 개인 상태를 관리하세요" title="MY" />
 
-        <View style={styles.profileCard}>
-          <Text style={styles.profileTitle}>{session.nickname || '방문객'}</Text>
-          <Text style={styles.profileMeta}>Entry Code {session.entryCode}</Text>
-          <Text style={styles.profileMeta}>현재 상태 {queueStatus}</Text>
-          <Text style={styles.profileMeta}>활성 예약 {waitings.length}건</Text>
-        </View>
+          <View style={styles.profileCard}>
+            <Text style={styles.profileTitle}>{session.nickname || '방문객'}</Text>
+            <Text style={styles.profileMeta}>Entry Code {session.entryCode}</Text>
+            <Text style={styles.profileMeta}>현재 상태 {queueStatus}</Text>
+            <Text style={styles.profileMeta}>활성 예약 {waitings.length}건</Text>
+          </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>닉네임 수정</Text>
-          <TextField onChangeText={setNickname} placeholder="닉네임" value={nickname} />
-          <ActionButton
-            label="닉네임 저장"
-            onPress={() => {
-              void session.saveNickname(nickname);
-            }}
-          />
-        </View>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>닉네임 수정</Text>
+            <TextField onChangeText={setNickname} placeholder="닉네임" value={nickname} />
+            <ActionButton
+              label="닉네임 저장"
+              onPress={() => {
+                void session.saveNickname(nickname);
+              }}
+            />
+          </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>설정</Text>
-          <ActionButton
-            label={session.marketingAgreed ? '마케팅 수신 동의됨' : '마케팅 수신 미동의'}
-            onPress={() => {
-              void session.saveAgreements(session.requiredAgreed, !session.marketingAgreed);
-            }}
-            variant="ghost"
-          />
-          <ActionButton
-            label="로그아웃"
-            onPress={() => {
-              void session.logout();
-            }}
-            variant="ghost"
-          />
-          <ActionButton
-            label="세션 초기화"
-            onPress={() => {
-              void session.resetAll();
-            }}
-            variant="ghost"
-          />
-        </View>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>설정</Text>
+            <ActionButton
+              label={session.marketingAgreed ? '마케팅 수신 동의됨' : '마케팅 수신 미동의'}
+              onPress={() => {
+                void session.saveAgreements(session.requiredAgreed, !session.marketingAgreed);
+              }}
+              variant="ghost"
+            />
+            <ActionButton
+              label="로그아웃"
+              onPress={() => {
+                void session.logout();
+              }}
+              variant="ghost"
+            />
+            <ActionButton
+              label="세션 초기화"
+              onPress={() => {
+                void session.resetAll();
+              }}
+              variant="ghost"
+            />
+          </View>
+        </ScrollView>
+
+        <FloatingTabBar />
       </View>
-
-      <FloatingTabBar />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   content: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
     gap: 20,
-    paddingBottom: 120,
+    paddingBottom: 148,
   },
   profileCard: {
     backgroundColor: palette.ink,
