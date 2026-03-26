@@ -46,6 +46,7 @@ import com.freeline.domain.pushnotification.service.WaitingFcmEventConsumer;
 import com.freeline.domain.waiting.service.WaitingExpireDelayPublisher;
 import com.freeline.domain.waiting.service.WaitingExpireTaskScheduler;
 import com.freeline.domain.waiting.service.WaitingPolicyResolver;
+import com.freeline.domain.waiting.service.WaitingStatusPersistenceService;
 
 @ExtendWith(MockitoExtension.class)
 class WaitingRabbitMqFlowTest {
@@ -81,6 +82,9 @@ class WaitingRabbitMqFlowTest {
 
     @Mock
     private EventPolicyRepository eventPolicyRepository;
+
+    @Mock
+    private WaitingStatusPersistenceService waitingStatusPersistenceService;
 
     private MockedStatic<TimeUtils> timeUtilsMock;
 
@@ -462,7 +466,8 @@ class WaitingRabbitMqFlowTest {
                         boothRepository,
                         boothPolicyRepository,
                         eventPolicyRepository
-                )
+                ),
+                waitingStatusPersistenceService
         );
     }
 

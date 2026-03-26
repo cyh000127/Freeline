@@ -27,6 +27,7 @@ public class WaitingExpireTaskScheduler {
     private final WaitingExpireDelayPublisher waitingExpireDelayPublisher;
     private final BoothWaitingRepository boothWaitingRepository;
     private final WaitingPolicyResolver waitingPolicyResolver;
+    private final WaitingStatusPersistenceService waitingStatusPersistenceService;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(final WaitingEventMessage message) {
@@ -59,6 +60,7 @@ public class WaitingExpireTaskScheduler {
 
         final Duration delay = Duration.between(TimeUtils.nowDateTime(), expiresAt);
         if (delay.isNegative() || delay.isZero()) {
+            waitingStatusPersistenceService.expireWaiting(waiting.getId(), expiresAt);
             return;
         }
 
