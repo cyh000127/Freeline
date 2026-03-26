@@ -163,7 +163,7 @@ $env:NEXT_PUBLIC_API_URL="http://localhost:8080/api"; npm run dev -- --port 3001
 
 ## Step 6. 모바일 앱 (Expo, 선택)
 
-모바일 API URL이 프로덕션 주소로 하드코딩되어 있습니다 (`fe/freeline_user/api/axios.ts`).
+모바일 API URL 기본값이 프로덕션 주소로 설정되어 있습니다 (`fe/freeline-user/src/constants/env.ts`).
 로컬 백엔드와 연결하려면 임시로 수정 후 실행:
 
 ```powershell
@@ -171,7 +171,7 @@ $env:NEXT_PUBLIC_API_URL="http://localhost:8080/api"; npm run dev -- --port 3001
 # Android 에뮬레이터: http://10.0.2.2:8080/api/v1
 # 실기기: http://{내 PC IP}:8080/api/v1
 
-cd fe/freeline_user/
+cd fe/freeline-user/
 npm install
 npm run start
 ```
