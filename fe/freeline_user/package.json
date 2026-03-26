@@ -8,7 +8,17 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "apk:configure": "npx eas-cli build:configure",
+    "apk:update:configure": "npx eas-cli update:configure",
+    "apk:build:dev": "npx eas-cli build -p android --profile dev-apk",
+    "apk:build:preview": "npx eas-cli build -p android --profile preview",
+    "apk:build:prod": "npx eas-cli build -p android --profile production --non-interactive",
+    "apk:build:local": "npx eas-cli build -p android --profile production --local --output ./build/freeline.apk",
+    "apk:list": "npx eas-cli build:list --platform android --limit 10",
+    "apk:download": "npx eas-cli build:list --platform android --status finished --limit 1 --json | node -e \"const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));if(d[0]?.artifacts?.buildUrl)console.log(d[0].artifacts.buildUrl);else process.exit(1)\"",
+    "apk:install:latest": "npx eas-cli build:run -p android --latest",
+    "apk:update": "npx eas-cli update --channel production --platform android"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

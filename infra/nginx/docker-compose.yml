@@ -16,6 +16,7 @@ services:
       - ./conf.d:/etc/nginx/conf.d
       - /etc/letsencrypt:/etc/letsencrypt
       - /var/www/certbot:/var/www/certbot
+      - /opt/freeline/apk:/var/www/apk:ro
     networks:
       - infra-public
     extra_hosts:
