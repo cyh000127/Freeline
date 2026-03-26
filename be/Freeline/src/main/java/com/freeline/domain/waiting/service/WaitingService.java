@@ -72,6 +72,7 @@ public class WaitingService {
     );
 
     private static final List<WaitingStatus> CANCEL_BLOCKED_STATUSES = List.of(
+            WaitingStatus.ENTERED,
             WaitingStatus.EXITED,
             WaitingStatus.EXPIRED,
             WaitingStatus.CANCELED
@@ -239,23 +240,13 @@ public class WaitingService {
     public WaitingExitResDto exitWaiting(final Long waitingId, final Long visitorId) {
         final BoothWaiting waiting = getWaitingEntity(waitingId);
         validateWaitingOwner(waiting, visitorId);
-        if (waiting.getStatus() != WaitingStatus.ENTERED) {
-            throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_EXIT);
-        }
+        return exitWaitingInternal(waiting);
+    }
 
-        final String previousStatus = waiting.getStatus().name();
-        waiting.updateStatus(WaitingStatus.EXITED);
-        waiting.updateExitedAt(TimeUtils.nowDateTime());
-        dispatchStatusChanged(waiting, previousStatus, WaitingEventType.WAITING_EXITED);
-
-        log.info(
-                "[Waiting] exit complete {waitingId: {}, boothId: {}, visitorId: {}}",
-                waiting.getId(),
-                waiting.getBoothId(),
-                visitorId
-        );
-
-        return WaitingConverter.toWaitingExitResDto(waiting);
+    public WaitingExitResDto exitWaitingByAdmin(final Long waitingId, final Long boothId) {
+        final BoothWaiting waiting = getWaitingEntity(waitingId);
+        validateWaitingBooth(waiting, boothId);
+        return exitWaitingInternal(waiting);
     }
 
     public WaitingAdmitResDto admitWaiting(final Long waitingId, final Long boothId) {
@@ -481,5 +472,25 @@ public class WaitingService {
                         waitingEventSnapshotAssembler.toSnapshot(waiting)
                 )
         );
+    }
+
+    private WaitingExitResDto exitWaitingInternal(final BoothWaiting waiting) {
+        if (waiting.getStatus() != WaitingStatus.ENTERED) {
+            throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_EXIT);
+        }
+
+        final String previousStatus = waiting.getStatus().name();
+        waiting.updateStatus(WaitingStatus.EXITED);
+        waiting.updateExitedAt(TimeUtils.nowDateTime());
+        dispatchStatusChanged(waiting, previousStatus, WaitingEventType.WAITING_EXITED);
+
+        log.info(
+                "[Waiting] exit complete {waitingId: {}, boothId: {}, visitorId: {}}",
+                waiting.getId(),
+                waiting.getBoothId(),
+                waiting.getVisitorId()
+        );
+
+        return WaitingConverter.toWaitingExitResDto(waiting);
     }
 }

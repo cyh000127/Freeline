@@ -47,6 +47,9 @@ class WaitingExpireTaskSchedulerTest {
     @Mock
     private EventPolicyRepository eventPolicyRepository;
 
+    @Mock
+    private WaitingStatusPersistenceService waitingStatusPersistenceService;
+
     private MockedStatic<TimeUtils> timeUtilsMock;
 
     @BeforeEach
@@ -184,6 +187,38 @@ class WaitingExpireTaskSchedulerTest {
         Mockito.verifyNoInteractions(waitingExpireDelayPublisher);
     }
 
+    @Test
+    void handle_expiresImmediatelyWhenDelayIsNotPositive() {
+        final WaitingExpireTaskScheduler scheduler = createScheduler();
+        final BoothWaiting waiting = BoothWaiting.builder()
+                .id(304L)
+                .boothId(12L)
+                .visitorId(24L)
+                .status(WaitingStatus.CALLED)
+                .calledAt(FIXED_NOW.minusSeconds(180))
+                .callExpiresAt(FIXED_NOW)
+                .build();
+        final WaitingEventMessage message = WaitingEventMessage.builder()
+                .schemaVersion(1)
+                .eventId(UUID.randomUUID())
+                .eventType(WaitingEventType.WAITING_CALLED)
+                .waitingId(304L)
+                .boothId(12L)
+                .visitorId(24L)
+                .previousStatus("WAITING")
+                .currentStatus("CALLED")
+                .occurredAt(FIXED_NOW)
+                .snapshot(null)
+                .build();
+
+        Mockito.when(boothWaitingRepository.findById(304L)).thenReturn(Optional.of(waiting));
+
+        scheduler.handle(message);
+
+        Mockito.verify(waitingStatusPersistenceService).expireWaiting(304L, FIXED_NOW);
+        Mockito.verifyNoInteractions(waitingExpireDelayPublisher);
+    }
+
     private WaitingExpireTaskScheduler createScheduler() {
         return new WaitingExpireTaskScheduler(
                 waitingExpireDelayPublisher,
@@ -192,7 +227,8 @@ class WaitingExpireTaskSchedulerTest {
                         boothRepository,
                         boothPolicyRepository,
                         eventPolicyRepository
-                )
+                ),
+                waitingStatusPersistenceService
         );
     }
 }

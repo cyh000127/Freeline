@@ -22,6 +22,7 @@ import com.freeline.domain.boothmanager.service.BoothManagerService;
 import com.freeline.domain.boothmanager.service.BoothManagerSseService;
 import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
+import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -77,6 +78,18 @@ public class BoothManagerController {
     ) {
         boothAccessService.validateBoothAccess(authentication, boothId);
         final WaitingAdmitResDto response = boothManagerService.admitWaiting(boothId, waitingId);
+        return ResponseUtils.ok(response);
+    }
+
+    @Operation(summary = "이용 종료 처리", description = "부스 관리자가 현재 이용중인 고객을 퇴장 처리합니다.")
+    @PatchMapping("/booths/{boothId}/waitings/{waitingId}/exit")
+    public ResponseEntity<BaseResponse<WaitingExitResDto>> exitWaiting(
+            final Authentication authentication,
+            @PathVariable final Long boothId,
+            @PathVariable final Long waitingId
+    ) {
+        boothAccessService.validateBoothAccess(authentication, boothId);
+        final WaitingExitResDto response = boothManagerService.exitWaiting(boothId, waitingId);
         return ResponseUtils.ok(response);
     }
 

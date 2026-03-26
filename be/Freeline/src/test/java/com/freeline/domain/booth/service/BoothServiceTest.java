@@ -179,6 +179,61 @@ class BoothServiceTest {
     }
 
     @Test
+    void 부스_상세_조회_성공_whenEventPolicyFallbackApplies() {
+        final Booth booth = Booth.builder()
+                .id(12L)
+                .eventId(5L)
+                .name("SSAFY 굿즈 부스")
+                .locationCode("A-03")
+                .openTime(LocalTime.of(10, 0))
+                .closeTime(LocalTime.of(18, 0))
+                .emergencyClosed(false)
+                .build();
+
+        final EventPolicy eventPolicy = EventPolicy.builder()
+                .id(1L)
+                .event(Event.builder().id(5L).build())
+                .defaultCallCount(3)
+                .defaultCallTtl(120)
+                .build();
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatus(12L, WaitingStatus.WAITING)).thenReturn(35L);
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.empty());
+        Mockito.when(eventPolicyRepository.findByEvent_Id(5L)).thenReturn(Optional.of(eventPolicy));
+        Mockito.when(boothGoodsRepository.findAllByBoothIdOrderByIdAsc(12L)).thenReturn(List.of());
+
+        final BoothResDto result = boothService.getBooth(12L);
+
+        Assertions.assertThat(result.callCount()).isEqualTo(3);
+        Assertions.assertThat(result.callValidSeconds()).isEqualTo(120);
+    }
+
+    @Test
+    void 부스_상세_조회_성공_whenNoPolicyUsesRuntimeDefaults() {
+        final Booth booth = Booth.builder()
+                .id(12L)
+                .eventId(5L)
+                .name("SSAFY 굿즈 부스")
+                .locationCode("A-03")
+                .openTime(LocalTime.of(10, 0))
+                .closeTime(LocalTime.of(18, 0))
+                .emergencyClosed(false)
+                .build();
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatus(12L, WaitingStatus.WAITING)).thenReturn(35L);
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.empty());
+        Mockito.when(eventPolicyRepository.findByEvent_Id(5L)).thenReturn(Optional.empty());
+        Mockito.when(boothGoodsRepository.findAllByBoothIdOrderByIdAsc(12L)).thenReturn(List.of());
+
+        final BoothResDto result = boothService.getBooth(12L);
+
+        Assertions.assertThat(result.callCount()).isEqualTo(1);
+        Assertions.assertThat(result.callValidSeconds()).isEqualTo(180);
+    }
+
+    @Test
     void 부스_대기열_현황_조회_성공() {
         final Booth booth = Booth.builder()
                 .id(12L)
@@ -243,6 +298,127 @@ class BoothServiceTest {
         Assertions.assertThat(result.frontQueue()).hasSize(2);
         Assertions.assertThat(result.currentCalledUser()).isNotNull();
         Assertions.assertThat(result.currentCalledUser().waitingId()).isEqualTo(1001L);
+    }
+
+    @Test
+    void 부스_대기열_현황_조회_성공_whenNoPolicyUsesRuntimeDefaultFrontQueueLimit() {
+        final Booth booth = Booth.builder()
+                .id(12L)
+                .eventId(5L)
+                .name("SSAFY 굿즈 부스")
+                .locationCode("A-03")
+                .openTime(LocalTime.of(10, 0))
+                .closeTime(LocalTime.of(18, 0))
+                .emergencyClosed(false)
+                .build();
+
+        final Visitor visitor = Visitor.builder()
+                .id(100L)
+                .name("홍길동")
+                .active(true)
+                .build();
+
+        final BoothWaiting calledWaiting = BoothWaiting.builder()
+                .id(1001L)
+                .boothId(12L)
+                .visitorId(100L)
+                .status(WaitingStatus.CALLED)
+                .waitingNumber(15)
+                .calledAt(LocalDateTime.of(2026, 3, 8, 21, 10, 0))
+                .visitor(visitor)
+                .build();
+
+        final BoothWaiting registeredWaiting = BoothWaiting.builder()
+                .id(1002L)
+                .boothId(12L)
+                .visitorId(100L)
+                .status(WaitingStatus.REGISTERED)
+                .waitingNumber(16)
+                .calledAt(LocalDateTime.of(2026, 3, 8, 21, 12, 0))
+                .visitor(visitor)
+                .build();
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.empty());
+        Mockito.when(eventPolicyRepository.findByEvent_Id(5L)).thenReturn(Optional.empty());
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatus(12L, WaitingStatus.WAITING)).thenReturn(57L);
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, List.of(WaitingStatus.CALLED, WaitingStatus.REGISTERED)))
+                .thenReturn(2L);
+        Mockito.when(boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
+                12L,
+                List.of(WaitingStatus.CALLED, WaitingStatus.REGISTERED)
+        )).thenReturn(List.of(calledWaiting, registeredWaiting));
+        Mockito.when(boothWaitingRepository.findFirstByBoothIdAndStatusOrderByCalledAtDesc(12L, WaitingStatus.CALLED))
+                .thenReturn(Optional.of(calledWaiting));
+
+        final BoothQueueResDto result = boothService.getBoothQueue(12L);
+
+        Assertions.assertThat(result.frontQueueCount()).isEqualTo(2L);
+        Assertions.assertThat(result.frontQueue()).hasSize(1);
+    }
+
+    @Test
+    void 부스_대기열_현황_조회_성공_whenEventPolicyFallbackApplies() {
+        final Booth booth = Booth.builder()
+                .id(12L)
+                .eventId(5L)
+                .name("SSAFY 굿즈 부스")
+                .locationCode("A-03")
+                .openTime(LocalTime.of(10, 0))
+                .closeTime(LocalTime.of(18, 0))
+                .emergencyClosed(false)
+                .build();
+
+        final EventPolicy eventPolicy = EventPolicy.builder()
+                .id(1L)
+                .event(Event.builder().id(5L).build())
+                .defaultCallCount(1)
+                .defaultCallTtl(120)
+                .build();
+
+        final Visitor visitor = Visitor.builder()
+                .id(100L)
+                .name("홍길동")
+                .active(true)
+                .build();
+
+        final BoothWaiting calledWaiting = BoothWaiting.builder()
+                .id(1001L)
+                .boothId(12L)
+                .visitorId(100L)
+                .status(WaitingStatus.CALLED)
+                .waitingNumber(15)
+                .calledAt(LocalDateTime.of(2026, 3, 8, 21, 10, 0))
+                .visitor(visitor)
+                .build();
+
+        final BoothWaiting registeredWaiting = BoothWaiting.builder()
+                .id(1002L)
+                .boothId(12L)
+                .visitorId(100L)
+                .status(WaitingStatus.REGISTERED)
+                .waitingNumber(16)
+                .calledAt(LocalDateTime.of(2026, 3, 8, 21, 12, 0))
+                .visitor(visitor)
+                .build();
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.empty());
+        Mockito.when(eventPolicyRepository.findByEvent_Id(5L)).thenReturn(Optional.of(eventPolicy));
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatus(12L, WaitingStatus.WAITING)).thenReturn(57L);
+        Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, List.of(WaitingStatus.CALLED, WaitingStatus.REGISTERED)))
+                .thenReturn(2L);
+        Mockito.when(boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
+                12L,
+                List.of(WaitingStatus.CALLED, WaitingStatus.REGISTERED)
+        )).thenReturn(List.of(calledWaiting, registeredWaiting));
+        Mockito.when(boothWaitingRepository.findFirstByBoothIdAndStatusOrderByCalledAtDesc(12L, WaitingStatus.CALLED))
+                .thenReturn(Optional.of(calledWaiting));
+
+        final BoothQueueResDto result = boothService.getBoothQueue(12L);
+
+        Assertions.assertThat(result.frontQueue()).hasSize(1);
+        Assertions.assertThat(result.frontQueue().getFirst().waitingId()).isEqualTo(1001L);
     }
 
     @Test
