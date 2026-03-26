@@ -15,7 +15,9 @@ import {
   Trash2,
   Loader2,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { authApi } from "@/lib/api/auth";
 import { eventApi } from "@/lib/api/event";
@@ -23,7 +25,7 @@ import { eventApi } from "@/lib/api/event";
 interface TicketData {
   visitorId: number;
   entryCode: string;
-  active: boolean;
+  isActive: boolean;
 }
 
 export default function VisitorTicketsPage() {
@@ -38,8 +40,30 @@ export default function VisitorTicketsPage() {
   const [tickets, setTickets] = useState<TicketData[]>([]);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
 
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [isFetchingTickets, setIsFetchingTickets] = useState(false);
+
+  const fetchTickets = async (pageNum: number) => {
+    setIsFetchingTickets(true);
+    try {
+      const res = await eventApi.getVisitorTickets(eventId, pageNum, 30);
+      if (res.data) {
+        setTickets(res.data.content);
+        setTotalPages(res.data.totalPages);
+        setTotalElements(res.data.totalElements);
+        setPage(res.data.page);
+      }
+    } catch (err) {
+      console.error("Failed to fetch tickets:", err);
+    } finally {
+      setIsFetchingTickets(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInitialData = async () => {
       try {
         const [meRes, eventRes] = await Promise.all([
           authApi.getMe(),
@@ -48,14 +72,22 @@ export default function VisitorTicketsPage() {
 
         if (meRes.data?.success) setUserName(meRes.data.data.name);
         if (eventRes.data?.success) setEventName(eventRes.data.data.name);
+        
+        await fetchTickets(0);
       } catch (err) {
         console.error(err);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchData();
+    fetchInitialData();
   }, [eventId]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      fetchTickets(page);
+    }
+  }, [page]);
 
   const handleGenerate = async () => {
     if (quantity <= 0) {
@@ -67,9 +99,10 @@ export default function VisitorTicketsPage() {
     try {
       const res = await authApi.generateTickets({ eventId, quantity });
       if (res.data?.success) {
-        setTickets(res.data.data.entryCodes || []);
         setGeneratedAt(new Date().toLocaleString());
         alert(`${res.data.data.createdCount}개의 티켓이 성공적으로 생성되었습니다.`);
+        setPage(0);
+        await fetchTickets(0);
       }
     } catch (err: any) {
       alert(err.response?.data?.message || "티켓 생성에 실패했습니다.");
@@ -269,7 +302,7 @@ export default function VisitorTicketsPage() {
               <div className="p-8 border-b border-gray-50 flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-[#2D2A4A]">생성된 티켓 목록</h2>
-                  <p className="text-sm text-gray-400 mt-1">총 {tickets.length}개의 티켓이 준비되었습니다.</p>
+                  <p className="text-sm text-gray-400 mt-1">총 {totalElements}개의 티켓이 발급되었습니다.</p>
                 </div>
 
                 {tickets.length > 0 && (
@@ -284,7 +317,11 @@ export default function VisitorTicketsPage() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                {tickets.length > 0 ? (
+                {isFetchingTickets ? (
+                  <div className="h-full flex items-center justify-center">
+                    <Loader2 className="w-10 h-10 animate-spin text-[#2D2A4A]/20" />
+                  </div>
+                ) : tickets.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {tickets.map((ticket) => (
                       <div
@@ -301,9 +338,15 @@ export default function VisitorTicketsPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="px-3 py-1 rounded-full bg-white text-[10px] font-bold text-emerald-500 shadow-sm border border-emerald-50">
-                              ACTIVE
-                            </span>
+                            {ticket.isActive ? (
+                              <span className="px-3 py-1 rounded-full bg-white text-[10px] font-bold text-emerald-500 shadow-sm border border-emerald-50">
+                                ACTIVE
+                              </span>
+                            ) : (
+                              <span className="px-3 py-1 rounded-full bg-white text-[10px] font-bold text-rose-500 shadow-sm border border-rose-50">
+                                INACTIVE
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -319,6 +362,58 @@ export default function VisitorTicketsPage() {
                   </div>
                 )}
               </div>
+
+              {totalPages > 1 && (
+                <div className="px-8 py-4 border-t border-gray-50 flex items-center justify-center gap-4">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setPage(prev => Math.max(0, prev - 1))}
+                    disabled={page === 0 || isFetchingTickets}
+                    className="rounded-xl hover:bg-gray-100"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      // Adjust to show page numbers around current page
+                      let pageNum = i;
+                      if (totalPages > 5) {
+                        if (page > 2) pageNum = page - 2 + i;
+                        if (pageNum >= totalPages) pageNum = totalPages - 5 + i;
+                        if (pageNum < 0) pageNum = i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={page === pageNum ? "default" : "ghost"}
+                          onClick={() => setPage(pageNum)}
+                          disabled={isFetchingTickets}
+                          className={`w-10 h-10 rounded-xl font-bold ${
+                            page === pageNum 
+                              ? "bg-[#2D2A4A] text-white hover:bg-[#2D2A4A]" 
+                              : "text-gray-500 hover:bg-gray-100"
+                          }`}
+                        >
+                          {pageNum + 1}
+                        </Button>
+                      );
+                    })}
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setPage(prev => Math.min(totalPages - 1, prev + 1))}
+                    disabled={page === totalPages - 1 || isFetchingTickets}
+                    className="rounded-xl hover:bg-gray-100"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </Button>
+                </div>
+              )}
 
               {tickets.length > 0 && (
                 <div className="p-6 bg-[#F8F9FA] border-t border-gray-50">

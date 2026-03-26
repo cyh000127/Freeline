@@ -61,7 +61,7 @@ export const authApi = {
   bulkSendBoothAdminLogins: (data: any) => api.post('/v1/auth/booth-admins/send-login-info', data),
   getBoothAdmins: (eventId: number | string) => api.get(`/v1/auth/booth-admins/event/${eventId}`),
   updateBoothAdmin: (adminId: number | string, data: any) => api.patch(`/v1/booths/accounts/${adminId}`, data),
-  deleteBoothAdmin: (adminId: number | string) => api.delete(`/v1/booths/accounts/${adminId}`),
+  deleteBoothAdmin: (adminId: number | string) => api.delete(`/v1/auth/booth-admins/${adminId}`),
 
   // 방문자 티켓 (엔트리 코드) 관련
   generateTickets: (data: { eventId: number; quantity: number }) =>
