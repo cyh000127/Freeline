@@ -18,6 +18,7 @@ public class CorsConfig {
             BackDomain.LIVE.getUrl(),
             FrontDomain.LOCAL1.getUrl(),
             FrontDomain.LOCAL2.getUrl(),
+            FrontDomain.LOCAL3.getUrl(),
             FrontDomain.LIVE.getUrl()
     );
 
