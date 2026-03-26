@@ -28,13 +28,19 @@ export default function LoginPage() {
 
     try {
       const response = await authApi.login({ id: loginId, password });
-      const token = response.data?.data?.accessToken || response.data?.accessToken || response.data?.token;
+      const userData = response.data?.data || response.data;
+      
+      // 1. 비밀번호 변경 필수 여부 먼저 확인
+      if (userData.isPasswordChangeRequired) {
+        setShowInitFlow(true);
+        return; // 대시보드로 이동하지 않고 중단
+      }
+
+      const token = userData.accessToken || userData.token;
       
       if (token) {
         localStorage.setItem("accessToken", token);
         
-        // Store additional booth/user info from response
-        const userData = response.data?.data || response.data;
         if (userData.boothId) localStorage.setItem("boothId", userData.boothId.toString());
         
         const bName = userData.boothName || userData.company || userData.name;
@@ -47,23 +53,25 @@ export default function LoginPage() {
 
         // Force refresh AuthContext before redirecting
         await refreshUser();
+        router.push("/");
+      } else {
+        setErrorMsg("로그인에 성공했으나 인증 토큰을 받지 못했습니다.");
       }
-      
-      router.push("/");
     } catch (error: unknown) {
       console.error("Login Error:", error);
       if (axios.isAxiosError(error)) {
         const responseData = error.response?.data;
-        const errorData = responseData?.error;
-        const msg = errorData?.message || responseData?.message || "";
-        const status = errorData?.status || responseData?.status || "";
+        const errorData = responseData?.error || responseData;
+        const msg = errorData?.message || "";
+        const status = errorData?.status || "";
         
-        if (status === "PASSWORD_CHANGE_REQUIRED" || msg.includes("비밀번호 변경")) {
+        // 백엔드 명세 변경으로 403 처리는 기본적으로 발생하지 않으나, 하위 호환성을 위해 유지하거나 정리 가능
+        if (status === "PASSWORD_CHANGE_REQUIRED" || (typeof msg === 'string' && msg.includes("비밀번호 변경"))) {
           setShowInitFlow(true);
           return;
         }
         
-        setErrorMsg(msg || "로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.");
+        setErrorMsg(typeof msg === 'string' ? msg : "로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.");
       } else {
         setErrorMsg("로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.");
       }

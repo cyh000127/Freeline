@@ -215,8 +215,25 @@ export default function EventBoothsPage() {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, selected: !r.selected } : r)));
   };
 
-  const deleteRow = (id: string) => {
-    setRows((p) => p.filter((r) => r.id !== id));
+  const deleteRow = async (id: string) => {
+    const row = rows.find((r) => r.id === id);
+    if (!row) return;
+
+    if (row.adminId) {
+      if (!confirm(`부스 관리자 '${row.adminName}' 계정을 정말로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+      try {
+        const res = await authApi.deleteBoothAdmin(row.adminId);
+        if (res.data?.success || res.status === 200 || res.status === 204) {
+          setRows((p) => p.filter((r) => r.id !== id));
+          alert("성공적으로 삭제되었습니다.");
+        }
+      } catch (err: any) {
+        alert(err.response?.data?.message || err.message || "삭제에 실패했습니다.");
+      }
+    } else {
+      setRows((p) => p.filter((r) => r.id !== id));
+    }
+
     if (rows.length <= 1) {
       setSelectedFile(null);
       setFileName("");
@@ -241,7 +258,12 @@ export default function EventBoothsPage() {
         setFileName("");
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || err.message || "테이블 등록에 실패했습니다.");
+      const errorStatus = err.response?.data?.status || err.response?.data?.error?.status;
+      if (errorStatus === "INVALID_CSV_FORMAT") {
+        alert("파일 형식이 올바르지 않거나 컬럼 양식이 다릅니다. 정상적인 CSV 파일인지 확인해 주세요.");
+      } else {
+        alert(err.response?.data?.message || err.message || "테이블 등록에 실패했습니다.");
+      }
     } finally {
       setIsCreating(false);
     }

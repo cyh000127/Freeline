@@ -195,9 +195,14 @@ export default function EventDetailPage() {
                     setHasUnsavedChanges(false);
                 }
             }
-        } catch (err) {
-            console.error("Map upload failed", err);
-            alert("지도 업로드에 실패했습니다.");
+        } catch (err: any) {
+            const errorStatus = err.response?.data?.status || err.response?.data?.error?.status;
+            if (errorStatus === "INVALID_IMAGE_FORMAT") {
+                alert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
+            } else {
+                console.error("Map upload failed", err);
+                alert("지도 업로드에 실패했습니다.");
+            }
         } finally {
             setIsLoading(false);
         }

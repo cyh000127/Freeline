@@ -281,8 +281,13 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
       if (thumbnailFile) {
         try {
           await eventApi.uploadThumbnail(eventId, thumbnailFile);
-        } catch (thumbErr) {
-          console.warn("썸네일 업로드 실패 (나머지 정보는 저장됨):", thumbErr);
+        } catch (thumbErr: any) {
+          const errorStatus = thumbErr.response?.data?.status || thumbErr.response?.data?.error?.status;
+          if (errorStatus === "INVALID_IMAGE_FORMAT") {
+            alert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
+          } else {
+            console.warn("썸네일 업로드 실패 (나머지 정보는 저장됨):", thumbErr);
+          }
         }
       }
 
