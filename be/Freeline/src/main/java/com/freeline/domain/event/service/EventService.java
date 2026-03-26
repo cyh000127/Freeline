@@ -22,6 +22,8 @@ import com.freeline.common.file.dto.FileInfo;
 import com.freeline.common.file.service.FileService;
 import com.freeline.common.file.util.CloudflareStorageUtil;
 import com.freeline.common.util.TimeUtils;
+import com.freeline.domain.booth.entity.Visitor;
+import com.freeline.domain.booth.repository.VisitorRepository;
 import com.freeline.domain.boothmap.entity.EventMap;
 import com.freeline.domain.boothmap.repository.EventMapRepository;
 import com.freeline.domain.event.converter.EventConverter;
@@ -52,14 +54,13 @@ import com.freeline.domain.event.repository.EventRepository;
 @RequiredArgsConstructor
 public class EventService {
 
-
     private static final String EVENT_THUMBNAIL_DIRECTORY = "events";
     private static final String EVENT_DIRECTORY = "event";
-
 
     private final EventRepository eventRepository;
     private final EventMapRepository eventMapRepository;
     private final EventPolicyRepository eventPolicyRepository;
+    private final VisitorRepository visitorRepository;
     private final FileService fileService;
     private final CloudflareStorageUtil cloudflareStorageUtil;
 
@@ -147,6 +148,27 @@ public class EventService {
         final Event event = getAuthorizedEvent(eventAdminId, eventId);
         final String mapImageUrl = eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(eventId)
                 .or(() -> eventMapRepository.findFirstByEventIdOrderByIdDesc(eventId))
+                .map(EventMap::getImagePath)
+                .orElse(null);
+
+        return EventConverter.toEventDetailResDto(
+                event,
+                mapImageUrl,
+                Boolean.TRUE.equals(includeBooths) ? Collections.emptyList() : null
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public EventDetailResDto getVisitorEventDetail(
+            final Long visitorId,
+            final Boolean includeBooths
+    ) {
+        final Visitor visitor = getVisitor(visitorId);
+        final Event event = eventRepository.findById(visitor.getEventId())
+                .orElseThrow(() -> new EventException(ErrorCode.EVENT_NOT_FOUND));
+
+        final String mapImageUrl = eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(event.getId())
+                .or(() -> eventMapRepository.findFirstByEventIdOrderByIdDesc(event.getId()))
                 .map(EventMap::getImagePath)
                 .orElse(null);
 
@@ -301,6 +323,11 @@ public class EventService {
 
         validateEventOwnership(eventAdminId, event);
         return event;
+    }
+
+    private Visitor getVisitor(final Long visitorId) {
+        return visitorRepository.findById(visitorId)
+                .orElseThrow(() -> new EventException(ErrorCode.VISITOR_NOT_FOUND));
     }
 
     private void validateEventPeriod(final LocalDate startDate, final LocalDate endDate) {
