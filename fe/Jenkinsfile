@@ -195,7 +195,7 @@ pipeline {
             }
             steps {
                 dir('fe/freeline-user') {
-                    sh '''set -euo pipefail
+                    sh '''set -eu
                         set +x
                         export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
                             --client-id=$INFISICAL_CLIENT_ID \
