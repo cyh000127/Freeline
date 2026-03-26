@@ -208,7 +208,7 @@ export default function EventDetailPage() {
 
         const hasUnmapped = areas.some(a => a.boothId === null);
         if (hasUnmapped) {
-            if (confirm("매핑되지 않은 부스가 있습니다. 임시저장하시겠습니까?")) {
+            if (confirm("설정되지 않은 부스가 있습니다. 임시저장하시겠습니까?")) {
                 await handleTempSave();
             }
             return;
@@ -364,6 +364,24 @@ export default function EventDetailPage() {
                                   영역 추가
                               </button>
                           )}
+                          {!isEditMode && (
+                              <>
+                                  <input
+                                      type="file"
+                                      id="layout-upload-overlay"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={handleLayoutUpload}
+                                  />
+                                  <label
+                                      htmlFor="layout-upload-overlay"
+                                      className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-black text-[15px] hover:bg-gray-200 transition-all shadow-sm cursor-pointer"
+                                  >
+                                      <Upload className="w-5 h-5"/>
+                                      새 지도 업로드
+                                  </label>
+                              </>
+                          )}
                           <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner">
                               <button
                                   onClick={() => setIsEditMode(false)}
@@ -426,27 +444,6 @@ export default function EventDetailPage() {
                 </div>
               </div>
             )}
-
-                  {/* Overlay Upload Button (when image exists and not editing) */}
-                  {layoutImageUrl && !isEditMode && (
-                      <div
-                          className="absolute inset-0 bg-black/5 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-10">
-                          <input
-                              type="file"
-                              id="layout-upload-overlay"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={handleLayoutUpload}
-                          />
-                          <label
-                              htmlFor="layout-upload-overlay"
-                              className="bg-white/95 backdrop-blur-sm text-[#2D2A4A] px-8 py-4 rounded-2xl font-black text-[18px] shadow-2xl flex items-center gap-3 cursor-pointer hover:bg-white transition-all transform hover:scale-105"
-                          >
-                              <Upload className="w-6 h-6"/>
-                              새 지도 업로드 및 자동 분석
-                          </label>
-                      </div>
-                  )}
           </div>
 
               {/* Action Buttons (Save) */}
