@@ -6,9 +6,11 @@ import { Card } from "@/components/ui/card";
 import { PauseCircle, XCircle, Plus, X, Trash2 } from "lucide-react";
 import { getGoodsList, createGoods, updateGoodsStatus, deleteGoods, Goods } from "@/lib/api/goods";
 import { useAuth } from "@/context/AuthContext";
+import { useModal } from "@/context/ModalContext";
 
 export default function GoodsPage() {
   const { user, isLoading: authLoading } = useAuth();
+  const { showAlert, showConfirm } = useModal();
   const boothId = user?.boothId || 0;
   const [goods, setGoods] = useState<Goods[]>([]);
   const [filter, setFilter] = useState<"ALL" | "ON_SALE" | "SOLD_OUT">("ALL");
@@ -55,35 +57,33 @@ export default function GoodsPage() {
       );
     } catch (error) {
       console.error("Failed to update status:", error);
-      alert("상태 변경에 실패했습니다.");
+      showAlert("상태 변경에 실패했습니다.");
     }
   };
 
   const handleDeleteGoods = async (goodsId: number) => {
-    if (!window.confirm("정말로 이 굿즈를 삭제하시겠습니까? (삭제 후 복구할 수 없습니다)")) {
-      return;
-    }
-    
-    try {
-      await deleteGoods(goodsId);
-      alert("굿즈가 성공적으로 삭제되었습니다.");
-      setGoods((prev) => prev.filter((g) => g.goodsId !== goodsId));
-    } catch (error) {
-      console.error("Failed to delete goods:", error);
-      alert("굿즈 삭제에 실패했습니다.");
-    }
+    showConfirm("정말로 이 굿즈를 삭제하시겠습니까? (삭제 후 복구할 수 없습니다)", async () => {
+      try {
+        await deleteGoods(goodsId);
+        showAlert("굿즈가 성공적으로 삭제되었습니다.");
+        setGoods((prev) => prev.filter((g) => g.goodsId !== goodsId));
+      } catch (error) {
+        console.error("Failed to delete goods:", error);
+        showAlert("굿즈 삭제에 실패했습니다.");
+      }
+    });
   };
 
   const handleCreateGoods = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newGoodsName || !newGoodsImage) {
-      alert("이름과 이미지를 모두 등록해주세요.");
+      showAlert("이름과 이미지를 모두 등록해주세요.");
       return;
     }
     
     try {
       await createGoods(boothId, { name: newGoodsName, imageFile: newGoodsImage });
-      alert("굿즈가 성공적으로 추가되었습니다.");
+      showAlert("굿즈가 성공적으로 추가되었습니다.");
       setIsModalOpen(false);
       setNewGoodsName("");
       setNewGoodsImage(null);
@@ -92,10 +92,10 @@ export default function GoodsPage() {
     } catch (error: any) {
       const errorStatus = error.response?.data?.status || error.response?.data?.error?.status;
       if (errorStatus === "INVALID_IMAGE_FORMAT") {
-        alert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
+        showAlert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
       } else {
         console.error("Failed to create goods:", error);
-        alert("굿즈 생성에 실패했습니다.");
+        showAlert("굿즈 생성에 실패했습니다.");
       }
     }
   };

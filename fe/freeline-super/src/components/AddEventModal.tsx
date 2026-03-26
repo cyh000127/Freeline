@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import DaumPostcode from "react-daum-postcode";
 import { api } from "@/lib/api";
 import { eventApi } from "@/lib/api/event";
+import { useModal } from "@/context/ModalContext";
 import {
   EVENT_FORM_LIMITS,
   getEventInputClassName,
@@ -34,6 +35,7 @@ const createInitialFormData = () => ({
 
 export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
   const [formData, setFormData] = useState(createInitialFormData);
+  const { showAlert } = useModal();
   const [isLoading, setIsLoading] = useState(false);
   const [isPostcodeOpen, setIsPostcodeOpen] = useState(false);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -172,7 +174,7 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
         }
       }
 
-      alert("행사가 성공적으로 추가되었습니다.");
+      showAlert("행사가 성공적으로 추가되었습니다.");
       handleClose();
       // 추가적으로 부모 컴포넌트(리스트)에 새로고침 요청을 보낼 수 있습니다.
     } catch (error: any) {
@@ -182,10 +184,10 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
       
       if (error.response?.status === 409) {
         const detail = typeof errorMessage === 'object' ? JSON.stringify(errorMessage) : errorMessage;
-        alert(`중복된 행사가 존재하거나 생성할 수 없습니다: ${detail}`);
+        showAlert(`중복된 행사가 존재하거나 생성할 수 없습니다: ${detail}`);
       } else {
         const detail = typeof errorMessage === 'object' ? JSON.stringify(errorMessage) : errorMessage;
-        alert(`오류가 발생했습니다: ${detail}`);
+        showAlert(`오류가 발생했습니다: ${detail}`);
       }
     } finally {
       setIsLoading(false);

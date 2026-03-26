@@ -10,9 +10,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { KeyRound, Lock, ChevronLeft, CheckCircle2, User, Building2 } from "lucide-react";
 import Link from "next/link";
 import { authApi } from "@/lib/api/auth";
+import { useModal } from "@/context/ModalContext";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { showAlert } = useModal();
 
   const [email, setEmail] = useState("");
   const [isEmailAvailable, setIsEmailAvailable] = useState<boolean | null>(null);
@@ -74,7 +76,7 @@ export default function RegisterPage() {
   // 이메일 인증 보내기
   const handleSendVerification = async () => {
     if (!email.includes("@")) {
-      alert("올바른 이메일 형식을 입력해주세요.");
+      showAlert("올바른 이메일 형식을 입력해주세요.");
       return;
     }
 
@@ -82,10 +84,10 @@ export default function RegisterPage() {
       setIsLoading(true);
       await authApi.sendEmailCode(email);
       setIsVerificationSent(true);
-      alert("인증번호가 전송되었습니다.");
+      showAlert("인증번호가 전송되었습니다.");
     } catch (error: any) {
       console.error(error);
-      alert(error.response?.data?.message || "인증번호 전송에 실패했습니다.");
+      showAlert(error.response?.data?.message || "인증번호 전송에 실패했습니다.");
     } finally {
       setIsLoading(false);
     }
@@ -99,10 +101,10 @@ export default function RegisterPage() {
       setIsLoading(true);
       await authApi.verifyEmailCode({ email, code: verificationCode });
       setIsVerified(true);
-      alert("인증이 완료되었습니다.");
+      showAlert("인증이 완료되었습니다.");
     } catch (error: any) {
       console.error(error);
-      alert(error.response?.data?.message || "인증번호가 올바르지 않습니다.");
+      showAlert(error.response?.data?.message || "인증번호가 올바르지 않습니다.");
       setIsVerified(false);
     } finally {
       setIsLoading(false);
@@ -118,11 +120,11 @@ export default function RegisterPage() {
       setIsLoading(true);
       // Backend might require a name. If not, we just send email & password
       await authApi.signup({ email, password, name, company });
-      alert("회원가입이 완료되었습니다. 로그인해주세요.");
+      showAlert("회원가입이 완료되었습니다. 로그인해주세요.");
       router.push("/login");
     } catch (error: any) {
       console.error(error);
-      alert(error.response?.data?.message || "회원가입에 실패했습니다.");
+      showAlert(error.response?.data?.message || "회원가입에 실패했습니다.");
     } finally {
       setIsLoading(false);
     }

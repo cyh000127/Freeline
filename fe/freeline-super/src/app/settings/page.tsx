@@ -9,9 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { authApi } from "@/lib/api/auth";
 import { LogOut } from "lucide-react";
+import { useModal } from "@/context/ModalContext";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { showAlert, showConfirm } = useModal();
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
@@ -61,15 +63,15 @@ export default function SettingsPage() {
       if (organization.trim()) payload.company = organization;
 
       if (Object.keys(payload).length === 0) {
-        alert("수정할 항목을 하나 이상 입력해주세요.");
+        showAlert("수정할 항목을 하나 이상 입력해주세요.");
         setIsLoading(false);
         return;
       }
 
       await authApi.updateMe(payload);
-      alert("입력하신 정보가 수정되었습니다.");
+      showAlert("입력하신 정보가 수정되었습니다.");
     } catch (err: any) {
-      alert(err.response?.data?.message || "수정 실패. 네트워크 로그를 확인하세요.");
+      showAlert(err.response?.data?.message || "수정 실패. 네트워크 로그를 확인하세요.");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -79,19 +81,19 @@ export default function SettingsPage() {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== newPasswordConfirm) {
-      alert("새 비밀번호 확인이 일치하지 않습니다.");
+      showAlert("새 비밀번호 확인이 일치하지 않습니다.");
       return;
     }
     try {
       setIsLoading(true);
       // NOTE: 백엔드의 실제 DTO 스펙에 맞게 currentPassword 필드 매핑이 다를 수 있음.
       await authApi.changePassword({ currentPassword, newPassword });
-      alert("비밀번호가 변경되었습니다.");
+      showAlert("비밀번호가 변경되었습니다.");
       setCurrentPassword("");
       setNewPassword("");
       setNewPasswordConfirm("");
     } catch (err: any) {
-      alert(err.response?.data?.message || "비밀번호 변경 실패.");
+      showAlert(err.response?.data?.message || "비밀번호 변경 실패.");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -99,27 +101,27 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccount = async () => {
-    if (confirm("정말로 탈퇴하시겠습니까?")) {
+    showConfirm("정말로 탈퇴하시겠습니까?", async () => {
       try {
         setIsLoading(true);
         await authApi.deleteAccount();
-        alert("탈퇴가 완료되었습니다.");
+        showAlert("탈퇴가 완료되었습니다.");
         localStorage.removeItem("accessToken");
         router.push("/login");
       } catch (err: any) {
-        alert(err.response?.data?.message || "탈퇴 실패.");
+        showAlert(err.response?.data?.message || "탈퇴 실패.");
         console.error(err);
       } finally {
         setIsLoading(false);
       }
-    }
+    });
   };
 
   const handleLogout = () => {
-    if (confirm("로그아웃 하시겠습니까?")) {
+    showConfirm("로그아웃 하시겠습니까?", () => {
       localStorage.removeItem("accessToken");
       router.replace("/login");
-    }
+    });
   };
 
   if (isChecking) {

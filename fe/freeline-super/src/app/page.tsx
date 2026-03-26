@@ -10,12 +10,14 @@ import { EditEventModal } from "@/components/EditEventModal";
 import { MoreVertical, Settings, LogOut, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { authApi } from "@/lib/api/auth";
 import { eventApi, Event } from "@/lib/api/event";
+import { useModal } from "@/context/ModalContext";
 
 const EVENT_PAGE_SIZE = 10;
 const PAGINATION_WINDOW = 5;
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
+  const { showAlert, showConfirm } = useModal();
   const [isChecking, setIsChecking] = useState(true);
   const [userName, setUserName] = useState("익명");
   const [timeLeft, setTimeLeft] = useState(3600); // 1시간 (초 단위)
@@ -112,10 +114,10 @@ export default function SuperAdminDashboard() {
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm("정말로 이 행사를 삭제하시겠습니까? (삭제 시 복구할 수 없습니다)")) {
+    showConfirm("정말로 이 행사를 삭제하시겠습니까? (삭제 시 복구할 수 없습니다)", async () => {
       try {
         await eventApi.deleteEvent(id);
-        alert("행사가 성공적으로 삭제되었습니다.");
+        showAlert("행사가 성공적으로 삭제되었습니다.");
         const nextPage = currentPage > 0 && events.length === 1 ? currentPage - 1 : currentPage;
         if (nextPage !== currentPage) {
           setCurrentPage(nextPage);
@@ -124,9 +126,9 @@ export default function SuperAdminDashboard() {
         }
       } catch (err) {
         console.error("삭제 실패", err);
-        alert("삭제에 실패했습니다.");
+        showAlert("삭제에 실패했습니다.");
       }
-    }
+    });
     setOpenMenuId(null);
   };
 
@@ -176,7 +178,7 @@ export default function SuperAdminDashboard() {
       const rToken = localStorage.getItem("refreshToken");
       
       if (!rToken) {
-        alert("리프레시 토큰이 없습니다. 다시 로그인해주세요.");
+        showAlert("리프레시 토큰이 없습니다. 다시 로그인해주세요.");
         router.replace("/login");
         return;
       }
@@ -193,13 +195,13 @@ export default function SuperAdminDashboard() {
           localStorage.setItem("refreshToken", newData.refreshToken);
         }
         setTimeLeft(3600); // Reset timer to 1 hour
-        alert("로그인 시간이 연장되었습니다.");
+        showAlert("로그인 시간이 연장되었습니다.");
       } else {
         throw new Error("Invalid refresh response");
       }
     } catch (error) {
       console.error("Failed to refresh session:", error);
-      alert("로그인 연장에 실패했습니다. 다시 로그인해주시기 바랍니다.");
+      showAlert("로그인 연장에 실패했습니다. 다시 로그인해주시기 바랍니다.");
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
       router.replace("/login");

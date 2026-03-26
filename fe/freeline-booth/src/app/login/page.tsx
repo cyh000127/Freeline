@@ -20,6 +20,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [showInitFlow, setShowInitFlow] = useState(false);
+  const [initBoothName, setInitBoothName] = useState("");
+  const [initCompany, setInitCompany] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +34,8 @@ export default function LoginPage() {
       
       // 1. 비밀번호 변경 필수 여부 먼저 확인
       if (userData.isPasswordChangeRequired) {
+        setInitBoothName(userData.boothName || "");
+        setInitCompany(userData.company || "");
         setShowInitFlow(true);
         return; // 대시보드로 이동하지 않고 중단
       }
@@ -86,6 +90,7 @@ export default function LoginPage() {
         <InitFlow 
           isStandalone={true} 
           initialLoginId={loginId} 
+          initialBoothName={initCompany || initBoothName} 
           initialOldPassword={password}
           onFinish={() => setShowInitFlow(false)} 
         />
