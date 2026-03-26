@@ -7,10 +7,10 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -80,7 +80,7 @@ public class BoothMapService {
         List<Booth> validBooths = boothRepository.findAllByEventIdOrderByIdAsc(eventId);
         List<Long> validBoothIds = validBooths.stream().map(Booth::getId).toList();
 
-        boolean allValid = requestedBoothIds.stream().allMatch(validBoothIds::contains);
+        boolean allValid = new java.util.HashSet<>(validBoothIds).containsAll(requestedBoothIds);
         if (!allValid) {
             throw new BoothException(ErrorCode.BOOTH_NOT_FOUND);
         }
@@ -296,17 +296,17 @@ public class BoothMapService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new EventException(ErrorCode.EVENT_NOT_FOUND));
 
-        String currentUserIdStr = SecurityContextHolder.getContext().getAuthentication().getName();
-        if (currentUserIdStr != null && !currentUserIdStr.equals("anonymousUser")) {
-            try {
-                Long currentUserId = Long.parseLong(currentUserIdStr);
-                if (!event.getEventAdminId().equals(currentUserId)) {
-                    throw new EventException(ErrorCode.ACCESS_DENIED);
-                }
-            } catch (NumberFormatException e) {
+        org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null || auth.getName().equals("anonymousUser")) {
+            throw new EventException(ErrorCode.ACCESS_DENIED);
+        }
+
+        try {
+            Long currentUserId = Long.parseLong(auth.getName());
+            if (!event.getEventAdminId().equals(currentUserId)) {
                 throw new EventException(ErrorCode.ACCESS_DENIED);
             }
-        } else {
+        } catch (NumberFormatException e) {
             throw new EventException(ErrorCode.ACCESS_DENIED);
         }
     }
