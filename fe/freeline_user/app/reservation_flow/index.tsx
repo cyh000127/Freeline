@@ -7,12 +7,11 @@ import { getEventBooths } from '@/features/booth/booth.api';
 import type { EventBoothItem } from '@/features/booth/types';
 import ReservationCard from '@/components/reservation/ReservationCard';
 
-// MOCK Event ID for MVP as requested by user
-const TEST_EVENT_ID = 5;
+// Removed TEST_EVENT_ID
 
 export default function BoothListScreen() {
   const router = useRouter();
-  const { accessToken } = useAuthSession();
+  const { accessToken, eventId } = useAuthSession();
   
   const [booths, setBooths] = useState<EventBoothItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +27,8 @@ export default function BoothListScreen() {
       try {
         setLoading(true);
         setError(null);
-        const data = await getEventBooths(accessToken, TEST_EVENT_ID);
+        // Uses the dynamic eventId extracted from entryCode (fallback to 1 if none)
+        const data = await getEventBooths(accessToken, eventId ?? 1);
         setBooths(data);
       } catch (err) {
         console.error('부스 목록 불러오기 실패:', err);

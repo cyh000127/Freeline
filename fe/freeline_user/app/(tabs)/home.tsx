@@ -7,8 +7,11 @@ import HomeBanner from '@/components/home/HomeBanner';
 // import { useQRMock } from '@/app/contexts/QRMockContext';
 import { useExperienceMock } from '@/mocks/useExperienceMock';
 import ExperienceCard from '@/components/home/ExperienceCard';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ReservationCard from '@/components/reservation/ReservationCard';
+import { useAuthSession } from '@/features/auth/auth-session.context';
+import { getEventDetail } from '@/features/event/event.api';
+import type { EventDetail } from '@/features/event/types';
 
 type HomeReservationItem = {
   // 임시 테스트용 예약현황 값
@@ -49,8 +52,30 @@ const HOME_RESERVATION_SEED: HomeReservationItem[] = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { accessToken, eventId } = useAuthSession();
 
   const [homeReservations, setHomeReservations] = useState<HomeReservationItem[]>([]);
+  const [eventDetail, setEventDetail] = useState<EventDetail | null>(null);
+  const [loadingEvent, setLoadingEvent] = useState(true);
+  
+  useEffect(() => {
+    async function fetchEvent() {
+      if (!accessToken) {
+        setLoadingEvent(false);
+        return;
+      }
+      try {
+        setLoadingEvent(true);
+        const data = await getEventDetail(accessToken, eventId ?? 1);
+        setEventDetail(data);
+      } catch (err) {
+        console.error('Failed to fetch event for HomeBanner', err);
+      } finally {
+        setLoadingEvent(false);
+      }
+    }
+    fetchEvent();
+  }, [accessToken, eventId]);
 
   const canAddReservation = homeReservations.length < 3;
 
@@ -97,13 +122,29 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <HomeBanner />
+        <HomeBanner eventDetail={eventDetail} loading={loadingEvent} />
         <View style={styles.expSection}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionAccent} />
             <Text style={styles.sectionTitle}>현재 체험 현황</Text>
           </View>
-          <ExperienceCard data={data} onPrimaryPress={() => console.log('action')} />
+          <ExperienceCard
+            data={data}
+            onPrimaryPress={() => {
+              if (data.status === 'called') {
+                router.push({
+                  pathname: '/qr/scan',
+                  params: {
+                    waitingId: '999',
+                    boothName: data.boothName,
+                    from: 'home',
+                  },
+                });
+              } else {
+                console.log('체험 종료 액션');
+              }
+            }}
+          />
         </View>
         <View style={styles.graySection}>
           <View style={styles.sectionHeader}>

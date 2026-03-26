@@ -45,6 +45,7 @@ const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
 
 const initialState: AuthSessionState = {
   entryCode: null,
+  eventId: null,
   visitorId: null,
   accessToken: null,
   nickname: null,
@@ -110,9 +111,14 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
 
       const result = await authenticateEntryCodeRequest(trimmed);
 
+      // Extract eventId from entryCode (e.g. "E2-1974" -> 2)
+      const match = trimmed.match(/^E(\d+)-/i);
+      const eventId = match ? parseInt(match[1], 10) : 1;
+
       const nextState: AuthSessionState = {
         ...session,
         entryCode: trimmed,
+        eventId,
         visitorId: result.visitorId,
         accessToken: result.accessToken,
         accountStatus: result.accountStatus,

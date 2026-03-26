@@ -1,11 +1,50 @@
 import { StyleSheet, Text, View, ImageBackground } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import type { EventDetail } from '@/features/event/types';
 
-export default function HomeBanner() {
+type Props = {
+  eventDetail: EventDetail | null;
+  loading: boolean;
+};
+
+function getEventDayCount(startDateStr: string, endDateStr: string): string {
+  if (!startDateStr || !endDateStr) return '-';
+  const today = new Date();
+  const start = new Date(startDateStr);
+  const end = new Date(endDateStr);
+  
+  today.setHours(0,0,0,0);
+  start.setHours(0,0,0,0);
+  end.setHours(0,0,0,0);
+
+  if (today < start) return '행사 전';
+  if (today > end) return '행사 종료';
+  
+  const diffTime = today.getTime() - start.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
+  return `${diffDays + 1}일차`;
+}
+
+export default function HomeBanner({ eventDetail, loading }: Props) {
+  const title = loading ? '불러오는 중...' : eventDetail?.name ?? '행사 정보 없음';
+  const dateStr = loading 
+    ? '불러오는 중...' 
+    : eventDetail 
+      ? `${eventDetail.startDate.replace(/-/g, '.')} - ${eventDetail.endDate.replace(/-/g, '.')}` 
+      : '-';
+
+  const dayCount = eventDetail 
+    ? getEventDayCount(eventDetail.startDate, eventDetail.endDate) 
+    : '-';
+
+  const bannerSource = eventDetail?.imageUrl 
+    ? { uri: eventDetail.imageUrl }
+    : require('@/assets/events/event_banner.png');
+
   return (
     <View style={styles.container}>
       <ImageBackground
-        source={require('@/assets/events/event_banner.png')}
+        source={bannerSource}
         style={styles.banner}
         imageStyle={styles.bannerImage}
         resizeMode="cover"
@@ -13,7 +52,7 @@ export default function HomeBanner() {
         <View style={styles.overlay} />
 
         <View style={styles.content}>
-          <Text style={styles.title}>AW2026 스마트{'\n'}제조혁신 산업전</Text>
+          <Text style={styles.title}>{title}</Text>
         </View>
       </ImageBackground>
 
@@ -25,10 +64,10 @@ export default function HomeBanner() {
             color="#000"
             style={{ marginTop: 1 }}
           />
-          <Text style={styles.infoText}>2026.03.06 - 2026.03.08</Text>
+          <Text style={styles.infoText}>{dateStr}</Text>
         </View>
 
-        <Text style={styles.infoText}>2일차</Text>
+        <Text style={styles.infoText}>{dayCount}</Text>
       </View>
     </View>
   );
