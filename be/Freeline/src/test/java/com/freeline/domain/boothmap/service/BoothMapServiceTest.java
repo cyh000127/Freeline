@@ -38,8 +38,8 @@ import com.freeline.domain.boothmap.repository.EventMapRepository;
 import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.exception.EventException;
 import com.freeline.domain.event.repository.EventRepository;
-import com.fasterxml.jackson.databind.type.CollectionType;
-import com.fasterxml.jackson.databind.type.TypeFactory;
+import tools.jackson.databind.type.CollectionType;
+import tools.jackson.databind.type.TypeFactory;
 
 import tools.jackson.databind.ObjectMapper;
 
