@@ -96,6 +96,21 @@ public class BoothMapService {
                 eventId, eventMap.getId(), newAreas.size());
     }
 
+    @Transactional
+    public void updateMappingSnapshot(final Long eventId, final com.freeline.domain.boothmap.dto.request.MappingSnapshotUpdateReqDto request) {
+        validateEventExists(eventId);
+
+        final EventMap eventMap = eventMapRepository.findById(request.eventMapId())
+                .orElseThrow(() -> new EventException(ErrorCode.EVENT_MAP_NOT_FOUND));
+
+        if (!eventMap.getEventId().equals(eventId)) {
+            throw new BoothException(ErrorCode.BOOTH_EVENT_MISMATCH);
+        }
+
+        eventMap.updateMappingSnapshot(request.mappingSnapshot());
+        log.info("[BoothMap] 임시 스냅샷 저장 완료 {eventId: {}, eventMapId: {}}", eventId, eventMap.getId());
+    }
+
     @Transactional(readOnly = true)
     public BoothMapResDto getBoothMap(final Long eventId) {
         validateEventExists(eventId);
