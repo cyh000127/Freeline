@@ -482,26 +482,28 @@ export default function EventDetailPage() {
               </div>
 
               {/* Action Buttons (Save) */}
-              {layoutImageUrl && isEditMode && (
-                  <div className="flex justify-end gap-3 mt-6">
-                      <button
-                          onClick={handleTempSave}
-                          disabled={isSaving}
-                          className="flex items-center gap-2 px-6 py-3 bg-green-100 text-green-700 rounded-2xl font-black text-[16px] hover:bg-green-200 transition-all shadow-sm disabled:opacity-50"
-                      >
-                          {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
-                          임시저장
-                      </button>
-                      <button
-                          onClick={handleSaveMap}
-                          disabled={isSaving}
-                          className="flex items-center gap-2 px-6 py-3 bg-[#2D2A4A] text-white rounded-2xl font-black text-[16px] hover:scale-105 transition-all shadow-md active:scale-95 disabled:opacity-50"
-                      >
-                          {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
-                          저장하기
-                      </button>
-                  </div>
-              )}
+              <div className="flex justify-end gap-3 mt-6 min-h-[56px]">
+                  {layoutImageUrl && isEditMode && (
+                      <>
+                          <button
+                              onClick={handleTempSave}
+                              disabled={isSaving}
+                              className="flex items-center gap-2 px-6 py-3 bg-green-100 text-green-700 rounded-2xl font-black text-[16px] hover:bg-green-200 transition-all shadow-sm disabled:opacity-50"
+                          >
+                              {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
+                              임시저장
+                          </button>
+                          <button
+                              onClick={handleSaveMap}
+                              disabled={isSaving}
+                              className="flex items-center gap-2 px-6 py-3 bg-[#2D2A4A] text-white rounded-2xl font-black text-[16px] hover:scale-105 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                          >
+                              {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
+                              저장하기
+                          </button>
+                      </>
+                  )}
+              </div>
         </div>
       </main>
 
