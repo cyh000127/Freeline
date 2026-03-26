@@ -311,6 +311,8 @@ export default function EventDetailPage() {
   }
 
     const mappedBoothIds = areas.filter(a => a.boothId !== null).map(a => a.boothId as number);
+    const currentActiveArea = areas.find(a => a.localId === activeLocalId);
+    const currentBoothId = currentActiveArea ? currentActiveArea.boothId : null;
 
   return (
     <div className="flex bg-[#F1F3F5] h-screen overflow-hidden">
@@ -484,6 +486,7 @@ export default function EventDetailPage() {
             onClose={() => setIsSearchModalOpen(false)}
             eventId={eventId}
             alreadyMappedBoothIds={mappedBoothIds}
+            currentBoothId={currentBoothId}
             onSelect={handleSelectBooth}
         />
     </div>
