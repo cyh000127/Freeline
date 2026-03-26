@@ -11,8 +11,11 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -124,6 +127,7 @@ public class BoothService {
     public BoothCreateResDto createBooth(final Long eventId, final BoothCreateReqDto request) {
         validateEventExists(eventId);
         validateOperatingHours(request.openTime(), request.closeTime());
+        validateDuplicateBoothName(eventId, request.name());
 
         final Booth booth = BoothConverter.toEntity(eventId, request);
         final Booth saved = boothRepository.save(booth);
@@ -142,6 +146,7 @@ public class BoothService {
         }
 
         final List<ParsedBoothCsvRow> parsedRows = parseBoothsFromCsv(file);
+        validateDuplicateBoothNamesForCsv(eventId, parsedRows);
         final List<Booth> booths = parsedRows.stream()
                 .map(row -> Booth.builder()
                         .eventId(eventId)
@@ -312,6 +317,7 @@ public class BoothService {
     public BoothCreateResDto updateBooth(final Long boothId, final BoothUpdateReqDto request) {
         final Booth booth = getBoothEntity(boothId);
         validateOperatingHours(request.openTime(), request.closeTime());
+        validateDuplicateBoothNameOnUpdate(booth.getEventId(), booth.getId(), request.name());
 
         booth.updateInfo(request.name(), request.locationCode(), request.openTime(), request.closeTime());
 
@@ -368,6 +374,45 @@ public class BoothService {
         if (!closeTime.isAfter(openTime)) {
             throw new BoothException(ErrorCode.INVALID_BOOTH_OPERATING_HOURS);
         }
+    }
+
+    private void validateDuplicateBoothName(final Long eventId, final String boothName) {
+        final String normalizedName = normalizeBoothName(boothName);
+        if (boothRepository.existsByEventIdAndNormalizedName(eventId, normalizedName)) {
+            throw new BoothException(ErrorCode.BOOTH_NAME_DUPLICATE);
+        }
+    }
+
+    private void validateDuplicateBoothNameOnUpdate(final Long eventId, final Long boothId, final String boothName) {
+        final String normalizedName = normalizeBoothName(boothName);
+        if (boothRepository.existsByEventIdAndNormalizedNameAndIdNot(eventId, boothId, normalizedName)) {
+            throw new BoothException(ErrorCode.BOOTH_NAME_DUPLICATE);
+        }
+    }
+
+    private void validateDuplicateBoothNamesForCsv(final Long eventId, final List<ParsedBoothCsvRow> parsedRows) {
+        final Set<String> normalizedNames = new LinkedHashSet<>();
+
+        for (ParsedBoothCsvRow row : parsedRows) {
+            final String normalizedName = normalizeBoothName(row.boothName());
+            if (!normalizedNames.add(normalizedName)) {
+                throw new BoothException(ErrorCode.BOOTH_NAME_DUPLICATE);
+            }
+        }
+
+        if (normalizedNames.isEmpty()) {
+            return;
+        }
+
+        final List<String> duplicatedNames =
+                boothRepository.findDuplicatedNormalizedNames(eventId, new ArrayList<>(normalizedNames));
+        if (!duplicatedNames.isEmpty()) {
+            throw new BoothException(ErrorCode.BOOTH_NAME_DUPLICATE);
+        }
+    }
+
+    private String normalizeBoothName(final String boothName) {
+        return boothName.trim().toLowerCase(Locale.ROOT);
     }
 
     private List<ParsedBoothCsvRow> parseBoothsFromCsv(final MultipartFile file) {

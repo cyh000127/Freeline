@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.freeline.common.error.ErrorCode;
 import com.freeline.common.file.service.FileService;
 import com.freeline.domain.booth.dto.request.BoothCreateReqDto;
 import com.freeline.domain.booth.dto.request.BoothPolicyUpdateReqDto;
@@ -120,6 +121,25 @@ class BoothServiceTest {
         Assertions.assertThat(result.boothId()).isEqualTo(12L);
         Assertions.assertThat(result.eventId()).isEqualTo(5L);
         Mockito.verify(boothRepository).save(ArgumentMatchers.any(Booth.class));
+    }
+
+    @Test
+    void 부스_등록_실패_행사내_부스명_중복() {
+        final BoothCreateReqDto request = BoothCreateReqDto.builder()
+                .name(" SSAFY 굿즈 부스 ")
+                .locationCode("A-03")
+                .openTime(LocalTime.of(10, 0))
+                .closeTime(LocalTime.of(18, 0))
+                .build();
+
+        Mockito.when(eventRepository.existsById(5L)).thenReturn(true);
+        Mockito.when(boothRepository.existsByEventIdAndNormalizedName(5L, "ssafy 굿즈 부스"))
+                .thenReturn(true);
+
+        Assertions.assertThatThrownBy(() -> boothService.createBooth(5L, request))
+                .isInstanceOf(BoothException.class)
+                .hasMessage(ErrorCode.BOOTH_NAME_DUPLICATE.getMessage());
+        Mockito.verify(boothRepository, Mockito.never()).save(ArgumentMatchers.any(Booth.class));
     }
 
     @Test
@@ -643,5 +663,33 @@ class BoothServiceTest {
                                 .build()
                 )).isInstanceOf(BoothException.class)
                 .hasMessage("부스 종료 시간은 시작 시간보다 늦어야 합니다.");
+    }
+
+    @Test
+    void 부스_정보_수정_실패_행사내_부스명_중복() {
+        final Booth booth = Booth.builder()
+                .id(12L)
+                .eventId(5L)
+                .name("기존 부스")
+                .locationCode("A-03")
+                .openTime(LocalTime.of(10, 0))
+                .closeTime(LocalTime.of(18, 0))
+                .emergencyClosed(false)
+                .build();
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(boothRepository.existsByEventIdAndNormalizedNameAndIdNot(5L, 12L, "goods booth"))
+                .thenReturn(true);
+
+        Assertions.assertThatThrownBy(() -> boothService.updateBooth(
+                        12L,
+                        BoothUpdateReqDto.builder()
+                                .name(" Goods Booth ")
+                                .locationCode("A-05")
+                                .openTime(LocalTime.of(10, 0))
+                                .closeTime(LocalTime.of(19, 0))
+                                .build()
+                )).isInstanceOf(BoothException.class)
+                .hasMessage(ErrorCode.BOOTH_NAME_DUPLICATE.getMessage());
     }
 }
