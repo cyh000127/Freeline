@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { Sidebar } from "@/components/Sidebar";
 import { authApi } from "@/lib/api/auth";
 import { eventApi, Event } from "@/lib/api/event";
+import { useModal } from "@/context/ModalContext";
 import {
   Upload,
   FileSpreadsheet,
@@ -99,6 +100,7 @@ export default function EventBoothsPage() {
   const params = useParams();
   const eventId = params.eventId as string;
   const router = useRouter();
+  const { showAlert, showConfirm } = useModal();
 
   const [userName, setUserName] = useState("관리자");
   const [event, setEvent] = useState<Event | null>(null);
@@ -173,14 +175,14 @@ export default function EventBoothsPage() {
   const handleFile = async (file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (!["csv", "xlsx", "xls"].includes(ext || "")) {
-      alert("CSV 또는 XLSX 파일만 업로드 가능합니다.");
+      showAlert("CSV 또는 XLSX 파일만 업로드 가능합니다.");
       return;
     }
     setIsParsing(true);
     try {
       const parsed = await parseFile(file);
       if (parsed.length === 0) {
-        alert(
+        showAlert(
           "데이터를 찾을 수 없습니다.\n필수 컬럼: 부스 이름, 관리자 이메일을 확인해 주세요."
         );
       }
@@ -207,7 +209,7 @@ export default function EventBoothsPage() {
       setSelectedFile(file);
       setRows((prev) => [...prev, ...parsed]);
     } catch {
-      alert("파일 파싱에 실패했습니다.");
+      showAlert("파일 파싱에 실패했습니다.");
     } finally {
       setIsParsing(false);
     }
@@ -241,16 +243,17 @@ export default function EventBoothsPage() {
     if (!row) return;
 
     if (row.adminId) {
-      if (!confirm(`부스 관리자 '${row.adminName}' 계정을 정말로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
-      try {
-        const res = await authApi.deleteBoothAdmin(row.adminId);
-        if (res.data?.success || res.status === 200 || res.status === 204) {
-          setRows((p) => p.filter((r) => r.id !== id));
-          alert("성공적으로 삭제되었습니다.");
+      showConfirm(`부스 관리자 '${row.adminName}' 계정을 정말로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`, async () => {
+        try {
+          const res = await authApi.deleteBoothAdmin(row.adminId!);
+          if (res.data?.success || res.status === 200 || res.status === 204) {
+            setRows((p) => p.filter((r) => r.id !== id));
+            showAlert("성공적으로 삭제되었습니다.");
+          }
+        } catch (err: any) {
+          showAlert(err.response?.data?.message || err.message || "삭제에 실패했습니다.");
         }
-      } catch (err: any) {
-        alert(err.response?.data?.message || err.message || "삭제에 실패했습니다.");
-      }
+      });
     } else {
       setRows((p) => p.filter((r) => r.id !== id));
     }
@@ -268,12 +271,12 @@ export default function EventBoothsPage() {
 
   // ───── API actions ─────────────────────────────────────────────────────────
   const handleOnboarding = async () => {
-    if (!selectedFile) { alert("업로드할 파일을 선택해주세요."); return; }
+    if (!selectedFile) { showAlert("업로드할 파일을 선택해주세요."); return; }
     setIsCreating(true);
     try {
       const res = await eventApi.onboardBooths(eventId, selectedFile);
       if (res.data?.success || res.status === 201) {
-        alert("계정이 성공적으로 일괄 생성되었습니다.\n이제 '이메일 일괄 전송'을 통해 계정 정보를 발송할 수 있습니다.");
+        showAlert("계정이 성공적으로 일괄 생성되었습니다.\n이제 '이메일 일괄 전송'을 통해 계정 정보를 발송할 수 있습니다.");
         await fetchBooths();
         setSelectedFile(null);
         setFileName("");
@@ -281,9 +284,9 @@ export default function EventBoothsPage() {
     } catch (err: any) {
       const errorStatus = err.response?.data?.status || err.response?.data?.error?.status;
       if (errorStatus === "INVALID_CSV_FORMAT") {
-        alert("파일 형식이 올바르지 않거나 컬럼 양식이 다릅니다. 정상적인 CSV 파일인지 확인해 주세요.");
+        showAlert("파일 형식이 올바르지 않거나 컬럼 양식이 다릅니다. 정상적인 CSV 파일인지 확인해 주세요.");
       } else {
-        alert(err.response?.data?.message || err.message || "테이블 등록에 실패했습니다.");
+        showAlert(err.response?.data?.message || err.message || "테이블 등록에 실패했습니다.");
       }
     } finally {
       setIsCreating(false);
@@ -293,25 +296,26 @@ export default function EventBoothsPage() {
   const handleSendMail = async () => {
     const selected = rows.filter((r) => r.selected && r.status === "registered" && r.adminId);
     if (selected.length === 0) {
-      alert("이메일을 발송할 관리자(등록완료 상태)를 선택해주세요.");
+      showAlert("이메일을 발송할 관리자(등록완료 상태)를 선택해주세요.");
       return;
     }
-    if (!confirm(`선택한 ${selected.length}명의 부스 관리자에게 로그인 정보를 전송하시겠습니까?`)) return;
-
-    setIsSendingMail(true);
-    try {
-      const adminIds = selected.map((r) => r.adminId!);
-      const res = await eventApi.sendLoginInfo({ boothAdminIds: adminIds });
-      if (res.data?.success) {
-        alert("성공적으로 이메일 전송을 요청했습니다.");
-        // optionally refresh UI or clear selection
-        setRows((prev) => prev.map((r) => selected.some((s) => s.id === r.id) ? { ...r, selected: false } : r));
+    
+    showConfirm(`선택한 ${selected.length}명의 부스 관리자에게 로그인 정보를 전송하시겠습니까?`, async () => {
+      setIsSendingMail(true);
+      try {
+        const adminIds = selected.map((r) => r.adminId!);
+        const res = await eventApi.sendLoginInfo({ boothAdminIds: adminIds });
+        if (res.data?.success) {
+          showAlert("성공적으로 이메일 전송을 요청했습니다.");
+          // optionally refresh UI or clear selection
+          setRows((prev) => prev.map((r) => selected.some((s) => s.id === r.id) ? { ...r, selected: false } : r));
+        }
+      } catch (err: any) {
+        showAlert(err.response?.data?.message || err.message || "이메일 전송에 실패했습니다.");
+      } finally {
+        setIsSendingMail(false);
       }
-    } catch (err: any) {
-      alert(err.response?.data?.message || err.message || "이메일 전송에 실패했습니다.");
-    } finally {
-      setIsSendingMail(false);
-    }
+    });
   };
 
   const selectedEventId = eventId;

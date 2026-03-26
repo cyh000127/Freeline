@@ -20,11 +20,13 @@ import {
 } from "@/lib/api/booth";
 import { getQR, generateQR, reissueQR, QRData } from "@/lib/api/qr";
 import { useAuth } from "@/context/AuthContext";
+import { useModal } from "@/context/ModalContext";
 
 type TabType = 'info' | 'policy' | 'qr';
 
 export default function SettingsPage() {
   const { user, isLoading: authLoading } = useAuth();
+  const { showAlert, showConfirm } = useModal();
   const boothId = user?.boothId || 0;
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [isLoading, setIsLoading] = useState(true);
@@ -138,11 +140,11 @@ export default function SettingsPage() {
     try {
       const res = await updateBooth(boothId, boothInfo);
       if (res.success) {
-        alert("부스 정보가 성공적으로 수정되었습니다.");
+        showAlert("부스 정보가 성공적으로 수정되었습니다.");
       }
     } catch (error) {
       console.error("Failed to update booth:", error);
-      alert("부스 정보 수정에 실패했습니다.");
+      showAlert("부스 정보 수정에 실패했습니다.");
     } finally {
       setIsSaving(false);
     }
@@ -154,11 +156,11 @@ export default function SettingsPage() {
     try {
       const res = await updateBoothPolicy(boothId, policyInfo);
       if (res.success) {
-        alert("부스 정책이 성공적으로 수정되었습니다.");
+        showAlert("부스 정책이 성공적으로 수정되었습니다.");
       }
     } catch (error) {
       console.error("Failed to update policy:", error);
-      alert("부스 정책 수정에 실패했습니다.");
+      showAlert("부스 정책 수정에 실패했습니다.");
     } finally {
       setIsSavingPolicy(false);
     }
@@ -187,7 +189,7 @@ export default function SettingsPage() {
   const handleImageUploadSubmit = async (isRep: boolean) => {
     const file = isRep ? repImageFile : logoImageFile;
     if (!file) {
-      alert("업로드할 파일을 선택해주세요.");
+      showAlert("업로드할 파일을 선택해주세요.");
       return;
     }
 
@@ -196,17 +198,17 @@ export default function SettingsPage() {
       try {
         const res = await uploadRepresentativeImage(boothId, file);
         if (res.success) {
-          alert("대표 이미지가 성공적으로 업로드되었습니다.");
+          showAlert("대표 이미지가 성공적으로 업로드되었습니다.");
           setRepImageFile(null);
           // Optional: re-fetch images to get server URL instead of blob
         }
       } catch (error: any) {
         const errorStatus = error.response?.data?.status || error.response?.data?.error?.status;
         if (errorStatus === "INVALID_IMAGE_FORMAT") {
-          alert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
+          showAlert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
         } else {
           console.error("Failed to upload representative image:", error);
-          alert("대표 이미지 업로드에 실패했습니다.");
+          showAlert("대표 이미지 업로드에 실패했습니다.");
         }
       } finally {
         setIsUploadingRepImage(false);
@@ -216,17 +218,17 @@ export default function SettingsPage() {
       try {
         const res = await uploadBoothImage(boothId, file);
         if (res.success) {
-          alert("로고 이미지가 성공적으로 업로드되었습니다.");
+          showAlert("로고 이미지가 성공적으로 업로드되었습니다.");
           setLogoImageFile(null);
           // Optional: re-fetch images to get server URL instead of blob
         }
       } catch (error: any) {
         const errorStatus = error.response?.data?.status || error.response?.data?.error?.status;
         if (errorStatus === "INVALID_IMAGE_FORMAT") {
-          alert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
+          showAlert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
         } else {
           console.error("Failed to upload image:", error);
-          alert("로고 이미지 업로드에 실패했습니다.");
+          showAlert("로고 이미지 업로드에 실패했습니다.");
         }
       } finally {
         setIsUploadingImage(false);
@@ -239,26 +241,27 @@ export default function SettingsPage() {
       const res = await generateQR(boothId);
       if (res.success) {
         setQrData(res.data);
-        alert("QR 코드가 생성되었습니다.");
+        showAlert("QR 코드가 생성되었습니다.");
       }
     } catch (error) {
       console.error("Failed to generate QR:", error);
-      alert("QR 코드 생성에 실패했습니다.");
+      showAlert("QR 코드 생성에 실패했습니다.");
     }
   };
 
   const handleReissueQR = async () => {
-    if (!confirm("QR 코드를 재발급하시겠습니까? 기존 QR 코드는 더 이상 사용할 수 없습니다.")) return;
-    try {
-      const res = await reissueQR(boothId);
-      if (res.success) {
-        setQrData(res.data);
-        alert("QR 코드가 재발급되었습니다.");
+    showConfirm("QR 코드를 재발급하시겠습니까? 기존 QR 코드는 더 이상 사용할 수 없습니다.", async () => {
+      try {
+        const res = await reissueQR(boothId);
+        if (res.success) {
+          setQrData(res.data);
+          showAlert("QR 코드가 재발급되었습니다.");
+        }
+      } catch (error) {
+        console.error("Failed to reissue QR:", error);
+        showAlert("QR 코드 재발급에 실패했습니다.");
       }
-    } catch (error) {
-      console.error("Failed to reissue QR:", error);
-      alert("QR 코드 재발급에 실패했습니다.");
-    }
+    });
   };
 
   const handlePrint = () => {

@@ -25,6 +25,7 @@ import {
 import { api } from "@/lib/api";
 import { authApi } from "@/lib/api/auth";
 import { eventApi, Event } from "@/lib/api/event";
+import { useModal } from "@/context/ModalContext";
 
 // Types
 interface BoothRow {
@@ -86,6 +87,7 @@ function parseFile(file: File): Promise<BoothRow[]> {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function BoothManagementPage() {
   const router = useRouter();
+  const { showAlert, showConfirm } = useModal();
 
   // Auth / header state
   const [isChecking, setIsChecking] = useState(true);
@@ -205,17 +207,17 @@ export default function BoothManagementPage() {
   const handleRefresh = async () => {
     try {
       const rToken = localStorage.getItem("refreshToken");
-      if (!rToken) { alert("다시 로그인해주세요."); router.replace("/login"); return; }
+      if (!rToken) { showAlert("다시 로그인해주세요."); router.replace("/login"); return; }
       const res = await authApi.refresh({ refreshToken: rToken });
       const d = res.data?.data;
       if (d?.accessToken) {
         localStorage.setItem("accessToken", d.accessToken);
         if (d.refreshToken) localStorage.setItem("refreshToken", d.refreshToken);
         setTimeLeft(3600);
-        alert("로그인 시간이 연장되었습니다.");
+        showAlert("로그인 시간이 연장되었습니다.");
       } else throw new Error();
     } catch {
-      alert("연장 실패. 다시 로그인해주세요.");
+      showAlert("연장 실패. 다시 로그인해주세요.");
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
       router.replace("/login");
@@ -223,17 +225,17 @@ export default function BoothManagementPage() {
   };
 
   const handleLogout = () => {
-    if (confirm("로그아웃 하시겠습니까?")) {
+    showConfirm("로그아웃 하시겠습니까?", () => {
       localStorage.removeItem("accessToken");
       router.replace("/login");
-    }
+    });
   };
 
   // ── File handling ─────────────────────────────────────────────────────────
   const handleFile = useCallback(async (file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (!["csv", "xlsx", "xls"].includes(ext || "")) {
-      alert("CSV 또는 XLSX 파일만 업로드 가능합니다.");
+      showAlert("CSV 또는 XLSX 파일만 업로드 가능합니다.");
       return;
     }
     setSelectedFile(file);
@@ -242,11 +244,11 @@ export default function BoothManagementPage() {
     try {
       const parsed = await parseFile(file);
       if (parsed.length === 0) {
-        alert("파일에서 데이터를 찾을 수 없습니다.\n필수 컬럼: 부스 이름, 관리자 이메일을 확인해 주세요.");
+        showAlert("파일에서 데이터를 찾을 수 없습니다.\n필수 컬럼: 부스 이름, 관리자 이메일을 확인해 주세요.");
       }
       setRows(parsed);
     } catch {
-      alert("파일 파싱에 실패했습니다. 파일 형식을 확인해주세요.");
+      showAlert("파일 파싱에 실패했습니다. 파일 형식을 확인해주세요.");
     } finally {
       setIsParsing(false);
     }
@@ -285,20 +287,20 @@ export default function BoothManagementPage() {
 
   // ── API actions ───────────────────────────────────────────────────────────
   const handleOnboarding = async () => {
-    if (!selectedEventId) { alert("행사를 먼저 선택해주세요."); return; }
-    if (!selectedFile) { alert("업로드할 파일을 선택해주세요."); return; }
+    if (!selectedEventId) { showAlert("행사를 먼저 선택해주세요."); return; }
+    if (!selectedFile) { showAlert("업로드할 파일을 선택해주세요."); return; }
 
     setIsCreating(true);
     try {
       const res = await eventApi.onboardBooths(selectedEventId, selectedFile);
       if (res.data?.success || res.status === 201) {
-        alert("계정이 성공적으로 일괄 생성되었습니다.\n이제 '이메일 일괄 전송'을 통해 계정 정보를 발송할 수 있습니다.");
+        showAlert("계정이 성공적으로 일괄 생성되었습니다.\n이제 '이메일 일괄 전송'을 통해 계정 정보를 발송할 수 있습니다.");
         await fetchBooths(selectedEventId);
         setSelectedFile(null);
         setFileName("");
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || err.message || "테이블 등록에 실패했습니다.");
+      showAlert(err.response?.data?.message || err.message || "테이블 등록에 실패했습니다.");
     } finally {
       setIsCreating(false);
     }
@@ -307,24 +309,25 @@ export default function BoothManagementPage() {
   const handleSendMail = async () => {
     const selected = rows.filter((r) => r.selected && r.status === "registered" && r.adminId);
     if (selected.length === 0) {
-      alert("이메일을 발송할 관리자(등록완료 상태)를 선택해주세요.");
+      showAlert("이메일을 발송할 관리자(등록완료 상태)를 선택해주세요.");
       return;
     }
-    if (!confirm(`선택한 ${selected.length}명의 최고 관리자에게 로그인 정보를 전송하시겠습니까?`)) return;
 
-    setIsSendingMail(true);
-    try {
-      const adminIds = selected.map((r) => r.adminId!);
-      const res = await eventApi.sendLoginInfo({ boothAdminIds: adminIds });
-      if (res.data?.success) {
-        alert("성공적으로 이메일 전송을 요청했습니다.");
-        setRows((prev) => prev.map((r) => selected.some((s) => s.id === r.id) ? { ...r, selected: false } : r));
+    showConfirm(`선택한 ${selected.length}명의 최고 관리자에게 로그인 정보를 전송하시겠습니까?`, async () => {
+      setIsSendingMail(true);
+      try {
+        const adminIds = selected.map((r) => r.adminId!);
+        const res = await eventApi.sendLoginInfo({ boothAdminIds: adminIds });
+        if (res.data?.success) {
+          showAlert("성공적으로 이메일 전송을 요청했습니다.");
+          setRows((prev) => prev.map((r) => selected.some((s) => s.id === r.id) ? { ...r, selected: false } : r));
+        }
+      } catch (err: any) {
+        showAlert(err.response?.data?.message || err.message || "이메일 전송에 실패했습니다.");
+      } finally {
+        setIsSendingMail(false);
       }
-    } catch (err: any) {
-      alert(err.response?.data?.message || err.message || "이메일 전송에 실패했습니다.");
-    } finally {
-      setIsSendingMail(false);
-    }
+    });
   };
 
   const selectedRows = rows.filter((r) => r.selected);

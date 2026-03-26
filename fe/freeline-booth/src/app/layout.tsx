@@ -7,6 +7,8 @@ export const metadata: Metadata = {
 };
 
 import { AuthProvider } from "@/context/AuthContext";
+import { ModalProvider } from "@/context/ModalContext";
+import { GlobalModal } from "@/components/GlobalModal";
 
 export default function RootLayout({
   children,
@@ -16,9 +18,12 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="antialiased">
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <ModalProvider>
+          <AuthProvider>
+            {children}
+            <GlobalModal />
+          </AuthProvider>
+        </ModalProvider>
       </body>
     </html>
   );

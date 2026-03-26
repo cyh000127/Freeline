@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, PackageOpen, Users, Settings, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useModal } from "@/context/ModalContext";
 
 const navigation = [
   { name: "대시보드", href: "/", icon: Menu, isReady: true },
@@ -17,6 +18,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
+  const { showAlert } = useModal();
 
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
@@ -50,7 +52,7 @@ export function Sidebar() {
             return (
               <button
                 key={item.name}
-                onClick={() => alert("준비 중인 기능입니다.")}
+                onClick={() => showAlert("준비 중인 기능입니다.")}
                 className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-sm font-medium text-gray-500 transition-colors hover:bg-white/5 hover:text-white cursor-not-allowed"
               >
                 {content}
@@ -77,7 +79,7 @@ export function Sidebar() {
       {/* Bottom Profile Section */}
       <div className="p-4">
         <button 
-          onClick={() => alert("준비 중인 기능입니다.")}
+          onClick={() => showAlert("준비 중인 기능입니다.")}
           className="w-full rounded-xl bg-white/10 px-4 py-3 text-xs font-bold text-white transition-colors hover:bg-white/20"
         >
           총괄 관리자에게 문의하기

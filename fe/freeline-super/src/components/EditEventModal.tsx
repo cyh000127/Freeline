@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import DaumPostcode from "react-daum-postcode";
 import { api } from "@/lib/api";
 import { eventApi } from "@/lib/api/event";
+import { useModal } from "@/context/ModalContext";
 import {
   EVENT_FORM_LIMITS,
   getEventInputClassName,
@@ -51,7 +52,7 @@ const createFormDataFromEvent = (event: any | null) => ({
 
 export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) {
   const [formData, setFormData] = useState(createInitialFormData);
-
+  const { showAlert } = useModal();
   const [policyData, setPolicyData] = useState(createInitialPolicyData);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -284,7 +285,7 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
         } catch (thumbErr: any) {
           const errorStatus = thumbErr.response?.data?.status || thumbErr.response?.data?.error?.status;
           if (errorStatus === "INVALID_IMAGE_FORMAT") {
-            alert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
+            showAlert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
           } else {
             console.warn("썸네일 업로드 실패 (나머지 정보는 저장됨):", thumbErr);
           }
@@ -298,7 +299,7 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
         console.warn("정책 수정 실패 (행사 정보는 저장됨):", pErr);
       }
 
-      alert("행사 정보가 성공적으로 수정되었습니다.");
+      showAlert("행사 정보가 성공적으로 수정되었습니다.");
       handleClose();
     } catch (error: any) {
       console.error("행사 수정 중 오류 발생:", error);
@@ -307,10 +308,10 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
       
       if (error.response?.status === 409) {
         const detail = typeof errorMessage === 'object' ? JSON.stringify(errorMessage) : errorMessage;
-        alert(`수정된 내용이 기존 데이터와 충돌하거나 허용되지 않습니다: ${detail}`);
+        showAlert(`수정된 내용이 기존 데이터와 충돌하거나 허용되지 않습니다: ${detail}`);
       } else {
         const detail = typeof errorMessage === 'object' ? JSON.stringify(errorMessage) : errorMessage;
-        alert(`오류가 발생했습니다: ${detail}`);
+        showAlert(`오류가 발생했습니다: ${detail}`);
       }
     } finally {
       setIsLoading(false);
