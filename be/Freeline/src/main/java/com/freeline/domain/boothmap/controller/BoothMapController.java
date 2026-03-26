@@ -54,6 +54,16 @@ public class BoothMapController {
         return ResponseUtils.ok(response);
     }
 
+    @Operation(summary = "부스 매핑 임시 저장", description = "작업 중인 부스 매핑 정보(스냅샷)를 임시로 저장합니다.")
+    @PutMapping("/events/{eventId}/snapshot")
+    public ResponseEntity<BaseResponse<Void>> saveMappingSnapshot(
+            @PathVariable final Long eventId,
+            @Valid @RequestBody final com.freeline.domain.boothmap.dto.request.MappingSnapshotUpdateReqDto request
+    ) {
+        boothMapService.updateMappingSnapshot(eventId, request);
+        return ResponseUtils.ok(null);
+    }
+
     @Operation(summary = "부스 영역 일괄 저장", description = "지도 위의 부스 영역들을 한 번에 저장하고 대표 지도로 설정합니다.")
     @PutMapping("/events/{eventId}/areas/bulk")
     public ResponseEntity<BaseResponse<Void>> bulkUpsertBoothMapAreas(
