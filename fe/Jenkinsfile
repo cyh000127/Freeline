@@ -195,14 +195,13 @@ pipeline {
                             --domain=$INFISICAL_URL/api \
                             --silent --plain)
                         set -x
-                        current_git_commit="$(git rev-parse HEAD)"
 
                         # Infisical에서 EXPO_TOKEN, EAS_PROJECT_ID 주입
                         infisical run \
                             --domain=$INFISICAL_URL/api \
                             --projectId=$INFISICAL_PROJECT_ID \
                             --env=prod --path=/fe \
-                            -- env CURRENT_GIT_COMMIT="$current_git_commit" bash -s <<'EOF'
+                            -- bash -s <<'EOF'
 set -euo pipefail
 
 : "${EXPO_TOKEN:?ERROR: EXPO_TOKEN is missing from Infisical /fe}"
@@ -225,18 +224,13 @@ set -euo pipefail
 
 npm ci
 mkdir -p ./build
-npx eas-cli build -p android \
+BUILD_JSON="$(EAS_NO_VCS=1 npx eas-cli build -p android \
     --profile production \
     --non-interactive \
-    --wait
+    --wait \
+    --json)"
 
-BUILD_URL="$(npx eas-cli build:list \
-    --platform android \
-    --build-profile production \
-    --status finished \
-    --git-commit-hash "$CURRENT_GIT_COMMIT" \
-    --limit 1 \
-    --json | node -e 'const fs=require("fs"); const builds=JSON.parse(fs.readFileSync(0,"utf8")); const url=builds[0]?.artifacts?.buildUrl; if(!url){console.error("ERROR: APK URL not found for current commit"); process.exit(1);} process.stdout.write(url);')"
+BUILD_URL="$(printf '%s' "$BUILD_JSON" | node -e 'const fs=require("fs"); const builds=JSON.parse(fs.readFileSync(0,"utf8")); const build=Array.isArray(builds)? builds[0] : builds; const url=build?.artifacts?.applicationArchiveUrl ?? build?.artifacts?.buildUrl; if(!url){console.error("ERROR: APK URL not found in EAS build result"); process.exit(1);} process.stdout.write(url);')"
 
 node -e '
 const fs = require("fs");
@@ -282,7 +276,6 @@ INNER_EOF
 release_container="$(docker create \
     -e EXPO_TOKEN \
     -e EAS_PROJECT_ID \
-    -e CURRENT_GIT_COMMIT="$CURRENT_GIT_COMMIT" \
     -w /app \
     node:20-bullseye \
     bash /tmp/release-apk.sh)"
