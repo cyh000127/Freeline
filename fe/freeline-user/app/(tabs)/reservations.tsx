@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { FloatingTabBar } from '@/components/FloatingTabBar';
@@ -8,6 +9,7 @@ import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
 import { WaitingCard } from '@/components/WaitingCard';
 import { useAppData } from '@/features/app-data/context';
+import type { DecoratedWaiting } from '@/features/app-data/types';
 import { usePageTracking } from '@/features/tracking/use-page-tracking';
 import { palette } from '@/theme/colors';
 import { formatHistoryStatus } from '@/utils/format';
@@ -22,6 +24,7 @@ export default function ReservationsScreen() {
   usePageTracking('reservations');
   const [filter, setFilter] = useState<(typeof filters)[number]['key']>('all');
   const { cancelWaiting, history, lastError, postponeWaiting, queueWaitings } = useAppData();
+  const [pendingCancel, setPendingCancel] = useState<DecoratedWaiting | null>(null);
   const calledCount = queueWaitings.filter((waiting) => waiting.status === 'CALLED').length;
   const waitingCount = queueWaitings.filter((waiting) => waiting.status === 'WAITING').length;
 
@@ -107,7 +110,7 @@ export default function ReservationsScreen() {
               {visible.map((waiting) => (
                 <WaitingCard
                   key={waiting.waiting_id}
-                  onCancel={() => void cancelWaiting(waiting)}
+                  onCancel={() => setPendingCancel(waiting)}
                   onOpen={() => {
                     if (waiting.boothId) {
                       router.push(`/booths/${waiting.boothId}`);
@@ -134,6 +137,19 @@ export default function ReservationsScreen() {
             />
           )}
         </ScrollView>
+
+        <ConfirmDialog
+          body={`${pendingCancel?.booth_name ?? '이 부스'} 예약을 취소할까요? 취소 후에는 다시 대기를 등록해야 합니다.`}
+          confirmLabel="예약 취소하기"
+          onClose={() => setPendingCancel(null)}
+          onConfirm={() => {
+            if (pendingCancel) {
+              void cancelWaiting(pendingCancel).finally(() => setPendingCancel(null));
+            }
+          }}
+          title="예약을 취소할까요?"
+          visible={!!pendingCancel}
+        />
 
         <FloatingTabBar />
       </View>

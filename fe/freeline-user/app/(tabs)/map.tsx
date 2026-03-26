@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { BoothTile } from '@/components/BoothTile';
 import { BoothBottomSheet } from '@/components/BoothBottomSheet';
 import { BoothListCard } from '@/components/BoothListCard';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { FloatingTabBar } from '@/components/FloatingTabBar';
@@ -33,11 +34,14 @@ export default function MapScreen() {
   const { accessToken } = useSession();
   const { trackEvent } = useTracking();
   const {
+    boothDetails,
     booths,
+    cancelWaiting,
     createWaiting,
+    findWaitingByBoothId,
     getBoothDetail,
     lastError,
-    queueWaitings,
+    postponeWaiting,
     selectBooth,
     selectedBooth,
   } = useAppData();
@@ -51,6 +55,8 @@ export default function MapScreen() {
   const [detailMap, setDetailMap] = useState<Record<number, BoothDetail>>({});
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [confirmingReserve, setConfirmingReserve] = useState(false);
+  const [cancelVisible, setCancelVisible] = useState(false);
+  const [canceling, setCanceling] = useState(false);
 
   useEffect(() => {
     if (!sheetVisible) {
@@ -160,6 +166,23 @@ export default function MapScreen() {
     }
   }
 
+  async function handleCancelConfirm() {
+    const activeWaiting = selectedBooth ? findWaitingByBoothId(selectedBooth.boothId) : null;
+
+    if (!activeWaiting) {
+      return;
+    }
+
+    try {
+      setCanceling(true);
+      await cancelWaiting(activeWaiting);
+      setCancelVisible(false);
+      setSheetVisible(false);
+    } finally {
+      setCanceling(false);
+    }
+  }
+
   const filteredBooths = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
 
@@ -174,15 +197,16 @@ export default function MapScreen() {
   }, [booths, searchQuery]);
 
   const boothWaitingCount = (boothId: number) => {
-    const detail = detailMap[boothId];
+    const detail = boothDetails[boothId] ?? detailMap[boothId];
 
     if (detail) {
       return detail.waitingCount;
     }
 
-    const matched = queueWaitings.filter((waiting) => waiting.boothId === boothId).length;
-    return matched > 0 ? matched : null;
+    return null;
   };
+
+  const selectedWaiting = selectedBooth ? findWaitingByBoothId(selectedBooth.boothId) : null;
 
   const statusSummary = booths.reduce(
     (accumulator, booth) => {
@@ -290,7 +314,7 @@ export default function MapScreen() {
                 {filteredBooths.map((booth) => (
                   <BoothListCard
                     booth={booth}
-                    boothDetail={detailMap[booth.boothId]}
+                    boothDetail={boothDetails[booth.boothId] ?? detailMap[booth.boothId]}
                     key={booth.boothId}
                     onPress={() => {
                       void openBoothSheet(booth);
@@ -311,9 +335,16 @@ export default function MapScreen() {
           detail={sheetDetail}
           estimatedMinutes={sheetEstimatedMinutes}
           expanded={expanded}
+          activeWaiting={selectedWaiting}
           loading={loadingSheet}
+          onCancel={() => setCancelVisible(true)}
           onClose={() => setSheetVisible(false)}
           onExpandToggle={() => setExpanded((current) => !current)}
+          onPostpone={() => {
+            if (selectedWaiting) {
+              void postponeWaiting(selectedWaiting);
+            }
+          }}
           onReserve={() => {
             if (selectedBooth) {
               setConfirmVisible(true);
@@ -333,6 +364,18 @@ export default function MapScreen() {
           }}
           visible={confirmVisible && !!selectedBooth}
           waitingCount={sheetDetail?.waitingCount ?? boothWaitingCount(selectedBooth?.boothId ?? -1)}
+        />
+
+        <ConfirmDialog
+          body={`${selectedBooth?.name ?? '이 부스'} 예약을 취소할까요? 취소 후에는 다시 대기를 등록해야 합니다.`}
+          confirmLabel="예약 취소하기"
+          confirming={canceling}
+          onClose={() => setCancelVisible(false)}
+          onConfirm={() => {
+            void handleCancelConfirm();
+          }}
+          title="예약을 취소할까요?"
+          visible={cancelVisible && !!selectedWaiting}
         />
 
         <FloatingTabBar />

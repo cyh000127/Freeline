@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { router } from 'expo-router';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ActionButton';
 import { BrandMark } from '@/components/BrandMark';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { FloatingTabBar } from '@/components/FloatingTabBar';
@@ -10,6 +12,7 @@ import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
 import { WaitingCard } from '@/components/WaitingCard';
 import { useAppData } from '@/features/app-data/context';
+import type { DecoratedWaiting } from '@/features/app-data/types';
 import { useSession } from '@/features/session/context';
 import { usePageTracking } from '@/features/tracking/use-page-tracking';
 import { palette } from '@/theme/colors';
@@ -30,6 +33,7 @@ export default function HomeScreen() {
     exitWaiting,
     postponeWaiting,
   } = useAppData();
+  const [pendingCancel, setPendingCancel] = useState<DecoratedWaiting | null>(null);
 
   if (!eventProfile) {
     return <Screen />;
@@ -136,7 +140,7 @@ export default function HomeScreen() {
           {highlightedWaitings.map((waiting) => (
             <WaitingCard
               key={waiting.waiting_id}
-              onCancel={() => void cancelWaiting(waiting)}
+              onCancel={() => setPendingCancel(waiting)}
               onOpen={() => {
                 if (waiting.boothId) {
                   router.push(`/booths/${waiting.boothId}`);
@@ -169,6 +173,19 @@ export default function HomeScreen() {
             onPress={() => router.replace('/(tabs)/map')}
           />
         </ScrollView>
+
+        <ConfirmDialog
+          body={`${pendingCancel?.booth_name ?? '이 부스'} 예약을 취소할까요? 취소 후에는 다시 대기를 등록해야 합니다.`}
+          confirmLabel="예약 취소하기"
+          onClose={() => setPendingCancel(null)}
+          onConfirm={() => {
+            if (pendingCancel) {
+              void cancelWaiting(pendingCancel).finally(() => setPendingCancel(null));
+            }
+          }}
+          title="예약을 취소할까요?"
+          visible={!!pendingCancel}
+        />
 
         <FloatingTabBar />
       </View>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ActionButton';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { FloatingTabBar } from '@/components/FloatingTabBar';
 import { Screen } from '@/components/Screen';
 import { SectionTitle } from '@/components/SectionTitle';
@@ -19,6 +20,7 @@ export default function MyScreen() {
   const { queueStatus, waitings } = useAppData();
   const [nickname, setNickname] = useState(session.nickname);
   const [error, setError] = useState('');
+  const [resetVisible, setResetVisible] = useState(false);
 
   useEffect(() => {
     setNickname(session.nickname);
@@ -80,12 +82,23 @@ export default function MyScreen() {
             <ActionButton
               label="진짜 세션 초기화"
               onPress={() => {
-                void handleResetAll();
+                setResetVisible(true);
               }}
               variant="ghost"
             />
           </View>
         </ScrollView>
+
+        <ConfirmDialog
+          body="저장된 로그인 정보와 세션 데이터를 모두 지우고 엔트리코드 입력 화면으로 돌아갑니다."
+          confirmLabel="세션 초기화"
+          onClose={() => setResetVisible(false)}
+          onConfirm={() => {
+            void handleResetAll();
+          }}
+          title="세션을 초기화할까요?"
+          visible={resetVisible}
+        />
 
         <FloatingTabBar />
       </View>

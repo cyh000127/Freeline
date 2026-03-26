@@ -13,8 +13,10 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type BoothDetail, type BoothSummary } from '@/features/api/booths';
+import type { DecoratedWaiting } from '@/features/app-data/types';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/layout';
+import { formatWaitingStatus } from '@/utils/format';
 import { ActionButton } from './ActionButton';
 import { AppImage } from './AppImage';
 
@@ -22,12 +24,15 @@ type Props = {
   booth: BoothSummary | null;
   detail: BoothDetail | null;
   estimatedMinutes?: number | null;
+  activeWaiting?: DecoratedWaiting | null;
   loading?: boolean;
   visible: boolean;
   onClose: () => void;
   onExpandToggle: () => void;
   expanded: boolean;
   onReserve: () => void;
+  onCancel?: () => void;
+  onPostpone?: () => void;
 };
 
 const screenHeight = Dimensions.get('window').height;
@@ -36,12 +41,15 @@ export function BoothBottomSheet({
   booth,
   detail,
   estimatedMinutes = null,
+  activeWaiting = null,
   loading = false,
   visible,
   onClose,
   onExpandToggle,
   expanded,
   onReserve,
+  onCancel,
+  onPostpone,
 }: Props) {
   const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(screenHeight)).current;
@@ -144,7 +152,16 @@ export function BoothBottomSheet({
                 </Text>
               </View>
               <View style={styles.queueHeroSide}>
-                <InfoChip label="상태" value={booth.isEmergencyClosed ? '긴급 마감' : '운영 중'} />
+                <InfoChip
+                  label="상태"
+                  value={
+                    activeWaiting
+                      ? `내 예약 ${formatWaitingStatus(activeWaiting.status)}`
+                      : booth.isEmergencyClosed
+                        ? '긴급 마감'
+                        : '운영 중'
+                  }
+                />
                 <InfoChip label="호출 인원" value={detail ? `${detail.callCount}명` : '확인 중'} />
               </View>
             </View>
@@ -199,13 +216,30 @@ export function BoothBottomSheet({
               }}
               variant="ghost"
             />
-            <ActionButton
-              grow
-              label={booth.isEmergencyClosed ? '현재 예약 불가' : '이 부스 예약하기'}
-              onPress={onReserve}
-              variant="secondary"
-              disabled={booth.isEmergencyClosed}
-            />
+            {activeWaiting?.status === 'WAITING' && activeWaiting.postpone_available && onPostpone ? (
+              <ActionButton
+                grow
+                label="순서 미루기"
+                onPress={onPostpone}
+                variant="ghost"
+              />
+            ) : null}
+            {activeWaiting ? (
+              <ActionButton
+                grow
+                label="예약 취소하기"
+                onPress={() => onCancel?.()}
+                variant="secondary"
+              />
+            ) : (
+              <ActionButton
+                grow
+                label={booth.isEmergencyClosed ? '현재 예약 불가' : '이 부스 예약하기'}
+                onPress={onReserve}
+                variant="secondary"
+                disabled={booth.isEmergencyClosed}
+              />
+            )}
           </View>
         </Animated.View>
       </View>
@@ -458,6 +492,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     paddingTop: 4,
   },
