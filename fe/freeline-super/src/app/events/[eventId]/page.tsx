@@ -55,6 +55,21 @@ export default function EventDetailPage() {
     const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
     const [activeLocalId, setActiveLocalId] = useState<string | null>(null);
 
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+    // Prevent leaving if unsaved changes exist
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = "";
+            }
+        };
+
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    }, [hasUnsavedChanges]);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -132,10 +147,16 @@ export default function EventDetailPage() {
             }
         };
 
-        updateSize();
+        // Delay initial measure slightly to ensure DOM is fully painted
+        setTimeout(updateSize, 100);
         window.addEventListener("resize", updateSize);
         return () => window.removeEventListener("resize", updateSize);
     }, [layoutImageUrl]);
+
+    const handleAreasChange = (newAreas: AreaItem[]) => {
+        setAreas(newAreas);
+        setHasUnsavedChanges(true);
+    };
 
     const handleLayoutUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -148,21 +169,6 @@ export default function EventDetailPage() {
             const res = await boothMapApi.uploadMapImage(eventId, file, true);
 
             if (res.data?.success && res.data?.data) {
-                // Get original image dimensions to maintain aspect ratio
-                const img = new Image();
-                img.onload = () => {
-                    const aspect = img.width / img.height;
-                    if (containerRef.current) {
-                        const containerWidth = containerRef.current.offsetWidth;
-                        const calculatedHeight = containerWidth / aspect;
-                        setContainerSize({
-                            width: containerWidth,
-                            height: calculatedHeight
-                        });
-                    }
-                };
-                img.src = res.data.data.imagePath;
-
                 setLayoutImageUrl(res.data.data.imagePath);
                 setEventMapId(res.data.data.eventMapId);
 
@@ -182,9 +188,11 @@ export default function EventDetailPage() {
                         heightRatio: d.heightRatio,
                     }));
                     setAreas(newDrafts);
+                    setHasUnsavedChanges(true);
                     setIsEditMode(true); // Automatically enter edit mode
                 } else {
                     setAreas([]);
+                    setHasUnsavedChanges(false);
                 }
             }
         } catch (err) {
@@ -198,6 +206,14 @@ export default function EventDetailPage() {
     const handleSaveMap = async () => {
         if (!eventMapId) return;
 
+        const hasUnmapped = areas.some(a => a.boothId === null);
+        if (hasUnmapped) {
+            if (confirm("설정되지 않은 부스가 있습니다. 임시저장하시겠습니까?")) {
+                await handleTempSave();
+            }
+            return;
+        }
+
         // Filter out unmapped areas
         const validAreas = areas.filter(a => a.boothId !== null).map(a => ({
             boothId: a.boothId as number,
@@ -207,20 +223,30 @@ export default function EventDetailPage() {
             heightRatio: a.heightRatio
         }));
 
-        if (validAreas.length === 0 && areas.length > 0) {
-            if (!confirm("매핑된 부스가 없습니다. 임시 영역을 모두 삭제하고 저장하시겠습니까?")) {
-                return;
-            }
-        }
-
         try {
             setIsSaving(true);
             await boothMapApi.updateBoothMapAreas(eventId, eventMapId, validAreas);
             setIsEditMode(false);
-            // Optional: Refetch map to ensure sync
+            setHasUnsavedChanges(false);
+            alert("저장되었습니다.");
         } catch (err) {
             console.error("Failed to save map areas", err);
             alert("지도 저장에 실패했습니다.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleTempSave = async () => {
+        if (!eventMapId) return;
+        try {
+            setIsSaving(true);
+            await boothMapApi.updateBoothMapSnapshot(eventId, eventMapId, {areas});
+            setHasUnsavedChanges(false);
+            alert("임시저장되었습니다.");
+        } catch (err) {
+            console.error("Failed to save snapshot", err);
+            alert("임시저장에 실패했습니다.");
         } finally {
             setIsSaving(false);
         }
@@ -235,7 +261,10 @@ export default function EventDetailPage() {
             widthRatio: 0.1,
             heightRatio: 0.1,
         };
-        setAreas(prev => [...prev, newArea]);
+        setAreas(prev => {
+            setHasUnsavedChanges(true);
+            return [...prev, newArea];
+        });
     };
 
     const handleOpenSearchModal = (localId: string) => {
@@ -246,12 +275,15 @@ export default function EventDetailPage() {
     const handleSelectBooth = (booth: { boothId: number; boothName: string }) => {
         if (!activeLocalId) return;
 
-        setAreas(prev => prev.map(area => {
-            if (area.localId === activeLocalId) {
-                return {...area, boothId: booth.boothId, boothName: booth.boothName};
-            }
-            return area;
-        }));
+        setAreas(prev => {
+            setHasUnsavedChanges(true);
+            return prev.map(area => {
+                if (area.localId === activeLocalId) {
+                    return {...area, boothId: booth.boothId, boothName: booth.boothName};
+                }
+                return area;
+            });
+        });
 
         setIsSearchModalOpen(false);
         setActiveLocalId(null);
@@ -260,7 +292,11 @@ export default function EventDetailPage() {
     const handleDeleteArea = () => {
         if (!activeLocalId) return;
 
-        setAreas(prev => prev.filter(area => area.localId !== activeLocalId));
+        setAreas(prev => {
+            const next = prev.filter(area => area.localId !== activeLocalId);
+            setHasUnsavedChanges(true);
+            return next;
+        });
         setIsSearchModalOpen(false);
         setActiveLocalId(null);
     };
@@ -287,6 +323,8 @@ export default function EventDetailPage() {
   }
 
     const mappedBoothIds = areas.filter(a => a.boothId !== null).map(a => a.boothId as number);
+    const currentActiveArea = areas.find(a => a.localId === activeLocalId);
+    const currentBoothId = currentActiveArea ? currentActiveArea.boothId : null;
 
   return (
     <div className="flex bg-[#F1F3F5] h-screen overflow-hidden">
@@ -330,8 +368,8 @@ export default function EventDetailPage() {
             </div>
               <div className="ml-auto flex gap-3">
                   {layoutImageUrl && (
-                      isEditMode ? (
-                          <>
+                      <>
+                          {isEditMode && (
                               <button
                                   onClick={handleAddArea}
                                   className="flex items-center gap-2 px-5 py-2.5 bg-blue-100 text-blue-700 rounded-xl font-black text-[15px] hover:bg-blue-200 transition-all shadow-sm"
@@ -339,31 +377,40 @@ export default function EventDetailPage() {
                                   <MapPin className="w-5 h-5"/>
                                   영역 추가
                               </button>
+                          )}
+                          {!isEditMode && (
+                              <>
+                                  <input
+                                      type="file"
+                                      id="layout-upload-overlay"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={handleLayoutUpload}
+                                  />
+                                  <label
+                                      htmlFor="layout-upload-overlay"
+                                      className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-black text-[15px] hover:bg-gray-200 transition-all shadow-sm cursor-pointer"
+                                  >
+                                      <Upload className="w-5 h-5"/>
+                                      새 지도 업로드
+                                  </label>
+                              </>
+                          )}
+                          <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner">
                               <button
                                   onClick={() => setIsEditMode(false)}
-                                  className="flex items-center gap-2 px-5 py-2.5 bg-gray-200 text-gray-700 rounded-xl font-black text-[15px] hover:bg-gray-300 transition-all"
+                                  className={`px-5 py-2 rounded-lg font-black text-[14px] transition-all ${!isEditMode ? "bg-white shadow text-[#2D2A4A]" : "text-gray-500 hover:text-gray-700"}`}
                               >
-                                  <X className="w-5 h-5"/>
-                                  취소
+                                  보기 모드
                               </button>
                               <button
-                                  onClick={handleSaveMap}
-                                  disabled={isSaving}
-                                  className="flex items-center gap-2 px-5 py-2.5 bg-[#2D2A4A] text-white rounded-xl font-black text-[15px] hover:scale-105 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                                  onClick={() => setIsEditMode(true)}
+                                  className={`px-5 py-2 rounded-lg font-black text-[14px] transition-all ${isEditMode ? "bg-[#DBFC53] shadow text-[#2D2A4A]" : "text-gray-500 hover:text-gray-700"}`}
                               >
-                                  {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
-                                  저장하기
+                                  편집 모드
                               </button>
-                          </>
-                      ) : (
-                          <button
-                              onClick={() => setIsEditMode(true)}
-                              className="flex items-center gap-2 px-5 py-2.5 bg-[#DBFC53] text-[#2D2A4A] rounded-xl font-black text-[15px] hover:scale-105 transition-all shadow-md shadow-[#DBFC53]/30 active:scale-95"
-                          >
-                              <Edit3 className="w-5 h-5"/>
-                              지도 편집
-                          </button>
-                      )
+                          </div>
+                      </>
                   )}
             </div>
           </div>
@@ -381,7 +428,7 @@ export default function EventDetailPage() {
                     containerWidth={containerSize.width}
                     containerHeight={containerSize.height}
                     onOpenSearchModal={handleOpenSearchModal}
-                    onAreasChange={setAreas}
+                    onAreasChange={handleAreasChange}
                 />
             ) : (
                 <div className="flex flex-col items-center gap-6 group w-full h-full justify-center">
@@ -411,28 +458,29 @@ export default function EventDetailPage() {
                 </div>
               </div>
             )}
+              </div>
 
-                  {/* Overlay Upload Button (when image exists and not editing) */}
-                  {layoutImageUrl && !isEditMode && (
-                      <div
-                          className="absolute inset-0 bg-black/5 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-10">
-                          <input
-                              type="file"
-                              id="layout-upload-overlay"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={handleLayoutUpload}
-                          />
-                          <label
-                              htmlFor="layout-upload-overlay"
-                              className="bg-white/95 backdrop-blur-sm text-[#2D2A4A] px-8 py-4 rounded-2xl font-black text-[18px] shadow-2xl flex items-center gap-3 cursor-pointer hover:bg-white transition-all transform hover:scale-105"
-                          >
-                              <Upload className="w-6 h-6"/>
-                              새 지도 업로드 및 자동 분석
-                          </label>
-                      </div>
-                  )}
-          </div>
+              {/* Action Buttons (Save) */}
+              {layoutImageUrl && isEditMode && (
+                  <div className="flex justify-end gap-3 mt-6">
+                      <button
+                          onClick={handleTempSave}
+                          disabled={isSaving}
+                          className="flex items-center gap-2 px-6 py-3 bg-green-100 text-green-700 rounded-2xl font-black text-[16px] hover:bg-green-200 transition-all shadow-sm disabled:opacity-50"
+                      >
+                          {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
+                          임시저장
+                      </button>
+                      <button
+                          onClick={handleSaveMap}
+                          disabled={isSaving}
+                          className="flex items-center gap-2 px-6 py-3 bg-[#2D2A4A] text-white rounded-2xl font-black text-[16px] hover:scale-105 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                      >
+                          {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
+                          저장하기
+                      </button>
+                  </div>
+              )}
         </div>
       </main>
 
@@ -450,6 +498,7 @@ export default function EventDetailPage() {
             onClose={() => setIsSearchModalOpen(false)}
             eventId={eventId}
             alreadyMappedBoothIds={mappedBoothIds}
+            currentBoothId={currentBoothId}
             onSelect={handleSelectBooth}
             onDeleteArea={handleDeleteArea}
         />

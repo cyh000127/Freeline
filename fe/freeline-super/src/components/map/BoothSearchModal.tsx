@@ -16,6 +16,7 @@ interface BoothSearchModalProps {
     onClose: () => void;
     eventId: number;
     alreadyMappedBoothIds: number[];
+    currentBoothId?: number | null;
     onSelect: (booth: BoothSearchResDto) => void;
     onDeleteArea?: () => void;
 }
@@ -25,6 +26,7 @@ export function BoothSearchModal({
                                      onClose,
                                      eventId,
                                      alreadyMappedBoothIds,
+                                     currentBoothId,
                                      onSelect,
                                      onDeleteArea,
                                  }: BoothSearchModalProps) {
@@ -40,9 +42,10 @@ export function BoothSearchModal({
             const res = await api.get(`/v1/booths/events/${eventId}/search`, {params});
 
             if (res.data.success) {
-                // 이미 다른 영역에 매핑된 부스 제외
+                // 이미 다른 영역에 매핑된 부스 제외 (단, 현재 영역에 매핑된 부스는 제외하지 않음)
                 const filtered = res.data.data.filter(
-                    (b: BoothSearchResDto) => !alreadyMappedBoothIds.includes(b.boothId)
+                    (b: BoothSearchResDto) =>
+                        !alreadyMappedBoothIds.includes(b.boothId) || b.boothId === currentBoothId
                 );
                 setBooths(filtered);
             }
@@ -51,7 +54,7 @@ export function BoothSearchModal({
         } finally {
             setLoading(false);
         }
-    }, [eventId, alreadyMappedBoothIds]);
+    }, [eventId, alreadyMappedBoothIds, currentBoothId]);
 
     useEffect(() => {
         if (isOpen) {
@@ -79,7 +82,7 @@ export function BoothSearchModal({
                 <div
                     className="flex justify-between items-center px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                     <h2 className="text-xl font-bold text-gray-800 dark:text-white">
-                        부스 매핑
+                        부스 설정
                     </h2>
                     <div className="flex items-center gap-2">
                         {onDeleteArea && (
@@ -87,7 +90,6 @@ export function BoothSearchModal({
                                 onClick={onDeleteArea}
                                 className="text-red-500 hover:bg-red-50 p-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
                             >
-                                <Trash2 className="w-4 h-4"/>
                                 영역 삭제
                             </button>
                         )}
@@ -125,7 +127,7 @@ export function BoothSearchModal({
 
                     {!loading && booths.length === 0 && (
                         <div className="text-center py-10 text-gray-500 dark:text-gray-400">
-                            {keyword ? "검색 결과가 없습니다." : "매핑 가능한 부스가 없습니다."}
+                            {keyword ? "검색 결과가 없습니다." : "설정 가능한 부스가 없습니다."}
                         </div>
                     )}
 
