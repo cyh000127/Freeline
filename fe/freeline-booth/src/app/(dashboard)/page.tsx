@@ -243,8 +243,8 @@ export default function DashboardPage() {
             <button
               onClick={() => setActiveTab('WAITING')}
               className={`inline-flex h-full items-center justify-center rounded-[14px] px-8 text-sm font-black transition-all duration-300 ${activeTab === 'WAITING'
-                  ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20"
-                  : "text-gray-400 hover:text-gray-900 hover:bg-gray-50"
+                ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20"
+                : "text-gray-400 hover:text-gray-900 hover:bg-gray-50"
                 }`}
             >
               대기 {calculatedCount.waiting}
@@ -252,8 +252,8 @@ export default function DashboardPage() {
             <button
               onClick={() => setActiveTab('ENTERED')}
               className={`inline-flex h-full items-center justify-center rounded-[14px] px-8 text-sm font-black transition-all duration-300 ${activeTab === 'ENTERED'
-                  ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20"
-                  : "text-gray-400 hover:text-gray-900 hover:bg-gray-50"
+                ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20"
+                : "text-gray-400 hover:text-gray-900 hover:bg-gray-50"
                 }`}
             >
               입장 {calculatedCount.inUse}
@@ -261,8 +261,8 @@ export default function DashboardPage() {
             <button
               onClick={() => setActiveTab('CANCELLED')}
               className={`inline-flex h-full items-center justify-center rounded-[14px] px-8 text-sm font-black transition-all duration-300 ${activeTab === 'CANCELLED'
-                  ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20"
-                  : "text-gray-400 hover:text-gray-900 hover:bg-gray-50"
+                ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20"
+                : "text-gray-400 hover:text-gray-900 hover:bg-gray-50"
                 }`}
             >
               취소
