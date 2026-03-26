@@ -59,6 +59,16 @@ export default function SettingsPage() {
     deferLimit: 3,
   });
 
+  const MAX_LENGTHS = {
+    name: 30,
+    locationCode: 10,
+    staySeconds: 5,
+    maxWaitingCount: 4,
+    callCount: 2,
+    callValidSeconds: 4,
+    deferLimit: 2,
+  };
+
   // QR Info State
   const [qrData, setQrData] = useState<QRData | null>(null);
 
@@ -464,25 +474,53 @@ export default function SettingsPage() {
 
               <form onSubmit={handleBoothUpdate} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="boothName">부스 명칭</Label>
+                  <div className="flex justify-between">
+                    <Label htmlFor="boothName">부스 명칭</Label>
+                    <span className={cn("text-[11px]", boothInfo.name.length >= MAX_LENGTHS.name ? "text-red-500 font-bold" : "text-gray-400")}>
+                      {boothInfo.name.length}/{MAX_LENGTHS.name}
+                    </span>
+                  </div>
                   <Input
                     id="boothName"
                     value={boothInfo.name}
-                    onChange={(e) => setBoothInfo({ ...boothInfo, name: e.target.value })}
+                    onChange={(e) => {
+                      if (e.target.value.length <= MAX_LENGTHS.name) {
+                        setBoothInfo({ ...boothInfo, name: e.target.value });
+                      }
+                    }}
                     placeholder="SSAFY 공식 굿즈 부스"
-                    className="h-12 bg-[#F8F9FA] border-0 rounded-xl"
+                    className={cn(
+                      "h-12 border-0 rounded-xl transition-all",
+                      boothInfo.name.length >= MAX_LENGTHS.name 
+                        ? "bg-red-50 ring-2 ring-red-500" 
+                        : "bg-[#F8F9FA] focus-visible:ring-[#2D2A4A]"
+                    )}
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="locationCode">부스 위치</Label>
+                  <div className="flex justify-between">
+                    <Label htmlFor="locationCode">부스 위치</Label>
+                    <span className={cn("text-[11px]", (boothInfo.locationCode || "").length >= MAX_LENGTHS.locationCode ? "text-red-500 font-bold" : "text-gray-400")}>
+                      {(boothInfo.locationCode || "").length}/{MAX_LENGTHS.locationCode}
+                    </span>
+                  </div>
                   <Input
                     id="locationCode"
                     value={boothInfo.locationCode}
-                    onChange={(e) => setBoothInfo({ ...boothInfo, locationCode: e.target.value })}
+                    onChange={(e) => {
+                      if (e.target.value.length <= MAX_LENGTHS.locationCode) {
+                        setBoothInfo({ ...boothInfo, locationCode: e.target.value });
+                      }
+                    }}
                     placeholder="A-05"
-                    className="h-12 bg-[#F8F9FA] border-0 rounded-xl"
+                    className={cn(
+                      "h-12 border-0 rounded-xl transition-all",
+                      (boothInfo.locationCode || "").length >= MAX_LENGTHS.locationCode 
+                        ? "bg-red-50 ring-2 ring-red-500" 
+                        : "bg-[#F8F9FA] focus-visible:ring-[#2D2A4A]"
+                    )}
                     required
                   />
                 </div>
@@ -619,24 +657,54 @@ export default function SettingsPage() {
               <form onSubmit={handlePolicyUpdate} className="space-y-6 w-full max-w-xl mx-auto py-4">
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="staySeconds">예상 체류 시간(초)</Label>
+                    <div className="flex justify-between">
+                      <Label htmlFor="staySeconds">예상 체류 시간(초)</Label>
+                      <span className={cn("text-[11px]", policyInfo.staySeconds.toString().length >= MAX_LENGTHS.staySeconds ? "text-red-500 font-bold" : "text-gray-400")}>
+                        {policyInfo.staySeconds.toString().length}/{MAX_LENGTHS.staySeconds}
+                      </span>
+                    </div>
                     <Input
                       id="staySeconds"
                       type="number"
                       value={policyInfo.staySeconds}
-                      onChange={(e) => setPolicyInfo({ ...policyInfo, staySeconds: parseInt(e.target.value) || 0 })}
-                      className="h-12 bg-[#F8F9FA] border-0 rounded-xl"
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        if (val.length <= MAX_LENGTHS.staySeconds) {
+                          setPolicyInfo({ ...policyInfo, staySeconds: parseInt(val) || 0 });
+                        }
+                      }}
+                      className={cn(
+                        "h-12 border-0 rounded-xl transition-all",
+                        policyInfo.staySeconds.toString().length >= MAX_LENGTHS.staySeconds 
+                          ? "bg-red-50 ring-2 ring-red-500" 
+                          : "bg-[#F8F9FA] focus-visible:ring-[#2D2A4A]"
+                      )}
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="maxWaitingCount">최대 대기 팀 수</Label>
+                    <div className="flex justify-between">
+                      <Label htmlFor="maxWaitingCount">최대 대기 팀 수</Label>
+                      <span className={cn("text-[11px]", policyInfo.maxWaitingCount.toString().length >= MAX_LENGTHS.maxWaitingCount ? "text-red-500 font-bold" : "text-gray-400")}>
+                        {policyInfo.maxWaitingCount.toString().length}/{MAX_LENGTHS.maxWaitingCount}
+                      </span>
+                    </div>
                     <Input
                       id="maxWaitingCount"
                       type="number"
                       value={policyInfo.maxWaitingCount}
-                      onChange={(e) => setPolicyInfo({ ...policyInfo, maxWaitingCount: parseInt(e.target.value) || 0 })}
-                      className="h-12 bg-[#F8F9FA] border-0 rounded-xl"
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        if (val.length <= MAX_LENGTHS.maxWaitingCount) {
+                          setPolicyInfo({ ...policyInfo, maxWaitingCount: parseInt(val) || 0 });
+                        }
+                      }}
+                      className={cn(
+                        "h-12 border-0 rounded-xl transition-all",
+                        policyInfo.maxWaitingCount.toString().length >= MAX_LENGTHS.maxWaitingCount 
+                          ? "bg-red-50 ring-2 ring-red-500" 
+                          : "bg-[#F8F9FA] focus-visible:ring-[#2D2A4A]"
+                      )}
                       required
                     />
                   </div>
@@ -644,37 +712,82 @@ export default function SettingsPage() {
 
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="callCount">호출 허용 횟수</Label>
+                    <div className="flex justify-between">
+                      <Label htmlFor="callCount">호출 허용 횟수</Label>
+                      <span className={cn("text-[11px]", policyInfo.callCount.toString().length >= MAX_LENGTHS.callCount ? "text-red-500 font-bold" : "text-gray-400")}>
+                        {policyInfo.callCount.toString().length}/{MAX_LENGTHS.callCount}
+                      </span>
+                    </div>
                     <Input
                       id="callCount"
                       type="number"
                       value={policyInfo.callCount}
-                      onChange={(e) => setPolicyInfo({ ...policyInfo, callCount: parseInt(e.target.value) || 0 })}
-                      className="h-12 bg-[#F8F9FA] border-0 rounded-xl"
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        if (val.length <= MAX_LENGTHS.callCount) {
+                          setPolicyInfo({ ...policyInfo, callCount: parseInt(val) || 0 });
+                        }
+                      }}
+                      className={cn(
+                        "h-12 border-0 rounded-xl transition-all",
+                        policyInfo.callCount.toString().length >= MAX_LENGTHS.callCount 
+                          ? "bg-red-50 ring-2 ring-red-500" 
+                          : "bg-[#F8F9FA] focus-visible:ring-[#2D2A4A]"
+                      )}
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="deferLimit">노쇼 취소 제한 횟수</Label>
+                    <div className="flex justify-between">
+                      <Label htmlFor="deferLimit">노쇼 취소 제한 횟수</Label>
+                      <span className={cn("text-[11px]", policyInfo.deferLimit.toString().length >= MAX_LENGTHS.deferLimit ? "text-red-500 font-bold" : "text-gray-400")}>
+                        {policyInfo.deferLimit.toString().length}/{MAX_LENGTHS.deferLimit}
+                      </span>
+                    </div>
                     <Input
                       id="deferLimit"
                       type="number"
                       value={policyInfo.deferLimit}
-                      onChange={(e) => setPolicyInfo({ ...policyInfo, deferLimit: parseInt(e.target.value) || 0 })}
-                      className="h-12 bg-[#F8F9FA] border-0 rounded-xl"
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        if (val.length <= MAX_LENGTHS.deferLimit) {
+                          setPolicyInfo({ ...policyInfo, deferLimit: parseInt(val) || 0 });
+                        }
+                      }}
+                      className={cn(
+                        "h-12 border-0 rounded-xl transition-all",
+                        policyInfo.deferLimit.toString().length >= MAX_LENGTHS.deferLimit 
+                          ? "bg-red-50 ring-2 ring-red-500" 
+                          : "bg-[#F8F9FA] focus-visible:ring-[#2D2A4A]"
+                      )}
                       required
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="callValidSeconds">호출 유효 시간(초)</Label>
+                  <div className="flex justify-between">
+                    <Label htmlFor="callValidSeconds">호출 유효 시간(초)</Label>
+                    <span className={cn("text-[11px]", policyInfo.callValidSeconds.toString().length >= MAX_LENGTHS.callValidSeconds ? "text-red-500 font-bold" : "text-gray-400")}>
+                      {policyInfo.callValidSeconds.toString().length}/{MAX_LENGTHS.callValidSeconds}
+                    </span>
+                  </div>
                   <Input
                     id="callValidSeconds"
                     type="number"
                     value={policyInfo.callValidSeconds}
-                    onChange={(e) => setPolicyInfo({ ...policyInfo, callValidSeconds: parseInt(e.target.value) || 0 })}
-                    className="h-12 bg-[#F8F9FA] border-0 rounded-xl"
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      if (val.length <= MAX_LENGTHS.callValidSeconds) {
+                        setPolicyInfo({ ...policyInfo, callValidSeconds: parseInt(val) || 0 });
+                      }
+                    }}
+                    className={cn(
+                      "h-12 border-0 rounded-xl transition-all",
+                      policyInfo.callValidSeconds.toString().length >= MAX_LENGTHS.callValidSeconds 
+                        ? "bg-red-50 ring-2 ring-red-500" 
+                        : "bg-[#F8F9FA] focus-visible:ring-[#2D2A4A]"
+                    )}
                     required
                   />
                 </div>
