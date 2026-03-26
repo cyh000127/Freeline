@@ -190,7 +190,7 @@ export default function ReservationFlowDetailScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#F7F7F8',
+    backgroundColor: '#F0F2F5',
   },
   centerBox: {
     alignItems: 'center',
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 28,
-    backgroundColor: '#F7F7F8',
+    backgroundColor: '#F0F2F5',
   },
   submitButton: {
     height: 52,

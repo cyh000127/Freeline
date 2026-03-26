@@ -52,11 +52,16 @@ export default function MapsPage() {
         </View>
 
         <View style={styles.body}>
-          <View style={styles.mockContent}>
-            <Text style={styles.mockText}>
-              {tab === 'map' ? 'MAP VIEW' : 'LIST VIEW'}
-            </Text>
-          </View>
+          {tab === 'map' ? (
+            <View style={styles.mapPlaceholder}>
+              <Text style={styles.mapPlaceholderTitle}>MAP VIEW</Text>
+              <Text style={styles.mapPlaceholderSub}>추후 지도 연동 예정</Text>
+            </View>
+          ) : (
+            <View style={styles.mockContent}>
+              <Text style={styles.mockText}>LIST VIEW</Text>
+            </View>
+          )}
 
           <Pressable
             style={styles.button}
@@ -139,11 +144,41 @@ const styles = StyleSheet.create({
 
   mockContent: {
     flex: 1,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   mockText: {
     fontSize: 16,
     color: '#000000',
+    fontWeight: '600',
+  },
+
+  mapPlaceholder: {
+    flex: 1,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: '#F7F4FF',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#2F2C48',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  mapPlaceholderTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#2F2C48',
+    marginBottom: 8,
+  },
+
+  mapPlaceholderSub: {
+    fontSize: 14,
+    color: '#5C5A72',
+    fontWeight: '600',
   },
 
   button: {

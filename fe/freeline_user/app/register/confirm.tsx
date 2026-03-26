@@ -4,14 +4,19 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import RegisterScreenLayout from '@/components/register/RegisterScreenLayout';
 import RegisterCheckboxRow from '@/components/register/RegisterCheckboxRow';
 import { useAuthSession } from '@/features/auth/auth-session.context';
+import { getEventDetail } from '@/features/event/event.api';
+import type { EventDetail } from '@/features/event/types';
 
 export default function ConfirmScreen() {
   const router = useRouter();
 
   const [requiredAgreed, setRequiredAgreed] = useState(false);
   const [marketingAgreed, setMarketingAgreed] = useState(false);
+  
+  const [eventDetail, setEventDetail] = useState<EventDetail | null>(null);
+  const [loadingEvent, setLoadingEvent] = useState(true);
 
-  const { accessToken, nickname, completeRegistration, isHydrating } = useAuthSession();
+  const { accessToken, eventId, nickname, completeRegistration, isHydrating } = useAuthSession();
 
   useEffect(() => {
     if (isHydrating) {
@@ -25,8 +30,24 @@ export default function ConfirmScreen() {
 
     if (!nickname) {
       router.replace('/register/nickname');
+      return;
     }
-  }, [accessToken, nickname, isHydrating, router]);
+
+    // Fetch event detail
+    const fetchEvent = async () => {
+      try {
+        setLoadingEvent(true);
+        const data = await getEventDetail(accessToken);
+        setEventDetail(data);
+      } catch (err) {
+        console.error('Failed to fetch event details:', err);
+      } finally {
+        setLoadingEvent(false);
+      }
+    };
+
+    fetchEvent();
+  }, [accessToken, eventId, nickname, isHydrating, router]);
 
   const displayNickname =
     typeof nickname === 'string' && nickname.trim().length > 0 ? nickname : '닉네임 없음';
@@ -51,7 +72,9 @@ export default function ConfirmScreen() {
       <View style={styles.infoWrap}>
         <View style={styles.row}>
           <Text style={styles.label}>박람회</Text>
-          <Text style={styles.value}>AW 2026 스마트 제조혁신 산업전</Text>
+          <Text style={styles.value}>
+            {loadingEvent ? '불러오는 중...' : eventDetail?.name ?? '행사 정보 없음'}
+          </Text>
         </View>
 
         <View style={styles.row}>
@@ -61,7 +84,13 @@ export default function ConfirmScreen() {
 
         <View style={styles.row}>
           <Text style={styles.label}>기간</Text>
-          <Text style={styles.value}>26.03.06 - 26.03.08</Text>
+          <Text style={styles.value}>
+            {loadingEvent 
+              ? '불러오는 중...' 
+              : (eventDetail 
+                  ? `${eventDetail.startDate.replace(/-/g, '.')} - ${eventDetail.endDate.replace(/-/g, '.')}` 
+                  : '-')}
+          </Text>
         </View>
       </View>
 

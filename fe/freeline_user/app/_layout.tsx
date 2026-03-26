@@ -10,6 +10,7 @@ import {
   AuthSessionProvider,
   useAuthSession,
 } from '@/features/auth/auth-session.context';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 
 function NotificationSubscriptionBridge() {
   const { accessToken } = useAuthSession();
@@ -34,7 +35,9 @@ function AppProviders() {
       <QRMockProvider>
         <NotificationLiveProvider>
           <NotificationSubscriptionBridge />
-          <Stack screenOptions={{ headerShown: false }} />
+          <AuthGuard>
+            <Stack screenOptions={{ headerShown: false }} />
+          </AuthGuard>
         </NotificationLiveProvider>
       </QRMockProvider>
     </TrackingProvider>
