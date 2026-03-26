@@ -217,10 +217,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
 
     await createWaitingApi(accessToken, boothId);
+    const booth = state.booths.find((item) => item.boothId === boothId) ?? null;
     trackEvent({
       action: 'WAITING_REGISTER',
       targetType: 'BOOTH',
       targetId: String(boothId),
+      metadata: booth
+        ? {
+            booth_name: booth.name,
+            location_code: booth.locationCode,
+          }
+        : undefined,
     });
     await refreshAll();
   }
@@ -253,6 +260,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
 
     await postponeWaitingApi(accessToken, waiting.waiting_id);
+    trackEvent({
+      action: 'MAP_INTERACTION',
+      targetType: 'BOOTH',
+      targetId: waiting.boothId ? String(waiting.boothId) : undefined,
+      metadata: {
+        interaction: 'postpone_waiting',
+        waiting_id: waiting.waiting_id,
+        booth_name: waiting.booth_name,
+      },
+    });
     await refreshAll();
   }
 

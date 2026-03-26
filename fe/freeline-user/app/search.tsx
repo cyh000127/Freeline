@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { TextField } from '@/components/TextField';
 import { useAppData } from '@/features/app-data/context';
+import { useTracking } from '@/features/tracking/tracking.context';
 import { usePageTracking } from '@/features/tracking/use-page-tracking';
 import { palette } from '@/theme/colors';
 
@@ -11,6 +12,7 @@ export default function SearchScreen() {
   usePageTracking('search');
   const [query, setQuery] = useState('');
   const { booths, selectBooth } = useAppData();
+  const { trackEvent } = useTracking();
 
   const results = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -48,6 +50,17 @@ export default function SearchScreen() {
             <Pressable
               key={booth.boothId}
               onPress={() => {
+                trackEvent({
+                  action: 'MAP_INTERACTION',
+                  targetType: 'BOOTH',
+                  targetId: String(booth.boothId),
+                  metadata: {
+                    interaction: 'search_select',
+                    query: query.trim(),
+                    booth_name: booth.name,
+                    location_code: booth.locationCode,
+                  },
+                });
                 selectBooth(booth.boothId);
                 router.replace('/(tabs)/map');
               }}

@@ -8,12 +8,16 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { type BoothDetail } from '@/features/api/booths';
 import { useAppData } from '@/features/app-data/context';
+import { useTracking } from '@/features/tracking/tracking.context';
+import { usePageTracking } from '@/features/tracking/use-page-tracking';
 import { palette } from '@/theme/colors';
 
 export default function BoothGoodsScreen() {
+  usePageTracking('goods');
   const params = useLocalSearchParams<{ boothId: string }>();
   const boothId = Number(params.boothId);
   const { boothDetails, getBoothDetail } = useAppData();
+  const { trackEvent } = useTracking();
   const [detail, setDetail] = useState<BoothDetail | null>(boothDetails[boothId] ?? null);
   const [loading, setLoading] = useState(!detail);
 
@@ -33,6 +37,23 @@ export default function BoothGoodsScreen() {
 
     void load();
   }, [boothId, detail, getBoothDetail]);
+
+  useEffect(() => {
+    if (!detail) {
+      return;
+    }
+
+    trackEvent({
+      action: 'GOODS_VIEW',
+      targetType: 'GOODS',
+      targetId: String(detail.boothId),
+      metadata: {
+        source: 'goods-page',
+        booth_name: detail.name,
+        goods_count: detail.goods.length,
+      },
+    });
+  }, [detail, trackEvent]);
 
   return (
     <Screen padded={false} scroll={false}>

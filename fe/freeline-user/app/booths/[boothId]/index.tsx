@@ -10,6 +10,7 @@ import { ReservationConfirmSheet } from '@/components/ReservationConfirmSheet';
 import { Screen } from '@/components/Screen';
 import { type BoothDetail } from '@/features/api/booths';
 import { useAppData } from '@/features/app-data/context';
+import { useTracking } from '@/features/tracking/tracking.context';
 import { usePageTracking } from '@/features/tracking/use-page-tracking';
 import { palette } from '@/theme/colors';
 
@@ -18,6 +19,7 @@ export default function BoothDetailScreen() {
   const params = useLocalSearchParams<{ boothId: string }>();
   const boothId = Number(params.boothId);
   const { boothDetails, createWaiting, getBoothDetail } = useAppData();
+  const { trackEvent } = useTracking();
   const [detail, setDetail] = useState<BoothDetail | null>(boothDetails[boothId] ?? null);
   const [loading, setLoading] = useState(!detail);
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -112,7 +114,19 @@ export default function BoothDetailScreen() {
                   </View>
                   <ActionButton
                     label="굿즈 목록 보기"
-                    onPress={() => router.push(`/booths/${detail.boothId}/goods`)}
+                    onPress={() => {
+                      trackEvent({
+                        action: 'GOODS_VIEW',
+                        targetType: 'GOODS',
+                        targetId: String(detail.boothId),
+                        metadata: {
+                          source: 'booth-detail',
+                          booth_name: detail.name,
+                          goods_count: detail.goods.length,
+                        },
+                      });
+                      router.push(`/booths/${detail.boothId}/goods`);
+                    }}
                     variant="ghost"
                   />
                 </View>
