@@ -91,6 +91,12 @@ public class HiveAnalysisService {
     }
 
     private void analyzeHourlyTraffic(Statement stmt, Long eventId) throws SQLException {
+        String normalizedActionHour = "CASE "
+                + "WHEN client_timestamp LIKE '%T%' THEN "
+                + "  DATE_FORMAT(FROM_UTC_TIMESTAMP(CAST(REPLACE(SUBSTR(client_timestamp, 1, 19), 'T', ' ') AS TIMESTAMP), 'Asia/Seoul'), 'yyyy-MM-dd HH') "
+                + "ELSE SUBSTR(client_timestamp, 1, 13) "
+                + "END";
+
         String sql = "INSERT OVERWRITE TABLE freeline.hourly_traffic_result "
                 + "SELECT "
                 + "  " + eventId + ", "
@@ -101,7 +107,7 @@ public class HiveAnalysisService {
                 + "FROM ("
                 + "  SELECT datetime_hour "
                 + "  FROM ("
-                + "    SELECT SUBSTR(client_timestamp, 1, 13) AS datetime_hour "
+                + "    SELECT " + normalizedActionHour + " AS datetime_hour "
                 + "    FROM freeline.action_logs "
                 + "    WHERE event_id = " + eventId + " "
                 + "    UNION ALL "
@@ -113,11 +119,11 @@ public class HiveAnalysisService {
                 + "  GROUP BY datetime_hour"
                 + ") h "
                 + "LEFT JOIN ("
-                + "  SELECT SUBSTR(client_timestamp, 1, 13) AS datetime_hour, "
+                + "  SELECT " + normalizedActionHour + " AS datetime_hour, "
                 + "    COUNT(DISTINCT visitor_id) AS active_user_count "
                 + "  FROM freeline.action_logs "
                 + "  WHERE event_id = " + eventId + " "
-                + "  GROUP BY SUBSTR(client_timestamp, 1, 13)"
+                + "  GROUP BY " + normalizedActionHour
                 + ") a ON h.datetime_hour = a.datetime_hour "
                 + "LEFT JOIN ("
                 + "  SELECT SUBSTR(bw.requested_at, 1, 13) AS datetime_hour, COUNT(*) AS register_count "
