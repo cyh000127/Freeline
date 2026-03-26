@@ -14,7 +14,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     ...config.android,
-    package: 'com.freeline.user',
+    package: 'freeline_user.app',
+    googleServicesFile: './google-services.json',
   },
   extra: {
     ...config.extra,
