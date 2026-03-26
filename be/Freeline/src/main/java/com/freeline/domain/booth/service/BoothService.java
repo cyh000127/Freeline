@@ -3,6 +3,8 @@ package com.freeline.domain.booth.service;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.LocalTime;
@@ -71,6 +73,15 @@ public class BoothService {
     private static final String BOOTH_DIRECTORY = "booth";
     private static final DateTimeFormatter CSV_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final int CSV_COLUMN_COUNT = 7;
+    private static final String[] CSV_HEADER_COLUMNS = {
+            "boothName",
+            "locationCode",
+            "openTime",
+            "closeTime",
+            "adminName",
+            "adminEmail",
+            "adminCompany"
+    };
     private static final int RANDOM_PASSWORD_LENGTH = 8;
     private static final String PASSWORD_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     private static final String PASSWORD_DIGITS = "0123456789";
@@ -361,15 +372,16 @@ public class BoothService {
 
     private List<ParsedBoothCsvRow> parseBoothsFromCsv(final MultipartFile file) {
         final List<ParsedBoothCsvRow> rows = new ArrayList<>();
+        final CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT);
 
         try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+                new InputStreamReader(file.getInputStream(), decoder))) {
             String line = reader.readLine();
             int lineNumber = 1;
 
-            if (line == null) {
-                throw new IllegalArgumentException("CSV 파일이 비어 있습니다.");
-            }
+            validateCsvHeader(line);
 
             while ((line = reader.readLine()) != null) {
                 lineNumber++;
@@ -380,11 +392,30 @@ public class BoothService {
 
                 rows.add(parseBoothRow(line, lineNumber));
             }
-        } catch (IOException ex) {
-            throw new IllegalArgumentException("CSV 파일을 읽는 중 오류가 발생했습니다.", ex);
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (IOException | RuntimeException ex) {
+            throw new BusinessException(ErrorCode.INVALID_CSV_FORMAT);
         }
 
         return rows;
+    }
+
+    private void validateCsvHeader(final String headerLine) {
+        if (headerLine == null) {
+            throw new BusinessException(ErrorCode.INVALID_CSV_FORMAT);
+        }
+
+        final String[] headers = headerLine.split(",", -1);
+        if (headers.length != CSV_COLUMN_COUNT) {
+            throw new BusinessException(ErrorCode.INVALID_CSV_FORMAT);
+        }
+
+        for (int index = 0; index < CSV_COLUMN_COUNT; index++) {
+            if (!CSV_HEADER_COLUMNS[index].equals(headers[index].trim())) {
+                throw new BusinessException(ErrorCode.INVALID_CSV_FORMAT);
+            }
+        }
     }
 
     private ParsedBoothCsvRow parseBoothRow(final String line, final int lineNumber) {

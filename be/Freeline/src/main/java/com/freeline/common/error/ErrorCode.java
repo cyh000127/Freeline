@@ -91,6 +91,8 @@ public enum ErrorCode {
     FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F-005", "파일 업로드에 실패했습니다."),
     FILE_DOWNLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F-006", "파일 조회에 실패했습니다."),
     FILE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F-007", "파일 삭제에 실패했습니다."),
+    INVALID_CSV_FORMAT(HttpStatus.BAD_REQUEST, "F-008", "파일 형식이 올바르지 않습니다. 정상적인 CSV 파일인지 확인해 주세요."),
+    INVALID_IMAGE_FORMAT(HttpStatus.BAD_REQUEST, "F-009", "지원하지 않는 이미지 포맷이거나 손상된 파일입니다."),
 
     /**
      * Goods Error (G-xxx)
