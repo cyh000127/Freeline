@@ -38,6 +38,8 @@ import com.freeline.domain.boothmap.repository.EventMapRepository;
 import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.exception.EventException;
 import com.freeline.domain.event.repository.EventRepository;
+import com.fasterxml.jackson.databind.type.CollectionType;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 
 import tools.jackson.databind.ObjectMapper;
 
@@ -253,7 +255,7 @@ class BoothMapServiceTest {
         Mockito.when(eventRepository.existsById(5L)).thenReturn(true);
         Mockito.when(eventRepository.findById(5L)).thenReturn(Optional.of(event));
 
-        Assertions.assertThatThrownBy(() -> boothMapService.getBoothMap(5L))
+        Assertions.assertThatThrownBy(() -> boothMapService.getBoothMap(1L, 5L))
                 .isInstanceOf(EventException.class)
                 .hasMessage("요청한 리소스에 접근할 권한이 없습니다.");
     }
@@ -283,7 +285,7 @@ class BoothMapServiceTest {
         Mockito.when(objectMapper.readValue(ArgumentMatchers.anyString(), ArgumentMatchers.eq(listType)))
                 .thenReturn(List.of(BoothAreaDraftDto.builder().xRatio(new BigDecimal("0.1")).build()));
 
-        final BoothMapResDto result = boothMapService.getBoothMap(5L);
+        final BoothMapResDto result = boothMapService.getBoothMap(1L, 5L);
 
         Assertions.assertThat(result.booths()).isEmpty();
         Assertions.assertThat(result.drafts()).hasSize(1);
