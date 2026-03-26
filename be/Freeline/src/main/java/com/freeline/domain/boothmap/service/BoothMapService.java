@@ -302,24 +302,4 @@ public class BoothMapService {
             throw new BoothException(ErrorCode.BOOTH_EVENT_MISMATCH);
         }
     }
-
-    private void validateEventOwnership(final Long eventId) {
-        validateEventExists(eventId);
-        Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new EventException(ErrorCode.EVENT_NOT_FOUND));
-
-        org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null || auth.getName().equals("anonymousUser")) {
-            throw new EventException(ErrorCode.ACCESS_DENIED);
-        }
-
-        try {
-            Long currentUserId = Long.parseLong(auth.getName());
-            if (!event.getEventAdminId().equals(currentUserId)) {
-                throw new EventException(ErrorCode.ACCESS_DENIED);
-            }
-        } catch (NumberFormatException e) {
-            throw new EventException(ErrorCode.ACCESS_DENIED);
-        }
-    }
 }
