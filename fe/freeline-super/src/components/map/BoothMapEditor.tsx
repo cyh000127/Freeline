@@ -77,6 +77,10 @@ export function BoothMapEditor({
         return Number((pixel / max).toFixed(4));
     };
 
+    const handleDragStart = () => {
+        isDraggingRef.current = true;
+    };
+
     const handleDragStop = (localId: string, d: { x: number; y: number }) => {
         if (!isEditMode) return;
         const newAreas = areas.map((area) => {
@@ -93,7 +97,11 @@ export function BoothMapEditor({
         onAreasChange(newAreas);
         setTimeout(() => {
             isDraggingRef.current = false;
-        }, 0);
+        }, 100); // 딜레이를 주어 클릭 이벤트와 충돌 방지
+    };
+
+    const handleResizeStart = () => {
+        isDraggingRef.current = true;
     };
 
     const handleResizeStop = (localId: string, ref: HTMLElement, position: { x: number; y: number }) => {
@@ -112,6 +120,9 @@ export function BoothMapEditor({
         });
         setAreas(newAreas);
         onAreasChange(newAreas);
+        setTimeout(() => {
+            isDraggingRef.current = false;
+        }, 100); // 딜레이를 주어 클릭 이벤트와 충돌 방지
     };
 
     return (
@@ -138,10 +149,9 @@ export function BoothMapEditor({
                             x: toPixel(area.xRatio, effectiveWidth),
                             y: toPixel(area.yRatio, effectiveHeight),
                         }}
-                        onDragStart={() => {
-                            isDraggingRef.current = true;
-                        }}
+                        onDragStart={handleDragStart}
                         onDragStop={(e, d) => handleDragStop(area.localId, d)}
+                        onResizeStart={handleResizeStart}
                         onResizeStop={(e, direction, ref, delta, position) =>
                             handleResizeStop(area.localId, ref, position)
                         }
