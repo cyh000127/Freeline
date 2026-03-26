@@ -31,7 +31,7 @@ export const boothMapApi = {
         });
     },
 
-    updateBoothMapSnapshot: (eventId: number, eventMapId: number, snapshot: any) => {
+    updateBoothMapSnapshot: (eventId: number, eventMapId: number, snapshot: unknown) => {
         return api.put(`/v1/boothmaps/events/${eventId}/snapshot`, {
             eventMapId,
             mappingSnapshot: JSON.stringify(snapshot),
