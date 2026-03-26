@@ -1,6 +1,10 @@
 package com.freeline.common.file.validator;
 
+import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.Set;
+
+import javax.imageio.ImageIO;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,6 +27,7 @@ public class MediaFileValidator {
         validateNotEmpty(file);
         validateContentType(file);
         validateFilename(file);
+        validateImageIntegrity(file);
     }
 
     private void validateNotEmpty(final MultipartFile file) {
@@ -43,6 +48,17 @@ public class MediaFileValidator {
         if (filename == null || filename.isBlank()
                 || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
             throw new BusinessException(ErrorCode.FILE_NAME_INVALID);
+        }
+    }
+
+    private void validateImageIntegrity(final MultipartFile file) {
+        try {
+            final BufferedImage image = ImageIO.read(file.getInputStream());
+            if (image == null) {
+                throw new BusinessException(ErrorCode.INVALID_IMAGE_FORMAT);
+            }
+        } catch (final IOException ex) {
+            throw new BusinessException(ErrorCode.INVALID_IMAGE_FORMAT);
         }
     }
 }
