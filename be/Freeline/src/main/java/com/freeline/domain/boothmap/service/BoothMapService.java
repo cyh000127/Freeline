@@ -35,6 +35,8 @@ import com.freeline.domain.boothmap.repository.EventMapRepository;
 import com.freeline.domain.event.exception.EventException;
 import com.freeline.domain.event.repository.EventRepository;
 
+import tools.jackson.databind.ObjectMapper;
+
 @Slf4j
 @Service
 @Transactional
@@ -56,6 +58,7 @@ public class BoothMapService {
     private final BoothMapAreaRepository boothMapAreaRepository;
     private final FileService fileService;
     private final AiVisionClient aiVisionClient;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public void bulkUpsertBoothMapAreas(final Long eventId, final BoothMapAreaBulkUpsertReqDto request) {
@@ -94,6 +97,21 @@ public class BoothMapService {
 
         log.info("[BoothMap] 일괄 영역 저장 및 대표지도 설정 완료 {eventId: {}, eventMapId: {}, areaCount: {}}",
                 eventId, eventMap.getId(), newAreas.size());
+    }
+
+    @Transactional
+    public void updateMappingSnapshot(final Long eventId, final com.freeline.domain.boothmap.dto.request.MappingSnapshotUpdateReqDto request) {
+        validateEventExists(eventId);
+
+        final EventMap eventMap = eventMapRepository.findById(request.eventMapId())
+                .orElseThrow(() -> new EventException(ErrorCode.EVENT_MAP_NOT_FOUND));
+
+        if (!eventMap.getEventId().equals(eventId)) {
+            throw new BoothException(ErrorCode.BOOTH_EVENT_MISMATCH);
+        }
+
+        eventMap.updateMappingSnapshot(request.mappingSnapshot());
+        log.info("[BoothMap] 임시 스냅샷 저장 완료 {eventId: {}, eventMapId: {}}", eventId, eventMap.getId());
     }
 
     @Transactional(readOnly = true)
@@ -151,6 +169,13 @@ public class BoothMapService {
             AiVisionClient.AiAnalysisResult aiResult = aiVisionClient.analyzeMapImage(saved.getImagePath());
             drafts = convertToRatioDrafts(aiResult);
             log.info("[BoothMap] AI 분석 성공: {}개의 부스 감지", drafts.size());
+
+            // AI 분석 결과를 JSON String으로 변환하여 임시 스냅샷으로 저장
+            if (!drafts.isEmpty()) {
+                String snapshotJson = objectMapper.writeValueAsString(drafts);
+                saved.updateMappingSnapshot(snapshotJson);
+                eventMapRepository.save(saved); // Update the snapshot in DB
+            }
         } catch (Exception e) {
             log.error("[BoothMap] AI 이미지 분석 실패 (지도는 정상 저장됨) {eventMapId: {}}", saved.getId(), e);
         }
