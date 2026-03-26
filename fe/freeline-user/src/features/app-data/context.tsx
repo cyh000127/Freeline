@@ -18,6 +18,7 @@ import {
 import { scanQr as scanQrApi } from '@/features/api/qr';
 import { useSession } from '@/features/session/context';
 import { useTracking } from '@/features/tracking/tracking.context';
+import { toUserErrorMessage } from '@/utils/error';
 import type { AppDataState, DecoratedWaiting, WaitingHistoryItem } from './types';
 
 type AppDataContextValue = AppDataState & {
@@ -163,8 +164,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         lastError: null,
       }));
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : '앱 데이터를 불러오지 못했습니다.';
+      const message = toUserErrorMessage(error, '앱 데이터를 불러오지 못했습니다.');
       console.warn('앱 데이터 새로고침 실패', error);
       setState((current) => ({
         ...current,

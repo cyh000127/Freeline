@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type BoothDetail, type BoothSummary } from '@/features/api/booths';
 import { palette } from '@/theme/colors';
+import { spacing } from '@/theme/layout';
 import { ActionButton } from './ActionButton';
 import { AppImage } from './AppImage';
 
@@ -260,12 +261,15 @@ const styles = StyleSheet.create({
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(16, 14, 29, 0.28)',
   },
   sheet: {
+    width: '100%',
+    maxWidth: spacing.viewportMaxWidth,
     backgroundColor: palette.background,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,

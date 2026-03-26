@@ -24,13 +24,18 @@ export function BottomActionBar({ children }: Props) {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    left: spacing.page,
-    right: spacing.page,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   bar: {
+    width: '100%',
+    maxWidth: spacing.viewportMaxWidth,
     backgroundColor: palette.background,
     borderRadius: 26,
     padding: 12,
+    paddingHorizontal: 12,
+    marginHorizontal: spacing.page,
     shadowColor: palette.shadow,
     shadowOpacity: 0.12,
     shadowRadius: 18,

@@ -18,21 +18,23 @@ export function FloatingTabBar() {
 
   return (
     <View style={[styles.wrap, { bottom: Math.max(insets.bottom, 10) }]}>
-      <View style={styles.bar}>
-        {tabs.map((tab) => {
-          const active = pathname === tab.href;
+      <View style={styles.shell}>
+        <View style={styles.bar}>
+          {tabs.map((tab) => {
+            const active = pathname === tab.href;
 
-          return (
-            <Pressable
-              key={tab.href}
-              onPress={() => router.replace(tab.href)}
-              style={[styles.item, active ? styles.activeItem : null]}
-            >
-              <Feather color={active ? palette.ink : '#FFFFFF'} name={tab.icon} size={20} />
-              <Text style={[styles.label, active ? styles.activeLabel : null]}>{tab.label}</Text>
-            </Pressable>
-          );
-        })}
+            return (
+              <Pressable
+                key={tab.href}
+                onPress={() => router.replace(tab.href)}
+                style={[styles.item, active ? styles.activeItem : null]}
+              >
+                <Feather color={active ? palette.ink : '#FFFFFF'} name={tab.icon} size={20} />
+                <Text style={[styles.label, active ? styles.activeLabel : null]}>{tab.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -41,10 +43,15 @@ export function FloatingTabBar() {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    left: spacing.page,
-    right: spacing.page,
+    left: 0,
+    right: 0,
     alignItems: 'center',
     zIndex: 20,
+  },
+  shell: {
+    width: '100%',
+    maxWidth: spacing.viewportMaxWidth,
+    paddingHorizontal: spacing.page,
   },
   bar: {
     width: '100%',

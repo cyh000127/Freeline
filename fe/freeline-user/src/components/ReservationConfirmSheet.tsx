@@ -2,6 +2,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { palette } from '@/theme/colors';
+import { spacing } from '@/theme/layout';
 import { ActionButton } from './ActionButton';
 
 type Props = {
@@ -92,12 +93,15 @@ const styles = StyleSheet.create({
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(16, 14, 29, 0.34)',
   },
   sheet: {
+    width: '100%',
+    maxWidth: spacing.viewportMaxWidth,
     backgroundColor: palette.background,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
