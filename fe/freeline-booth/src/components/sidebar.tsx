@@ -9,7 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 const navigation = [
   { name: "대시보드", href: "/", icon: Menu, isReady: true },
   { name: "굿즈 관리", href: "/goods", icon: PackageOpen, isReady: true },
-  { name: "사용자 통계", href: "/statistics", icon: Users, isReady: false },
+  { name: "사용자 통계", href: "/statistics", icon: Users, isReady: true },
   { name: "환경 설정", href: "/settings", icon: Settings, isReady: true },
 ];
 
