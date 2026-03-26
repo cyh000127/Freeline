@@ -9,6 +9,7 @@
 #   ./run.sh                          # E2E 리포트 파이프라인 전체 검증
 #   ./run.sh demo                     # 시연용 데이터 셋업
 #   ./run.sh demo --auto-close        # 시연용 + 행사 자동 CLOSED
+#   ./run.sh demo --ready-pack        # 시연용 완성형(계정/리포트 포함)
 #   ./run.sh stress                   # 고도화 부하 테스트 (ramping + spike)
 #
 #   VU_COUNT=1000 ITERATIONS=5 ./run.sh           # 대규모 E2E 테스트
@@ -55,7 +56,7 @@ case "$MODE" in
   *)
     echo "사용법: $0 [e2e|demo|stress] [추가 옵션]"
     echo "  e2e    — E2E 리포트 파이프라인 전체 검증 (기본)"
-    echo "  demo   — 시연용 데이터 셋업 (--auto-close 옵션 가능)"
+    echo "  demo   — 시연용 데이터 셋업 (--auto-close/--auto-report/--ready-pack 옵션 가능)"
     echo "  stress — 고도화 부하 테스트 (ramping VU + spike 시나리오)"
     exit 1
     ;;
