@@ -5,6 +5,7 @@ const SESSION_KEY = 'auth-session';
 
 export type PersistedAuthSession = {
   entryCode: string | null;
+  eventId: number | null;
   visitorId: number | null;
   accessToken: string | null;
   nickname: string | null;
