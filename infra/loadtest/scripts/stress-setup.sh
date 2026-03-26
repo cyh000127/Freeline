@@ -246,9 +246,9 @@ K6_OUT="--out experimental-prometheus-rw"
 K6_OK=false
 if ssh -o ConnectTimeout=5 "${K6_SERVER}" "docker ps --format '{{.Names}}' | grep -q k6-manager" 2>/dev/null; then
   log_info "Server B k6-manager에서 실행..."
-  # entry code 파일을 k6 컨테이너에 복사
-  scp -q "$ENTRY_CODES_FILE" "${K6_SERVER}:/tmp/entry_codes.json" 2>/dev/null
-  ssh "${K6_SERVER}" "docker cp /tmp/entry_codes.json k6-manager:/scripts/entry_codes.json" 2>/dev/null
+  # /scripts는 호스트 바인드 마운트 — 호스트 경로에 직접 복사
+  K6_SCRIPTS_HOST=$(ssh "${K6_SERVER}" "docker inspect k6-manager --format '{{range .Mounts}}{{if eq .Destination \"/scripts\"}}{{.Source}}{{end}}{{end}}'" 2>/dev/null)
+  scp -q "$ENTRY_CODES_FILE" "${K6_SERVER}:${K6_SCRIPTS_HOST}/entry_codes.json" 2>/dev/null
   K6_RESULT=$(ssh "${K6_SERVER}" "docker exec k6-manager k6 run ${K6_OUT} ${K6_ENV} /scripts/stress-test.js" 2>&1) || true
   K6_OK=true
 elif command -v k6 &>/dev/null; then
