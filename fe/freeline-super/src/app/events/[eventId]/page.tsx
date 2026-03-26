@@ -16,7 +16,10 @@ import {
     Calendar,
     MapPin,
     Loader2,
-    Save
+    Save,
+    ZoomIn,
+    ZoomOut,
+    RotateCcw
 } from "lucide-react";
 
 interface AreaItem {
@@ -49,11 +52,20 @@ export default function EventDetailPage() {
     const [eventMapId, setEventMapId] = useState<number | null>(null);
     const [isEditMode, setIsEditMode] = useState(false);
     const [areas, setAreas] = useState<AreaItem[]>([]);
+    const [originalAreas, setOriginalAreas] = useState<AreaItem[]>([]);
+    const [areasHistory, setAreasHistory] = useState<AreaItem[][]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
     // Container dimensions
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerSize, setContainerSize] = useState({width: 0, height: 0});
+
+    // Zoom & Pan state
+    const [zoomLevel, setZoomLevel] = useState(1);
+    const [zoomOrigin, setZoomOrigin] = useState({x: '50%', y: '50%'});
+    const [panPosition, setPanPosition] = useState({x: 0, y: 0});
+    const isPanningRef = useRef(false);
+    const lastPanMousePositionRef = useRef({x: 0, y: 0});
 
     // Search Modal state
     const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -123,6 +135,7 @@ export default function EventDetailPage() {
                           heightRatio: b.heightRatio,
                       }));
                       setAreas(mappedAreas);
+                      setOriginalAreas(mappedAreas);
                   }
               }
           } catch (mapErr) {
@@ -156,8 +169,52 @@ export default function EventDetailPage() {
         return () => globalThis.removeEventListener("resize", updateSize);
     }, [layoutImageUrl]);
 
+    // Prevent default scroll when using Alt+Wheel on map container
+    useEffect(() => {
+        const handleWheel = (e: WheelEvent) => {
+            if (e.altKey) {
+                e.preventDefault();
+            }
+        };
+        const el = containerRef.current;
+        if (el) {
+            el.addEventListener('wheel', handleWheel, {passive: false});
+        }
+        return () => {
+            if (el) {
+                el.removeEventListener('wheel', handleWheel);
+            }
+        };
+    }, []);
+
+    const handleToggleEditMode = () => {
+        if (isEditMode) {
+            if (hasUnsavedChanges) {
+                showConfirm("저장되지 않은 변경사항이 있습니다. 보기 모드로 이동하면 변경사항이 취소됩니다. 이동하시겠습니까?", () => {
+                    setAreas(originalAreas);
+                    setAreasHistory([]);
+                    setHasUnsavedChanges(false);
+                    setIsEditMode(false);
+                });
+            } else {
+                setIsEditMode(false);
+            }
+        } else {
+            setIsEditMode(true);
+        }
+    };
+
     const handleAreasChange = (newAreas: AreaItem[]) => {
+        setAreasHistory(prev => [...prev, areas]);
         setAreas(newAreas);
+        setHasUnsavedChanges(true);
+    };
+
+    const handleUndo = () => {
+        if (areasHistory.length === 0) return;
+        const previousAreas = areasHistory[areasHistory.length - 1];
+        setAreas(previousAreas);
+        setAreasHistory(prev => prev.slice(0, -1));
         setHasUnsavedChanges(true);
     };
 
@@ -191,10 +248,12 @@ export default function EventDetailPage() {
                         heightRatio: d.heightRatio,
                     }));
                     setAreas(newDrafts);
+                    setOriginalAreas([]);
                     setHasUnsavedChanges(true);
                     setIsEditMode(true); // Automatically enter edit mode
                 } else {
                     setAreas([]);
+                    setOriginalAreas([]);
                     setHasUnsavedChanges(false);
                 }
             }
@@ -233,6 +292,7 @@ export default function EventDetailPage() {
         try {
             setIsSaving(true);
             await boothMapApi.updateBoothMapAreas(eventId, eventMapId, validAreas);
+            setOriginalAreas(areas);
             setIsEditMode(false);
             setHasUnsavedChanges(false);
             showAlert("저장되었습니다.");
@@ -249,6 +309,7 @@ export default function EventDetailPage() {
         try {
             setIsSaving(true);
             await boothMapApi.updateBoothMapSnapshot(eventId, eventMapId, {areas});
+            setOriginalAreas(areas);
             setHasUnsavedChanges(false);
             showAlert("임시저장되었습니다.");
         } catch (err) {
@@ -260,6 +321,7 @@ export default function EventDetailPage() {
     };
 
     const handleAddArea = () => {
+        setAreasHistory(prev => [...prev, areas]);
         const newArea = {
             localId: `new-${Date.now()}`,
             boothId: null,
@@ -288,6 +350,7 @@ export default function EventDetailPage() {
         color: string;
     }) => {
         if (activeLocalId === null) return;
+        setAreasHistory(prev => [...prev, areas]);
 
         setAreas(prev => {
             setHasUnsavedChanges(true);
@@ -313,6 +376,7 @@ export default function EventDetailPage() {
 
     const handleDeleteArea = () => {
         if (activeLocalId === null) return;
+        setAreasHistory(prev => [...prev, areas]);
 
         setAreas(prev => {
             const next = prev.filter(area => area.localId !== activeLocalId);
@@ -378,27 +442,36 @@ export default function EventDetailPage() {
           <div className="flex items-center gap-6 mb-8">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-[#10B981]" />
-              <span className="text-[13px] font-bold text-gray-600">원활 (1m²당 5명 이하)</span>
+                <span className="text-[13px] font-bold text-gray-600">원활</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-[#F59E0B]" />
-              <span className="text-[13px] font-bold text-gray-600">보통 (1m²당 7명 이하)</span>
+                <span className="text-[13px] font-bold text-gray-600">보통</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-[#EF4444]" />
-              <span className="text-[13px] font-bold text-gray-600">혼잡 (1m²당 8명 이상)</span>
+                <span className="text-[13px] font-bold text-gray-600">혼잡</span>
             </div>
               <div className="ml-auto flex gap-3">
                   {layoutImageUrl && (
                       <>
                           {isEditMode ? (
-                              <button
-                                  onClick={handleAddArea}
-                                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-100 text-blue-700 rounded-xl font-black text-[15px] hover:bg-blue-200 transition-all shadow-sm"
-                              >
-                                  <MapPin className="w-5 h-5"/>
-                                  영역 추가
-                              </button>
+                              <>
+                                  <button
+                                      onClick={handleUndo}
+                                      disabled={areasHistory.length === 0}
+                                      className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-black text-[15px] hover:bg-gray-200 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                      이전으로
+                                  </button>
+                                  <button
+                                      onClick={handleAddArea}
+                                      className="flex items-center gap-2 px-5 py-2.5 bg-blue-100 text-blue-700 rounded-xl font-black text-[15px] hover:bg-blue-200 transition-all shadow-sm"
+                                  >
+                                      <MapPin className="w-5 h-5"/>
+                                      영역 추가
+                                  </button>
+                              </>
                           ) : (
                               <>
                                   <input
@@ -417,20 +490,12 @@ export default function EventDetailPage() {
                                   </label>
                               </>
                           )}
-                          <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner">
-                              <button
-                                  onClick={() => setIsEditMode(false)}
-                                  className={`px-5 py-2 rounded-lg font-black text-[14px] transition-all ${!isEditMode ? "bg-white shadow text-[#2D2A4A]" : "text-gray-500 hover:text-gray-700"}`}
-                              >
-                                  보기 모드
-                              </button>
-                              <button
-                                  onClick={() => setIsEditMode(true)}
-                                  className={`px-5 py-2 rounded-lg font-black text-[14px] transition-all ${isEditMode ? "bg-[#DBFC53] shadow text-[#2D2A4A]" : "text-gray-500 hover:text-gray-700"}`}
-                              >
-                                  편집 모드
-                              </button>
-                          </div>
+                          <button
+                              onClick={handleToggleEditMode}
+                              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-[15px] transition-all shadow-sm ${isEditMode ? "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50" : "bg-[#DBFC53] text-[#2D2A4A] hover:bg-[#c9e846]"}`}
+                          >
+                              {isEditMode ? "보기 모드" : "편집 모드"}
+                          </button>
                       </>
                   )}
             </div>
@@ -439,18 +504,113 @@ export default function EventDetailPage() {
           {/* Map Layout Area */}
               <div
                   ref={containerRef}
-                  className="flex-1 bg-[#F1F3F5] rounded-[32px] flex items-center justify-center border-2 border-dashed border-gray-200 overflow-hidden relative"
+                  className="flex-1 bg-[#F1F3F5] rounded-[32px] flex items-center justify-center border-2 border-dashed border-gray-200 overflow-hidden relative group"
+                  onWheel={(e) => {
+                      if (e.altKey) {
+                          e.preventDefault();
+                          if (!containerRef.current) return;
+
+                          const rect = containerRef.current.getBoundingClientRect();
+                          const x = ((e.clientX - rect.left) / rect.width) * 100;
+                          const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+                          // Only set origin if we are actually zooming
+                          setZoomOrigin({x: `${x}%`, y: `${y}%`});
+
+                          setZoomLevel(prev => {
+                              const newZoom = e.deltaY < 0 ? prev + 0.1 : prev - 0.1;
+                              return Math.min(Math.max(0.5, newZoom), 3);
+                          });
+                      }
+                  }}
+                  onMouseDown={(e) => {
+                      if (e.altKey) {
+                          e.preventDefault();
+                          isPanningRef.current = true;
+                          lastPanMousePositionRef.current = {x: e.clientX, y: e.clientY};
+                      }
+                  }}
+                  onMouseMove={(e) => {
+                      if (isPanningRef.current) {
+                          const deltaX = e.clientX - lastPanMousePositionRef.current.x;
+                          const deltaY = e.clientY - lastPanMousePositionRef.current.y;
+                          setPanPosition(prev => ({
+                              x: prev.x + deltaX,
+                              y: prev.y + deltaY
+                          }));
+                          lastPanMousePositionRef.current = {x: e.clientX, y: e.clientY};
+                      }
+                  }}
+                  onMouseUp={() => {
+                      isPanningRef.current = false;
+                  }}
+                  onMouseLeave={() => {
+                      isPanningRef.current = false;
+                  }}
+                  style={{
+                      cursor: isPanningRef.current ? 'grabbing' : 'default'
+                  }}
               >
+                  {/* Floating Zoom Controls */}
+                  {layoutImageUrl && (
+                      <div
+                          className="absolute top-4 right-4 z-50 flex flex-col items-center bg-white/90 backdrop-blur-sm rounded-xl shadow-md border border-gray-200 overflow-hidden transition-opacity opacity-70 hover:opacity-100">
+                          <button
+                              onClick={() => {
+                                  setZoomOrigin({x: '50%', y: '50%'});
+                                  setZoomLevel(prev => Math.min(3, prev + 0.1));
+                              }}
+                              className="p-2 hover:bg-gray-100 transition-colors text-gray-600"
+                              title="확대"
+                          >
+                              <ZoomIn className="w-5 h-5"/>
+                          </button>
+                          <button
+                              onClick={() => {
+                                  setZoomOrigin({x: '50%', y: '50%'});
+                                  setZoomLevel(prev => Math.max(0.5, prev - 0.1));
+                              }}
+                              className="p-2 hover:bg-gray-100 transition-colors text-gray-600"
+                              title="축소"
+                          >
+                              <ZoomOut className="w-5 h-5"/>
+                          </button>
+                          <div className="h-[1px] w-6 bg-gray-200 my-1"></div>
+                          <button
+                              onClick={() => {
+                                  setZoomLevel(1);
+                                  setPanPosition({x: 0, y: 0});
+                                  setZoomOrigin({x: '50%', y: '50%'});
+                              }}
+                              className="p-2 hover:bg-gray-100 transition-colors text-gray-600"
+                              title="원래 크기"
+                          >
+                              <RotateCcw className="w-4 h-4"/>
+                          </button>
+                      </div>
+                  )}
+
             {layoutImageUrl ? (
-                <BoothMapEditor
-                    layoutImageUrl={layoutImageUrl}
-                    initialAreas={areas}
-                    isEditMode={isEditMode}
-                    containerWidth={containerSize.width}
-                    containerHeight={containerSize.height}
-                    onOpenSearchModal={handleOpenSearchModal}
-                    onAreasChange={handleAreasChange}
-                />
+                <div
+                    style={{
+                        transform: `translate(${panPosition.x}px, ${panPosition.y}px) scale(${zoomLevel})`,
+                        transformOrigin: `${zoomOrigin.x} ${zoomOrigin.y}`,
+                        transition: isPanningRef.current ? 'none' : 'transform 0.2s ease-out',
+                        width: '100%',
+                        height: '100%'
+                    }}
+                >
+                    <BoothMapEditor
+                        layoutImageUrl={layoutImageUrl}
+                        initialAreas={areas}
+                        isEditMode={isEditMode}
+                        containerWidth={containerSize.width}
+                        containerHeight={containerSize.height}
+                        onOpenSearchModal={handleOpenSearchModal}
+                        onAreasChange={handleAreasChange}
+                        zoomLevel={zoomLevel}
+                    />
+                </div>
             ) : (
                 <div className="flex flex-col items-center gap-6 group w-full h-full justify-center">
                     <div
