@@ -180,7 +180,7 @@ export function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
     } catch (error: any) {
       console.error("행사 생성 중 오류 발생:", error);
       const serverData = error.response?.data;
-      const errorMessage = serverData?.error?.message || serverData?.message || serverData?.error || "행사 생성에 실패했습니다.";
+      const errorMessage = serverData?.error?.message || serverData?.message || error.message || "행사 생성에 실패했습니다.";
       
       if (error.response?.status === 409) {
         const detail = typeof errorMessage === 'object' ? JSON.stringify(errorMessage) : errorMessage;

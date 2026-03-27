@@ -124,7 +124,7 @@ export default function RegisterPage() {
       router.push("/login");
     } catch (error: any) {
       console.error(error);
-      showAlert(error.response?.data?.message || "회원가입에 실패했습니다.");
+      showAlert(error.response?.data?.message || error.message || "회원가입에 실패했습니다.");
     } finally {
       setIsLoading(false);
     }

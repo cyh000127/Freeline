@@ -9,7 +9,10 @@ export interface Goods {
 
 export interface GoodsResponse {
   success: boolean;
+  message: string;
   data: Goods[];
+  error: any | null;
+  timestamp: string;
 }
 
 export const getGoodsList = async (boothId: number): Promise<GoodsResponse> => {
@@ -20,7 +23,7 @@ export const getGoodsList = async (boothId: number): Promise<GoodsResponse> => {
 export const createGoods = async (
   boothId: number,
   data: { name: string; imageFile: File }
-): Promise<Goods> => {
+): Promise<{ success: boolean; data: Goods }> => {
   const formData = new FormData();
   formData.append('name', data.name);
   formData.append('imageFile', data.imageFile);
