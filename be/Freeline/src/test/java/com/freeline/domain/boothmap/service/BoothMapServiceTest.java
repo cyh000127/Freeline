@@ -37,6 +37,7 @@ import com.freeline.domain.boothmap.repository.EventMapRepository;
 import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.exception.EventException;
 import com.freeline.domain.event.repository.EventRepository;
+import com.freeline.domain.waiting.service.WaitingPolicyResolver;
 
 import tools.jackson.databind.ObjectMapper;
 
@@ -66,6 +67,9 @@ class BoothMapServiceTest {
 
     @Mock
     private ObjectMapper objectMapper;
+
+    @Mock
+    private WaitingPolicyResolver waitingPolicyResolver;
 
     @InjectMocks
     private BoothMapService boothMapService;
@@ -173,8 +177,9 @@ class BoothMapServiceTest {
         Mockito.when(boothMapAreaRepository.findAllByEventMapIdOrderByIdAsc(10L)).thenReturn(List.of(area));
         Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(
                 101L,
-                List.of(WaitingStatus.WAITING, WaitingStatus.CALLED, WaitingStatus.REGISTERED)
+                List.of(WaitingStatus.WAITING, WaitingStatus.CALLED)
         )).thenReturn(12L);
+        Mockito.when(waitingPolicyResolver.resolveStayTimeSeconds(101L, 0)).thenReturn(300);
 
         final BoothMapResDto result = boothMapService.getBoothMap(5L);
 
@@ -182,6 +187,8 @@ class BoothMapServiceTest {
         Assertions.assertThat(result.eventMapId()).isEqualTo(10L);
         Assertions.assertThat(result.booths()).hasSize(1);
         Assertions.assertThat(result.booths().get(0).boothId()).isEqualTo(101L);
+        Assertions.assertThat(result.booths().get(0).waitingCount()).isEqualTo(12L);
+        Assertions.assertThat(result.booths().get(0).estimatedWaitTime()).isEqualTo(60L);
         Assertions.assertThat(result.drafts()).isEmpty();
     }
 

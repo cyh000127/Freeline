@@ -30,6 +30,11 @@ public interface BoothWaitingRepository extends JpaRepository<BoothWaiting, Long
             final Collection<WaitingStatus> statuses
     );
 
+    List<BoothWaiting> findAllByBoothIdInAndStatusInOrderByBoothIdAscWaitingNumberAsc(
+            final Collection<Long> boothIds,
+            final Collection<WaitingStatus> statuses
+    );
+
     List<BoothWaiting> findAllByVisitorIdAndStatusInOrderByRequestedAtAsc(
             final Long visitorId,
             final Collection<WaitingStatus> statuses

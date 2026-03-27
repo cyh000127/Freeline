@@ -26,7 +26,12 @@ import org.springframework.data.domain.Sort;
 import com.freeline.common.error.ErrorCode;
 import com.freeline.common.file.service.FileService;
 import com.freeline.common.file.util.CloudflareStorageUtil;
+import com.freeline.domain.booth.entity.Booth;
+import com.freeline.domain.booth.entity.BoothWaiting;
 import com.freeline.domain.booth.entity.Visitor;
+import com.freeline.domain.booth.entity.WaitingStatus;
+import com.freeline.domain.booth.repository.BoothRepository;
+import com.freeline.domain.booth.repository.BoothWaitingRepository;
 import com.freeline.domain.booth.repository.VisitorRepository;
 import com.freeline.domain.boothmap.entity.EventMap;
 import com.freeline.domain.boothmap.repository.EventMapRepository;
@@ -59,6 +64,12 @@ class EventServiceTest {
 
     @Mock
     private EventPolicyRepository eventPolicyRepository;
+
+    @Mock
+    private BoothRepository boothRepository;
+
+    @Mock
+    private BoothWaitingRepository boothWaitingRepository;
 
     @Mock
     private VisitorRepository visitorRepository;
@@ -362,6 +373,68 @@ class EventServiceTest {
         Assertions.assertThat(event.getName()).isEqualTo("2026 SSAFY Book Fair");
         Assertions.assertThat(event.getStatus()).isEqualTo(EventStatus.DRAFT);
         Mockito.verify(eventRepository, Mockito.never()).saveAndFlush(Mockito.any(Event.class));
+    }
+
+    @Test
+    void updateEvent_closesActiveWaitings_whenEventCloses() {
+        final Event event = createEvent(205L, 5L, EventStatus.OPEN);
+        final EventUpdateReqDto request = EventUpdateReqDto.builder()
+                .status("CLOSED")
+                .build();
+        final Booth firstBooth = Booth.builder().id(11L).eventId(205L).name("A").build();
+        final Booth secondBooth = Booth.builder().id(12L).eventId(205L).name("B").build();
+        final BoothWaiting waiting = BoothWaiting.builder()
+                .id(1L)
+                .boothId(11L)
+                .visitorId(101L)
+                .status(WaitingStatus.WAITING)
+                .waitingNumber(1)
+                .deferCount(0)
+                .requestedAt(LocalDateTime.of(2026, 3, 20, 10, 0))
+                .build();
+        final BoothWaiting called = BoothWaiting.builder()
+                .id(2L)
+                .boothId(11L)
+                .visitorId(102L)
+                .status(WaitingStatus.CALLED)
+                .waitingNumber(2)
+                .deferCount(0)
+                .requestedAt(LocalDateTime.of(2026, 3, 20, 10, 1))
+                .build();
+        final BoothWaiting entered = BoothWaiting.builder()
+                .id(3L)
+                .boothId(12L)
+                .visitorId(103L)
+                .status(WaitingStatus.ENTERED)
+                .waitingNumber(1)
+                .deferCount(0)
+                .requestedAt(LocalDateTime.of(2026, 3, 20, 10, 2))
+                .build();
+
+        Mockito.when(eventRepository.findById(205L)).thenReturn(Optional.of(event));
+        Mockito.when(boothRepository.findAllByEventIdOrderByIdAsc(205L)).thenReturn(List.of(firstBooth, secondBooth));
+        Mockito.when(boothWaitingRepository.findAllByBoothIdInAndStatusInOrderByBoothIdAscWaitingNumberAsc(
+                List.of(11L, 12L),
+                List.of(
+                        WaitingStatus.WAITING,
+                        WaitingStatus.CALLED,
+                        WaitingStatus.REGISTERED,
+                        WaitingStatus.ENTERED
+                )
+        )).thenReturn(List.of(waiting, called, entered));
+        Mockito.when(eventRepository.saveAndFlush(event)).thenReturn(event);
+
+        final EventUpdateResDto result = eventService.updateEvent(5L, 205L, false, request);
+
+        Assertions.assertThat(result.status()).isEqualTo(EventStatus.CLOSED.name());
+        Assertions.assertThat(event.getStatus()).isEqualTo(EventStatus.CLOSED);
+        Assertions.assertThat(waiting.getStatus()).isEqualTo(WaitingStatus.CANCELED);
+        Assertions.assertThat(called.getStatus()).isEqualTo(WaitingStatus.CANCELED);
+        Assertions.assertThat(entered.getStatus()).isEqualTo(WaitingStatus.EXITED);
+        Assertions.assertThat(waiting.getExitedAt()).isNotNull();
+        Assertions.assertThat(called.getExitedAt()).isNotNull();
+        Assertions.assertThat(entered.getExitedAt()).isNotNull();
+        Mockito.verify(boothWaitingRepository).saveAll(List.of(waiting, called, entered));
     }
 
     @Test

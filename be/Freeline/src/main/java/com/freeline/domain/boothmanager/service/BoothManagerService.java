@@ -18,6 +18,10 @@ import com.freeline.domain.boothmanager.converter.BoothManagerConverter;
 import com.freeline.domain.boothmanager.dto.response.BoothManagerDashboardResDto;
 import com.freeline.domain.boothmanager.dto.response.BoothManagerSummaryResDto;
 import com.freeline.domain.boothmanager.dto.response.BoothManagerWaitingItemResDto;
+import com.freeline.domain.event.entity.Event;
+import com.freeline.domain.event.entity.EventStatus;
+import com.freeline.domain.event.exception.EventException;
+import com.freeline.domain.event.repository.EventRepository;
 import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
 import com.freeline.domain.waiting.dto.response.WaitingCallResDto;
 import com.freeline.domain.waiting.dto.response.WaitingExitResDto;
@@ -48,11 +52,13 @@ public class BoothManagerService {
 
     private final BoothRepository boothRepository;
     private final BoothWaitingRepository boothWaitingRepository;
+    private final EventRepository eventRepository;
     private final WaitingService waitingService;
 
     @Transactional(readOnly = true)
     public BoothManagerDashboardResDto getDashboard(final Long boothId) {
         final Booth booth = getBoothEntity(boothId);
+        validateEventIsOpen(booth);
         final List<BoothWaiting> activeWaitings = boothWaitingRepository.findWithVisitorByBoothIdAndStatusInOrderByWaitingNumberAsc(
                 boothId,
                 MANAGER_ACTIVE_STATUSES
@@ -107,5 +113,14 @@ public class BoothManagerService {
     private Booth getBoothEntity(final Long boothId) {
         return boothRepository.findById(boothId)
                 .orElseThrow(() -> new BoothException(ErrorCode.BOOTH_NOT_FOUND));
+    }
+
+    private void validateEventIsOpen(final Booth booth) {
+        final Event event = eventRepository.findById(booth.getEventId())
+                .orElseThrow(() -> new EventException(ErrorCode.EVENT_NOT_FOUND));
+
+        if (event.getStatus() != EventStatus.OPEN) {
+            throw new EventException(ErrorCode.EVENT_NOT_OPEN_FOR_WAITING_OPERATION);
+        }
     }
 }
