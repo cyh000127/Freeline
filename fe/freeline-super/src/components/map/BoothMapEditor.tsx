@@ -424,21 +424,23 @@ export function BoothMapEditor({
                             }
                         }}
                     >
-                        {/* Booth Info Display (Centered) */}
+                        {/* [MODIFIED] 부스 정보 정중앙 배치 및 스타일 개선 */}
                         {area.boothName && (
-                            <div
-                                className="flex flex-col items-center justify-center bg-white/90 text-gray-800 px-2 py-1 rounded shadow-sm overflow-hidden max-w-full pointer-events-none"
-                            >
-                                {area.locationCode && (
+                            <div className="pointer-events-none flex h-full w-full items-center justify-center overflow-hidden p-1">
+                                <div
+                                    className="flex max-h-full w-full max-w-full flex-col items-center justify-center overflow-hidden rounded bg-white/90 px-2 py-1 text-center text-gray-800 shadow-sm"
+                                >
+                                    {area.locationCode && (
+                                        <span
+                                            className="max-w-full truncate text-[9px] font-semibold leading-tight text-gray-500">
+                                            {area.locationCode}
+                                        </span>
+                                    )}
                                     <span
-                                        className="text-[9px] font-semibold text-gray-500 mb-0.5 whitespace-nowrap text-ellipsis overflow-hidden max-w-full">
-                                        {area.locationCode}
+                                        className="max-w-full truncate text-xs font-bold leading-tight">
+                                        {area.boothName}
                                     </span>
-                                )}
-                                <span
-                                    className="text-xs font-bold whitespace-nowrap text-ellipsis overflow-hidden max-w-full">
-                                    {area.boothName}
-                                </span>
+                                </div>
                             </div>
                         )}
                     </Rnd>
