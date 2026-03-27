@@ -10,10 +10,13 @@ import { EmptyState } from '@/components/EmptyState';
 import { ReservationConfirmSheet } from '@/components/ReservationConfirmSheet';
 import { Screen } from '@/components/Screen';
 import { type BoothDetail } from '@/features/api/booths';
+import { WAITING_LIMIT_MESSAGE } from '@/features/app-data/constants';
 import { useAppData } from '@/features/app-data/context';
+import { useToast } from '@/features/toast/context';
 import { useTracking } from '@/features/tracking/tracking.context';
 import { usePageTracking } from '@/features/tracking/use-page-tracking';
 import { palette } from '@/theme/colors';
+import { toUserErrorMessage } from '@/utils/error';
 import { formatWaitingStatus } from '@/utils/format';
 
 export default function BoothDetailScreen() {
@@ -29,12 +32,50 @@ export default function BoothDetailScreen() {
     postponeWaiting,
   } = useAppData();
   const { trackEvent } = useTracking();
+  const { showToast } = useToast();
   const [detail, setDetail] = useState<BoothDetail | null>(boothDetails[boothId] ?? null);
   const [loading, setLoading] = useState(!detail);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [confirmingReserve, setConfirmingReserve] = useState(false);
   const [cancelVisible, setCancelVisible] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [limitVisible, setLimitVisible] = useState(false);
+  const [registerErrorMessage, setRegisterErrorMessage] = useState<string | null>(null);
+  const [registerErrorPending, setRegisterErrorPending] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!registerErrorPending || confirmVisible) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      if (registerErrorPending.includes(WAITING_LIMIT_MESSAGE)) {
+        setLimitVisible(true);
+      } else {
+        setRegisterErrorMessage(registerErrorPending);
+      }
+      setRegisterErrorPending(null);
+    }, 260);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [confirmVisible, registerErrorPending]);
+
+  function openRegisterErrorDialog(message: string) {
+    setRegisterErrorMessage(null);
+    setLimitVisible(false);
+    setRegisterErrorPending(message);
+    setConfirmVisible(false);
+  }
+
+  useEffect(() => {
+    const latest = boothDetails[boothId];
+    if (latest) {
+      setDetail(latest);
+      setLoading(false);
+    }
+  }, [boothDetails, boothId]);
 
   useEffect(() => {
     if (!Number.isFinite(boothId) || detail) {
@@ -64,6 +105,10 @@ export default function BoothDetailScreen() {
       setConfirmingReserve(true);
       await createWaiting(detail.boothId);
       setConfirmVisible(false);
+      showToast({ type: 'success', message: '대기 신청이 완료되었습니다.' });
+    } catch (error) {
+      const message = toUserErrorMessage(error, '대기 등록에 실패했습니다.');
+      openRegisterErrorDialog(message);
     } finally {
       setConfirmingReserve(false);
     }
@@ -78,8 +123,30 @@ export default function BoothDetailScreen() {
       setCanceling(true);
       await cancelWaiting(activeWaiting);
       setCancelVisible(false);
+      showToast({ type: 'success', message: '예약이 취소되었습니다.' });
+    } catch (error) {
+      showToast({
+        type: 'error',
+        message: toUserErrorMessage(error, '예약 취소에 실패했습니다.'),
+      });
     } finally {
       setCanceling(false);
+    }
+  }
+
+  async function handlePostpone() {
+    if (!activeWaiting) {
+      return;
+    }
+
+    try {
+      await postponeWaiting(activeWaiting);
+      showToast({ type: 'success', message: '순서를 뒤로 미뤘습니다.' });
+    } catch (error) {
+      showToast({
+        type: 'error',
+        message: toUserErrorMessage(error, '순서 미루기에 실패했습니다.'),
+      });
     }
   }
 
@@ -186,9 +253,7 @@ export default function BoothDetailScreen() {
                   <ActionButton
                     grow
                     label="순서 미루기"
-                    onPress={() => {
-                      void postponeWaiting(activeWaiting);
-                    }}
+                    onPress={() => void handlePostpone()}
                     variant="ghost"
                   />
                 ) : null}
@@ -233,6 +298,26 @@ export default function BoothDetailScreen() {
               }}
               title="예약을 취소할까요?"
               visible={cancelVisible && !!activeWaiting}
+            />
+
+            <ConfirmDialog
+              body={WAITING_LIMIT_MESSAGE}
+              confirmLabel="확인"
+              hideCancel
+              onClose={() => setLimitVisible(false)}
+              onConfirm={() => setLimitVisible(false)}
+              title="대기 등록 제한"
+              visible={limitVisible}
+            />
+
+            <ConfirmDialog
+              body={registerErrorMessage ?? ''}
+              confirmLabel="확인"
+              hideCancel
+              onClose={() => setRegisterErrorMessage(null)}
+              onConfirm={() => setRegisterErrorMessage(null)}
+              title="대기 등록 실패"
+              visible={!!registerErrorMessage}
             />
           </>
         ) : null}

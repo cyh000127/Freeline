@@ -10,8 +10,10 @@ import { SectionTitle } from '@/components/SectionTitle';
 import { WaitingCard } from '@/components/WaitingCard';
 import { useAppData } from '@/features/app-data/context';
 import type { DecoratedWaiting } from '@/features/app-data/types';
+import { useToast } from '@/features/toast/context';
 import { usePageTracking } from '@/features/tracking/use-page-tracking';
 import { palette } from '@/theme/colors';
+import { toUserErrorMessage } from '@/utils/error';
 import { formatHistoryStatus } from '@/utils/format';
 
 const filters = [
@@ -23,6 +25,7 @@ const filters = [
 export default function ReservationsScreen() {
   usePageTracking('reservations');
   const [filter, setFilter] = useState<(typeof filters)[number]['key']>('all');
+  const { showToast } = useToast();
   const { cancelWaiting, history, lastError, postponeWaiting, queueWaitings } = useAppData();
   const [pendingCancel, setPendingCancel] = useState<DecoratedWaiting | null>(null);
   const calledCount = queueWaitings.filter((waiting) => waiting.status === 'CALLED').length;
@@ -39,6 +42,35 @@ export default function ReservationsScreen() {
 
     return queueWaitings;
   }, [filter, queueWaitings]);
+
+  async function handlePostpone(waiting: DecoratedWaiting) {
+    try {
+      await postponeWaiting(waiting);
+      showToast({ type: 'success', message: '순서를 뒤로 미뤘습니다.' });
+    } catch (error) {
+      showToast({
+        type: 'error',
+        message: toUserErrorMessage(error, '순서 미루기에 실패했습니다.'),
+      });
+    }
+  }
+
+  async function handleCancelConfirm() {
+    if (!pendingCancel) {
+      return;
+    }
+
+    try {
+      await cancelWaiting(pendingCancel);
+      showToast({ type: 'success', message: '예약이 취소되었습니다.' });
+      setPendingCancel(null);
+    } catch (error) {
+      showToast({
+        type: 'error',
+        message: toUserErrorMessage(error, '예약 취소에 실패했습니다.'),
+      });
+    }
+  }
 
   return (
     <Screen padded={false} scroll={false}>
@@ -118,7 +150,7 @@ export default function ReservationsScreen() {
                   }}
                   onPostpone={
                     waiting.postpone_available
-                      ? () => void postponeWaiting(waiting)
+                      ? () => void handlePostpone(waiting)
                       : undefined
                   }
                   onScan={
@@ -142,11 +174,7 @@ export default function ReservationsScreen() {
           body={`${pendingCancel?.booth_name ?? '이 부스'} 예약을 취소할까요? 취소 후에는 다시 대기를 등록해야 합니다.`}
           confirmLabel="예약 취소하기"
           onClose={() => setPendingCancel(null)}
-          onConfirm={() => {
-            if (pendingCancel) {
-              void cancelWaiting(pendingCancel).finally(() => setPendingCancel(null));
-            }
-          }}
+          onConfirm={() => void handleCancelConfirm()}
           title="예약을 취소할까요?"
           visible={!!pendingCancel}
         />

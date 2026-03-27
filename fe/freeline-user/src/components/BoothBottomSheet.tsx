@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type BoothDetail, type BoothSummary } from '@/features/api/booths';
 import type { DecoratedWaiting } from '@/features/app-data/types';
+import { useWebModalFocus } from '@/hooks/use-web-modal-focus';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/layout';
 import { formatWaitingStatus } from '@/utils/format';
@@ -54,8 +55,11 @@ export function BoothBottomSheet({
   const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(screenHeight)).current;
   const [mounted, setMounted] = useState(visible);
+  const focusRef = useWebModalFocus<View>(visible);
 
-  const targetHeight = expanded ? screenHeight - insets.top : Math.min(screenHeight * 0.62, 600);
+  const maxSheetHeight = screenHeight - insets.top;
+  const collapsedHeight = Math.min(screenHeight * 0.86, maxSheetHeight - 24);
+  const targetHeight = expanded ? maxSheetHeight : collapsedHeight;
 
   useEffect(() => {
     if (visible) {
@@ -99,6 +103,9 @@ export function BoothBottomSheet({
         <Pressable onPress={onClose} style={styles.backdrop} />
 
         <Animated.View
+          accessibilityViewIsModal
+          focusable
+          ref={focusRef}
           style={[
             styles.sheet,
             {
@@ -207,15 +214,6 @@ export function BoothBottomSheet({
           </ScrollView>
 
           <View style={styles.footer}>
-            <ActionButton
-              grow
-              label="부스 상세 보기"
-              onPress={() => {
-                onClose();
-                router.push(`/booths/${booth.boothId}`);
-              }}
-              variant="ghost"
-            />
             {activeWaiting?.status === 'WAITING' && activeWaiting.postpone_available && onPostpone ? (
               <ActionButton
                 grow
@@ -296,10 +294,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     alignItems: 'center',
+    zIndex: 2000,
+    elevation: 2000,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(16, 14, 29, 0.28)',
+    zIndex: 1999,
   },
   sheet: {
     width: '100%',
@@ -314,6 +315,7 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: -8 },
     elevation: 12,
+    zIndex: 2001,
   },
   handleArea: {
     alignItems: 'center',

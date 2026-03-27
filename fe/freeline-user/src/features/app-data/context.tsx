@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 import {
   fetchBoothDetail,
   fetchBooths,
@@ -19,6 +20,7 @@ import { scanQr as scanQrApi } from '@/features/api/qr';
 import { useSession } from '@/features/session/context';
 import { useTracking } from '@/features/tracking/tracking.context';
 import { toUserErrorMessage } from '@/utils/error';
+import { ACTIVE_WAITING_LIMIT, WAITING_LIMIT_MESSAGE } from './constants';
 import type { AppDataState, DecoratedWaiting, WaitingHistoryItem } from './types';
 
 type AppDataContextValue = AppDataState & {
@@ -60,10 +62,20 @@ function historyEntry(waiting: DecoratedWaiting, status: WaitingStatus): Waiting
   };
 }
 
+function normalizeBoothName(name: string | null | undefined) {
+  return name?.replace(/\s+/g, '').trim().toLowerCase() ?? '';
+}
+
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const { accessToken, eventId } = useSession();
   const { trackEvent } = useTracking();
   const [state, setState] = useState<AppDataState>(initialState);
+  const refreshInFlightRef = useRef(false);
+  const stateRef = useRef<AppDataState>(initialState);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   // Initial load is keyed only by auth/session changes; manual refresh uses the public action.
   useEffect(() => {
@@ -78,6 +90,27 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, eventId]);
+
+  useEffect(() => {
+    if (!accessToken || !eventId) {
+      return;
+    }
+
+    const subscription = AppState.addEventListener('change', (status) => {
+      if (status === 'active') {
+        void refreshAll();
+      }
+    });
+
+    const interval = setInterval(() => {
+      void refreshAll();
+    }, 15_000);
+
+    return () => {
+      subscription.remove();
+      clearInterval(interval);
+    };
   }, [accessToken, eventId]);
 
   async function loadBooths(token: string, targetEventId: number) {
@@ -97,14 +130,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     boothDetails: Record<number, BoothDetail>,
   ) {
     const waitingPayload = await fetchMyWaitings(token);
+    const detailCache = { ...boothDetails };
 
     const waitings = await Promise.all(
       waitingPayload.waitings.map(async (waiting) => {
         const matchedBooth =
-          booths.find((booth) => booth.name === waiting.booth_name) ?? null;
+          waiting.booth_id != null
+            ? booths.find((booth) => booth.boothId === waiting.booth_id) ?? null
+            : booths.find(
+                (booth) =>
+                  normalizeBoothName(booth.name) === normalizeBoothName(waiting.booth_name),
+              ) ?? null;
 
         let estimatedMinutes: number | null = null;
-        let boothDetail = matchedBooth ? boothDetails[matchedBooth.boothId] : undefined;
+        let boothDetail = matchedBooth ? detailCache[matchedBooth.boothId] : undefined;
 
         if (matchedBooth) {
           try {
@@ -117,6 +156,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           if (!boothDetail) {
             try {
               boothDetail = await fetchBoothDetail(matchedBooth.boothId, token);
+              detailCache[matchedBooth.boothId] = boothDetail;
             } catch (error) {
               console.warn('부스 상세 조회 실패', error);
             }
@@ -125,7 +165,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
         const next: DecoratedWaiting = {
           ...waiting,
-          boothId: matchedBooth?.boothId ?? null,
+          boothId: waiting.booth_id ?? matchedBooth?.boothId ?? null,
           locationCode: matchedBooth?.locationCode ?? null,
           estimatedMinutes,
           boothDetail,
@@ -138,7 +178,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return {
       queueStatus: waitingPayload.visitor_queue_status as QueueStatus,
       waitings,
+      boothDetails: detailCache,
     };
+  }
+
+  function resolveBoothByWaiting(waiting: DecoratedWaiting) {
+    return (
+      stateRef.current.booths.find((booth) => booth.boothId === waiting.boothId) ??
+      stateRef.current.booths.find(
+        (booth) => normalizeBoothName(booth.name) === normalizeBoothName(waiting.booth_name),
+      ) ??
+      null
+    );
   }
 
   async function refreshAll(isInitial = false) {
@@ -146,21 +197,32 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (refreshInFlightRef.current) {
+      return;
+    }
+
+    refreshInFlightRef.current = true;
+
     setState((current) => ({
       ...current,
-        isLoading: isInitial,
-        isRefreshing: !isInitial,
-        lastError: null,
-      }));
+      isLoading: isInitial,
+      isRefreshing: !isInitial,
+      lastError: null,
+    }));
 
     try {
+      const currentState = stateRef.current;
       const booths = await loadBooths(accessToken, eventId);
-      const decorated = await decorateWaitings(accessToken, booths, state.boothDetails);
-      const selectedExists = booths.some((booth) => booth.boothId === state.selectedBoothId);
+      const decorated = await decorateWaitings(accessToken, booths, currentState.boothDetails);
+      const selectedExists = booths.some((booth) => booth.boothId === currentState.selectedBoothId);
 
       setState((current) => ({
         ...current,
         booths,
+        boothDetails: {
+          ...current.boothDetails,
+          ...decorated.boothDetails,
+        },
         waitings: decorated.waitings,
         queueStatus: decorated.queueStatus,
         selectedBoothId: selectedExists
@@ -179,6 +241,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         isRefreshing: false,
         lastError: message,
       }));
+    } finally {
+      refreshInFlightRef.current = false;
     }
   }
 
@@ -187,7 +251,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       return null;
     }
 
-    const detail = await fetchBoothDetail(boothId, accessToken);
+    const [detail, expected] = await Promise.all([
+      fetchBoothDetail(boothId, accessToken),
+      fetchExpectedTime(boothId, accessToken).catch(() => null),
+    ]);
+    const matchedBooth =
+      stateRef.current.booths.find((booth) => booth.boothId === boothId) ?? null;
 
     setState((current) => ({
       ...current,
@@ -196,7 +265,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         [boothId]: detail,
       },
       waitings: current.waitings.map((waiting) =>
-        waiting.boothId === boothId ? { ...waiting, boothDetail: detail } : waiting,
+        waiting.boothId === boothId ||
+        (waiting.boothId == null &&
+          normalizeBoothName(waiting.booth_name) === normalizeBoothName(matchedBooth?.name))
+          ? {
+              ...waiting,
+              boothId,
+              boothDetail: detail,
+              locationCode: matchedBooth?.locationCode ?? detail.locationCode,
+              estimatedMinutes: expected?.estimated_minutes ?? waiting.estimatedMinutes,
+            }
+          : waiting,
       ),
     }));
 
@@ -244,6 +323,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       throw new Error('로그인이 필요합니다.');
     }
 
+    const activeWaitingCount = state.waitings.filter((waiting) => waiting.status !== 'ENTERED').length;
+
+    if (activeWaitingCount >= ACTIVE_WAITING_LIMIT) {
+      throw new Error(WAITING_LIMIT_MESSAGE);
+    }
+
     const existingWaiting = state.waitings.find((waiting) => waiting.boothId === boothId);
 
     if (existingWaiting) {
@@ -272,6 +357,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       throw new Error('로그인이 필요합니다.');
     }
 
+    const targetBooth = resolveBoothByWaiting(waiting);
+
     await cancelWaitingApi(accessToken, waiting.waiting_id);
     trackEvent({
       action: 'WAITING_CANCEL',
@@ -287,8 +374,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       history: [historyEntry(waiting, 'CANCELED'), ...current.history].slice(0, 30),
     }));
     await refreshAll();
-    if (waiting.boothId) {
-      await syncBoothDetail(waiting.boothId);
+    if (targetBooth) {
+      await syncBoothDetail(targetBooth.boothId);
     }
   }
 
@@ -296,6 +383,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     if (!accessToken) {
       throw new Error('로그인이 필요합니다.');
     }
+
+    const targetBooth = resolveBoothByWaiting(waiting);
 
     await postponeWaitingApi(accessToken, waiting.waiting_id);
     trackEvent({
@@ -309,8 +398,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       },
     });
     await refreshAll();
-    if (waiting.boothId) {
-      await syncBoothDetail(waiting.boothId);
+    if (targetBooth) {
+      await syncBoothDetail(targetBooth.boothId);
     }
   }
 
@@ -318,6 +407,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     if (!accessToken) {
       throw new Error('로그인이 필요합니다.');
     }
+
+    const targetBooth = resolveBoothByWaiting(waiting);
 
     await exitWaitingApi(accessToken, waiting.waiting_id);
     trackEvent({
@@ -334,8 +425,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       history: [historyEntry(waiting, 'EXITED'), ...current.history].slice(0, 30),
     }));
     await refreshAll();
-    if (waiting.boothId) {
-      await syncBoothDetail(waiting.boothId);
+    if (targetBooth) {
+      await syncBoothDetail(targetBooth.boothId);
     }
   }
 

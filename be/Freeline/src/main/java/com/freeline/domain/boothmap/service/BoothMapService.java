@@ -25,10 +25,12 @@ import com.freeline.common.error.ErrorCode;
 import com.freeline.common.file.dto.FileInfo;
 import com.freeline.common.file.service.FileService;
 import com.freeline.domain.booth.entity.Booth;
+import com.freeline.domain.booth.entity.Visitor;
 import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.exception.BoothException;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.booth.repository.VisitorRepository;
 import com.freeline.domain.boothmap.client.AiVisionClient;
 import com.freeline.domain.boothmap.dto.request.BoothMapAreaBulkUpsertReqDto;
 import com.freeline.domain.boothmap.dto.request.MappingSnapshotUpdateReqDto;
@@ -66,6 +68,7 @@ public class BoothMapService {
     private final EventRepository eventRepository;
     private final BoothRepository boothRepository;
     private final BoothWaitingRepository boothWaitingRepository;
+    private final VisitorRepository visitorRepository;
     private final EventMapRepository eventMapRepository;
     private final BoothMapAreaRepository boothMapAreaRepository;
     private final FileService fileService;
@@ -141,26 +144,15 @@ public class BoothMapService {
     public BoothMapResDto getBoothMap(final Long eventId) {
         validateEventOwnership(eventId);
 
-        final EventMap eventMap = eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(eventId)
-                .or(() -> eventMapRepository.findFirstByEventIdOrderByIdDesc(eventId))
-                .orElseThrow(() -> new EventException(ErrorCode.EVENT_MAP_NOT_FOUND));
+        return buildBoothMapResponse(eventId);
+    }
 
-        final Map<Long, Booth> boothsById = boothRepository.findAllByEventIdOrderByIdAsc(eventId)
-                .stream()
-                .collect(Collectors.toMap(Booth::getId, Function.identity()));
+    @Transactional(readOnly = true)
+    public BoothMapResDto getVisitorBoothMap(final Long visitorId) {
+        final Visitor visitor = visitorRepository.findById(visitorId)
+                .orElseThrow(() -> new EventException(ErrorCode.VISITOR_NOT_FOUND));
 
-        final List<BoothMapAreaResDto> booths = boothMapAreaRepository.findAllByEventMapIdOrderByIdAsc(eventMap.getId())
-                .stream()
-                .map(area -> toBoothMapAreaResDto(area, boothsById.get(area.getBoothId())))
-                .toList();
-
-        return BoothMapResDto.builder()
-                .eventId(eventId)
-                .eventMapId(eventMap.getId())
-                .mapImageUrl(eventMap.getImagePath())
-                .booths(booths)
-                .drafts(parseDrafts(eventMap))
-                .build();
+        return buildBoothMapResponse(visitor.getEventId());
     }
 
     public EventMapUploadResDto upsertEventMap(final Long eventId, final MultipartFile file, final boolean visible) {
@@ -264,6 +256,29 @@ public class BoothMapService {
         }
 
         return Math.ceilDiv(waitingCount * (long) stayTimeSeconds, SECONDS_PER_MINUTE);
+    }
+
+    private BoothMapResDto buildBoothMapResponse(final Long eventId) {
+        final EventMap eventMap = eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(eventId)
+                .or(() -> eventMapRepository.findFirstByEventIdOrderByIdDesc(eventId))
+                .orElseThrow(() -> new EventException(ErrorCode.EVENT_MAP_NOT_FOUND));
+
+        final Map<Long, Booth> boothsById = boothRepository.findAllByEventIdOrderByIdAsc(eventId)
+                .stream()
+                .collect(Collectors.toMap(Booth::getId, Function.identity()));
+
+        final List<BoothMapAreaResDto> booths = boothMapAreaRepository.findAllByEventMapIdOrderByIdAsc(eventMap.getId())
+                .stream()
+                .map(area -> toBoothMapAreaResDto(area, boothsById.get(area.getBoothId())))
+                .toList();
+
+        return BoothMapResDto.builder()
+                .eventId(eventId)
+                .eventMapId(eventMap.getId())
+                .mapImageUrl(eventMap.getImagePath())
+                .booths(booths)
+                .drafts(parseDrafts(eventMap))
+                .build();
     }
 
     private EventMap getValidatedEventMap(final Long eventId, final Long eventMapId) {
