@@ -35,6 +35,24 @@ export interface MapUploadResponse {
   booths: BoothCoordinate[];
 }
 
+export interface CreatedBoothAdminCredential {
+  adminId: number;
+  boothId: number;
+  boothName: string;
+  loginId: string;
+  rawPassword: string;
+  email: string;
+  name?: string | null;
+  company?: string | null;
+}
+
+export interface BoothCsvUploadResult {
+  eventId: number;
+  importedCount: number;
+  adminCreatedCount: number;
+  createdAdmins: CreatedBoothAdminCredential[];
+}
+
 export interface PaginatedResponse<T> {
   content: T[];
   hasNext: boolean;
@@ -92,7 +110,7 @@ export const eventApi = {
   onboardBooths: (eventId: number | string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post<ApiResponse<any>>(`/v1/events/${eventId}/booths/csv`, formData, {
+    return api.post<ApiResponse<BoothCsvUploadResult>>(`/v1/events/${eventId}/booths/csv`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },

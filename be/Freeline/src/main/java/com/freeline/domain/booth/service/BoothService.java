@@ -49,6 +49,7 @@ import com.freeline.domain.booth.dto.response.BoothQueueResDto;
 import com.freeline.domain.booth.dto.response.BoothResDto;
 import com.freeline.domain.booth.dto.response.BoothSearchResDto;
 import com.freeline.domain.booth.dto.response.BoothStatusResDto;
+import com.freeline.domain.booth.dto.response.CreatedBoothAdminCredentialResDto;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.BoothImage;
 import com.freeline.domain.booth.entity.BoothPolicy;
@@ -158,8 +159,27 @@ public class BoothService {
                         .build())
                 .toList();
         final List<Booth> savedBooths = boothRepository.saveAll(booths);
-        final List<BoothAdmin> boothAdmins = createBoothAdmins(eventId, parsedRows, savedBooths);
-        boothAdminRepository.saveAll(boothAdmins);
+        final List<CreatedBoothAdminDraft> createdAdminDrafts = createBoothAdmins(eventId, parsedRows, savedBooths);
+        final List<BoothAdmin> boothAdmins = boothAdminRepository.saveAll(createdAdminDrafts.stream()
+                .map(CreatedBoothAdminDraft::boothAdmin)
+                .toList());
+        final List<CreatedBoothAdminCredentialResDto> createdAdmins = new ArrayList<>();
+
+        for (int index = 0; index < boothAdmins.size(); index++) {
+            final BoothAdmin boothAdmin = boothAdmins.get(index);
+            final CreatedBoothAdminDraft draft = createdAdminDrafts.get(index);
+
+            createdAdmins.add(CreatedBoothAdminCredentialResDto.builder()
+                    .adminId(boothAdmin.getId())
+                    .boothId(boothAdmin.getBoothId())
+                    .boothName(draft.boothName())
+                    .loginId(boothAdmin.getLoginId())
+                    .rawPassword(draft.rawPassword())
+                    .email(boothAdmin.getEmail())
+                    .name(boothAdmin.getName())
+                    .company(boothAdmin.getCompany())
+                    .build());
+        }
 
         log.info("[Booth] CSV bulk upload completed {eventId: {}, boothCount: {}, boothAdminCount: {}}",
                 eventId, savedBooths.size(), boothAdmins.size());
@@ -168,6 +188,7 @@ public class BoothService {
                 .eventId(eventId)
                 .importedCount(savedBooths.size())
                 .adminCreatedCount(boothAdmins.size())
+                .createdAdmins(createdAdmins)
                 .build();
     }
 
@@ -500,26 +521,30 @@ public class BoothService {
         );
     }
 
-    private List<BoothAdmin> createBoothAdmins(
+    private List<CreatedBoothAdminDraft> createBoothAdmins(
             final Long eventId,
             final List<ParsedBoothCsvRow> parsedRows,
             final List<Booth> savedBooths
     ) {
-        final List<BoothAdmin> boothAdmins = new ArrayList<>();
+        final List<CreatedBoothAdminDraft> boothAdmins = new ArrayList<>();
 
         for (int i = 0; i < parsedRows.size(); i++) {
             final ParsedBoothCsvRow row = parsedRows.get(i);
             final Booth booth = savedBooths.get(i);
             final String rawPassword = generateRandomPassword();
 
-            boothAdmins.add(BoothAdmin.builder()
-                    .boothId(booth.getId())
-                    .loginId(generateLoginId(eventId))
-                    .password(passwordEncoder.encode(rawPassword))
-                    .name(row.adminName())
-                    .email(row.adminEmail())
-                    .company(row.adminCompany())
-                    .build());
+            boothAdmins.add(new CreatedBoothAdminDraft(
+                    BoothAdmin.builder()
+                            .boothId(booth.getId())
+                            .loginId(generateLoginId(eventId))
+                            .password(passwordEncoder.encode(rawPassword))
+                            .name(row.adminName())
+                            .email(row.adminEmail())
+                            .company(row.adminCompany())
+                            .build(),
+                    rawPassword,
+                    booth.getName()
+            ));
         }
 
         return boothAdmins;
@@ -591,6 +616,13 @@ public class BoothService {
             String adminName,
             String adminEmail,
             String adminCompany
+    ) {
+    }
+
+    private record CreatedBoothAdminDraft(
+            BoothAdmin boothAdmin,
+            String rawPassword,
+            String boothName
     ) {
     }
 }

@@ -1,5 +1,7 @@
 package com.freeline.domain.booth.dto.response;
 
+import java.util.List;
+
 import lombok.Builder;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -14,6 +16,9 @@ public record BoothCsvUploadResDto(
         int importedCount,
 
         @Schema(description = "생성된 부스 관리자 계정 수", example = "12")
-        int adminCreatedCount
+        int adminCreatedCount,
+
+        @Schema(description = "생성 직후 1회 노출되는 부스 관리자 계정 정보")
+        List<CreatedBoothAdminCredentialResDto> createdAdmins
 ) {
 }
