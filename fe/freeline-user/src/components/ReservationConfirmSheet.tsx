@@ -3,6 +3,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/layout';
+import { useWebModalFocus } from '@/hooks/use-web-modal-focus';
 import { ActionButton } from './ActionButton';
 
 type Props = {
@@ -27,6 +28,7 @@ export function ReservationConfirmSheet({
   confirming = false,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const focusRef = useWebModalFocus<View>(visible);
 
   if (!visible) {
     return null;
@@ -37,7 +39,12 @@ export function ReservationConfirmSheet({
       <View style={styles.modalRoot}>
         <Pressable onPress={onClose} style={styles.backdrop} />
 
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 18) }]}>
+        <View
+          accessibilityViewIsModal
+          focusable
+          ref={focusRef}
+          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 18) }]}
+        >
           <View style={styles.header}>
             <View style={styles.headerCopy}>
               <Text style={styles.eyebrow}>대기 등록 확인</Text>
@@ -94,10 +101,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     alignItems: 'center',
+    zIndex: 3000,
+    elevation: 3000,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(16, 14, 29, 0.34)',
+    zIndex: 2999,
   },
   sheet: {
     width: '100%',
@@ -108,6 +118,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 18,
     gap: 16,
+    zIndex: 3001,
+    elevation: 3001,
   },
   header: {
     flexDirection: 'row',

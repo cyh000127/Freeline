@@ -7,6 +7,7 @@ import { BoothListCard } from '@/components/BoothListCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { EventMapCanvas } from '@/components/EventMapCanvas';
 import { FloatingTabBar } from '@/components/FloatingTabBar';
 import { ReservationConfirmSheet } from '@/components/ReservationConfirmSheet';
 import { Screen } from '@/components/Screen';
@@ -17,22 +18,27 @@ import {
   type BoothDetail,
   type BoothSummary,
 } from '@/features/api/booths';
+import { fetchVisitorBoothMap, type BoothMapArea } from '@/features/api/booth-map';
+import { WAITING_LIMIT_MESSAGE } from '@/features/app-data/constants';
 import { useAppData } from '@/features/app-data/context';
 import { useSession } from '@/features/session/context';
+import { useToast } from '@/features/toast/context';
 import { useTracking } from '@/features/tracking/tracking.context';
 import { usePageTracking } from '@/features/tracking/use-page-tracking';
 import { palette } from '@/theme/colors';
 import { getBoothCongestion } from '@/utils/booth-congestion';
+import { toUserErrorMessage } from '@/utils/error';
 
 const mapTabs = [
-  { key: 'map', label: '지도' },
-  { key: 'list', label: '부스 리스트' },
+  { key: 'map', label: '부스 배치도' },
+  { key: 'list', label: '부스 목록' },
 ] as const;
 
 export default function MapScreen() {
   usePageTracking('map');
-  const { accessToken } = useSession();
+  const { accessToken, eventId, eventProfile } = useSession();
   const { trackEvent } = useTracking();
+  const { showToast } = useToast();
   const {
     boothDetails,
     booths,
@@ -57,12 +63,97 @@ export default function MapScreen() {
   const [confirmingReserve, setConfirmingReserve] = useState(false);
   const [cancelVisible, setCancelVisible] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [limitVisible, setLimitVisible] = useState(false);
+  const [registerErrorMessage, setRegisterErrorMessage] = useState<string | null>(null);
+  const [registerErrorPending, setRegisterErrorPending] = useState<string | null>(null);
+  const [mapImageUrl, setMapImageUrl] = useState<string | null>(eventProfile?.mapImageUrl ?? null);
+  const [mapAreas, setMapAreas] = useState<BoothMapArea[]>([]);
+  const [mapLoadState, setMapLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+
+  useEffect(() => {
+    if (!registerErrorPending || confirmVisible) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      if (registerErrorPending.includes(WAITING_LIMIT_MESSAGE)) {
+        setLimitVisible(true);
+      } else {
+        setRegisterErrorMessage(registerErrorPending);
+      }
+      setRegisterErrorPending(null);
+    }, 260);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [confirmVisible, registerErrorPending]);
+
+  function openRegisterErrorDialog(message: string) {
+    setRegisterErrorMessage(null);
+    setLimitVisible(false);
+    setRegisterErrorPending(message);
+    setConfirmVisible(false);
+  }
 
   useEffect(() => {
     if (!sheetVisible) {
       setExpanded(false);
     }
   }, [sheetVisible]);
+
+  useEffect(() => {
+    if (!selectedBooth) {
+      return;
+    }
+
+    const latest = boothDetails[selectedBooth.boothId] ?? detailMap[selectedBooth.boothId] ?? null;
+    if (latest) {
+      setSheetDetail(latest);
+    }
+  }, [boothDetails, detailMap, selectedBooth]);
+
+  useEffect(() => {
+    setMapImageUrl(eventProfile?.mapImageUrl ?? null);
+  }, [eventProfile?.mapImageUrl]);
+
+  useEffect(() => {
+    if (!accessToken || !eventId || activeTab !== 'map') {
+      return;
+    }
+
+    let cancelled = false;
+    setMapLoadState('loading');
+
+    async function loadEventMap() {
+      try {
+        const response = await fetchVisitorBoothMap(accessToken);
+
+        if (cancelled) {
+          return;
+        }
+
+        setMapImageUrl(response.mapImageUrl);
+        setMapAreas(response.booths);
+        setMapLoadState(response.mapImageUrl && response.booths.length ? 'ready' : 'error');
+      } catch (error) {
+        console.warn('행사 지도 조회 실패', error);
+
+        if (cancelled) {
+          return;
+        }
+
+        setMapAreas([]);
+        setMapLoadState('error');
+      }
+    }
+
+    void loadEventMap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, activeTab, eventId]);
 
   useEffect(() => {
     if (!accessToken || booths.length === 0) {
@@ -140,11 +231,16 @@ export default function MapScreen() {
         [booth.boothId]: detail,
       }));
 
-      try {
-        const expected = await fetchExpectedTime(booth.boothId, accessToken);
-        setSheetEstimatedMinutes(expected.estimated_minutes);
-      } catch (error) {
-        console.warn('예상 대기시간 조회 실패', error);
+      if (accessToken) {
+        try {
+          const expected = await fetchExpectedTime(booth.boothId, accessToken);
+          setSheetEstimatedMinutes(expected.estimated_minutes);
+        } catch (error) {
+          console.warn('예상 대기시간 조회 실패', error);
+          setSheetEstimatedMinutes(null);
+        }
+      } else {
+        setSheetEstimatedMinutes(null);
       }
     } finally {
       setLoadingSheet(false);
@@ -161,6 +257,10 @@ export default function MapScreen() {
       await createWaiting(selectedBooth.boothId);
       setConfirmVisible(false);
       setSheetVisible(false);
+      showToast({ type: 'success', message: '대기 신청이 완료되었습니다.' });
+    } catch (error) {
+      const message = toUserErrorMessage(error, '대기 등록에 실패했습니다.');
+      openRegisterErrorDialog(message);
     } finally {
       setConfirmingReserve(false);
     }
@@ -178,8 +278,30 @@ export default function MapScreen() {
       await cancelWaiting(activeWaiting);
       setCancelVisible(false);
       setSheetVisible(false);
+      showToast({ type: 'success', message: '예약이 취소되었습니다.' });
+    } catch (error) {
+      showToast({
+        type: 'error',
+        message: toUserErrorMessage(error, '예약 취소에 실패했습니다.'),
+      });
     } finally {
       setCanceling(false);
+    }
+  }
+
+  async function handlePostpone() {
+    if (!selectedWaiting) {
+      return;
+    }
+
+    try {
+      await postponeWaiting(selectedWaiting);
+      showToast({ type: 'success', message: '순서를 뒤로 미뤘습니다.' });
+    } catch (error) {
+      showToast({
+        type: 'error',
+        message: toUserErrorMessage(error, '순서 미루기에 실패했습니다.'),
+      });
     }
   }
 
@@ -206,6 +328,28 @@ export default function MapScreen() {
     return null;
   };
 
+  const boothMap = useMemo(
+    () => Object.fromEntries(booths.map((booth) => [booth.boothId, booth])),
+    [booths],
+  );
+
+  const displayMapAreas = useMemo(
+    () =>
+      mapAreas.map((area) => ({
+        ...area,
+        waitingCount: boothWaitingCount(area.boothId) ?? area.waitingCount,
+        isEmergencyClosed: boothMap[area.boothId]?.isEmergencyClosed ?? area.isEmergencyClosed,
+        boothName: boothMap[area.boothId]?.name ?? area.boothName,
+        locationCode: boothMap[area.boothId]?.locationCode ?? area.locationCode,
+      })),
+    [boothMap, mapAreas],
+  );
+
+  const filteredMapAreas = useMemo(
+    () => displayMapAreas.filter((area) => filteredBooths.some((booth) => booth.boothId === area.boothId)),
+    [displayMapAreas, filteredBooths],
+  );
+
   const selectedWaiting = selectedBooth ? findWaitingByBoothId(selectedBooth.boothId) : null;
 
   const statusSummary = booths.reduce(
@@ -229,27 +373,13 @@ export default function MapScreen() {
     <Screen padded={false} scroll={false}>
       <View style={styles.flex}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <SectionTitle caption="운영 중인 부스를 빠르게 찾아보세요" title="부스 배치도" />
-
-          <View style={styles.searchCard}>
-            <View style={styles.searchInputWrap}>
-              <Feather color={palette.textMuted} name="search" size={18} />
-              <TextInput
-                onChangeText={setSearchQuery}
-                placeholder="부스명 또는 위치 코드로 검색"
-                placeholderTextColor={palette.textMuted}
-                style={styles.searchInput}
-                value={searchQuery}
-              />
-              {searchQuery ? (
-                <Pressable onPress={() => setSearchQuery('')} style={styles.searchClear}>
-                  <Feather color={palette.textMuted} name="x" size={16} />
-                </Pressable>
-              ) : null}
+          <View style={styles.pageHeader}>
+            <View style={styles.pageHeaderCopy}>
+              <Text style={styles.pageTitle}>배치도</Text>
             </View>
-            <Text style={styles.searchHint}>
-              {filteredBooths.length}개 부스가 검색되었습니다.
-            </Text>
+            <Pressable style={styles.iconButton}>
+              <Feather color={palette.text} name="bell" size={24} />
+            </Pressable>
           </View>
 
           <View style={styles.tabRow}>
@@ -270,35 +400,80 @@ export default function MapScreen() {
             })}
           </View>
 
-          <View style={styles.legendCard}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: palette.success }]} />
-              <Text style={styles.legendText}>원활 {statusSummary.smooth}</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: palette.warning }]} />
-              <Text style={styles.legendText}>보통 {statusSummary.normal}</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: palette.danger }]} />
-              <Text style={styles.legendText}>혼잡 {statusSummary.busy}</Text>
-            </View>
-          </View>
-
           {lastError ? <ErrorBanner message={lastError} /> : null}
 
           {filteredBooths.length ? (
             activeTab === 'map' ? (
-              <View style={styles.mapBoard}>
-                <View style={styles.mapBoardHeader}>
-                  <Text style={styles.mapBoardTitle}>Hall A Booths</Text>
-                  <Text style={styles.mapBoardMeta}>색상으로 혼잡도를 확인하세요</Text>
+              mapLoadState === 'ready' && mapImageUrl && filteredMapAreas.length ? (
+                <EventMapCanvas
+                  areas={filteredMapAreas}
+                  boothMap={boothMap}
+                  imageUrl={mapImageUrl}
+                  onPressArea={(booth) => {
+                    void openBoothSheet(booth);
+                  }}
+                  selectedBoothId={selectedBooth?.boothId ?? null}
+                />
+              ) : (
+                <View style={styles.mapBoard}>
+                  <View style={styles.grid}>
+                    {filteredBooths.map((booth) => (
+                      <BoothTile
+                        booth={booth}
+                        key={booth.boothId}
+                        onPress={() => {
+                          void openBoothSheet(booth);
+                        }}
+                        selected={selectedBooth?.boothId === booth.boothId}
+                        waitingCount={boothWaitingCount(booth.boothId)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              )
+            ) : (
+              <>
+                <View style={styles.searchCard}>
+                  <View style={styles.searchInputWrap}>
+                    <Feather color={palette.textMuted} name="search" size={18} />
+                    <TextInput
+                      onChangeText={setSearchQuery}
+                      placeholder="부스명 또는 위치 코드로 검색"
+                      placeholderTextColor={palette.textMuted}
+                      style={styles.searchInput}
+                      value={searchQuery}
+                    />
+                    {searchQuery ? (
+                      <Pressable onPress={() => setSearchQuery('')} style={styles.searchClear}>
+                        <Feather color={palette.textMuted} name="x" size={16} />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  <Text style={styles.searchHint}>
+                    {filteredBooths.length}개 부스가 검색되었습니다.
+                  </Text>
                 </View>
 
-                <View style={styles.grid}>
+                <View style={styles.legendCard}>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: palette.success }]} />
+                    <Text style={styles.legendText}>원활 {statusSummary.smooth}</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: palette.warning }]} />
+                    <Text style={styles.legendText}>보통 {statusSummary.normal}</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: palette.danger }]} />
+                    <Text style={styles.legendText}>혼잡 {statusSummary.busy}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.list}>
                   {filteredBooths.map((booth) => (
-                    <BoothTile
+                    <BoothListCard
                       booth={booth}
+                      boothDetail={boothDetails[booth.boothId] ?? detailMap[booth.boothId]}
                       key={booth.boothId}
                       onPress={() => {
                         void openBoothSheet(booth);
@@ -308,22 +483,7 @@ export default function MapScreen() {
                     />
                   ))}
                 </View>
-              </View>
-            ) : (
-              <View style={styles.list}>
-                {filteredBooths.map((booth) => (
-                  <BoothListCard
-                    booth={booth}
-                    boothDetail={boothDetails[booth.boothId] ?? detailMap[booth.boothId]}
-                    key={booth.boothId}
-                    onPress={() => {
-                      void openBoothSheet(booth);
-                    }}
-                    selected={selectedBooth?.boothId === booth.boothId}
-                    waitingCount={boothWaitingCount(booth.boothId)}
-                  />
-                ))}
-              </View>
+              </>
             )
           ) : (
             <EmptyState caption="현재 불러온 부스가 없습니다." title="배치도 데이터 없음" />
@@ -340,11 +500,7 @@ export default function MapScreen() {
           onCancel={() => setCancelVisible(true)}
           onClose={() => setSheetVisible(false)}
           onExpandToggle={() => setExpanded((current) => !current)}
-          onPostpone={() => {
-            if (selectedWaiting) {
-              void postponeWaiting(selectedWaiting);
-            }
-          }}
+          onPostpone={() => void handlePostpone()}
           onReserve={() => {
             if (selectedBooth) {
               setConfirmVisible(true);
@@ -378,6 +534,26 @@ export default function MapScreen() {
           visible={cancelVisible && !!selectedWaiting}
         />
 
+        <ConfirmDialog
+          body={WAITING_LIMIT_MESSAGE}
+          confirmLabel="확인"
+          hideCancel
+          onClose={() => setLimitVisible(false)}
+          onConfirm={() => setLimitVisible(false)}
+          title="대기 등록 제한"
+          visible={limitVisible}
+        />
+
+        <ConfirmDialog
+          body={registerErrorMessage ?? ''}
+          confirmLabel="확인"
+          hideCancel
+          onClose={() => setRegisterErrorMessage(null)}
+          onConfirm={() => setRegisterErrorMessage(null)}
+          title="대기 등록 실패"
+          visible={!!registerErrorMessage}
+        />
+
         <FloatingTabBar />
       </View>
     </Screen>
@@ -389,12 +565,34 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    gap: 20,
+    paddingTop: 24,
+    gap: 18,
     paddingBottom: 148,
   },
+  pageHeader: {
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 16,
+  },
+  pageHeaderCopy: {
+    gap: 4,
+  },
+  pageTitle: {
+    color: palette.text,
+    fontSize: 28,
+    fontWeight: '900',
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   searchCard: {
+    marginHorizontal: 20,
     backgroundColor: palette.surface,
     borderRadius: 24,
     padding: 18,
@@ -427,29 +625,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   tabRow: {
+    paddingHorizontal: 20,
     flexDirection: 'row',
     gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+    paddingBottom: 12,
   },
   tabButton: {
-    flex: 1,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: palette.surfaceAlt,
+    paddingVertical: 6,
   },
   tabButtonActive: {
-    backgroundColor: palette.ink,
+    borderBottomWidth: 2,
+    borderBottomColor: palette.text,
   },
   tabLabel: {
     color: palette.textMuted,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
   },
   tabLabelActive: {
-    color: '#FFFFFF',
+    color: palette.text,
   },
   legendCard: {
+    marginHorizontal: 20,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
@@ -473,35 +672,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   mapBoard: {
-    backgroundColor: '#E9EEF8',
-    borderRadius: 30,
-    padding: 18,
-    gap: 16,
-    borderWidth: 1,
-    borderColor: '#D8E0F0',
-  },
-  mapBoardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  mapBoardTitle: {
-    color: palette.ink,
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  mapBoardMeta: {
-    color: palette.inkMuted,
-    fontSize: 12,
-    fontWeight: '700',
+    backgroundColor: '#D9D9D9',
   },
   grid: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     gap: 12,
   },
   list: {
+    paddingHorizontal: 20,
     gap: 14,
   },
 });
