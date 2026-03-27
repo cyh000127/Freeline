@@ -2,6 +2,7 @@ package com.freeline.domain.event.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -22,7 +23,12 @@ import com.freeline.common.file.dto.FileInfo;
 import com.freeline.common.file.service.FileService;
 import com.freeline.common.file.util.CloudflareStorageUtil;
 import com.freeline.common.util.TimeUtils;
+import com.freeline.domain.booth.entity.Booth;
+import com.freeline.domain.booth.entity.BoothWaiting;
 import com.freeline.domain.booth.entity.Visitor;
+import com.freeline.domain.booth.entity.WaitingStatus;
+import com.freeline.domain.booth.repository.BoothRepository;
+import com.freeline.domain.booth.repository.BoothWaitingRepository;
 import com.freeline.domain.booth.repository.VisitorRepository;
 import com.freeline.domain.boothmap.entity.EventMap;
 import com.freeline.domain.boothmap.repository.EventMapRepository;
@@ -61,6 +67,8 @@ public class EventService {
     private final EventRepository eventRepository;
     private final EventMapRepository eventMapRepository;
     private final EventPolicyRepository eventPolicyRepository;
+    private final BoothRepository boothRepository;
+    private final BoothWaitingRepository boothWaitingRepository;
     private final VisitorRepository visitorRepository;
     private final FileService fileService;
     private final CloudflareStorageUtil cloudflareStorageUtil;
@@ -254,6 +262,8 @@ public class EventService {
             return EventConverter.toEventUpdateResDto(event.getId(), responseStatus, event.getUpdatedAt());
         }
 
+        final boolean shouldCloseActiveWaitings = shouldCloseActiveWaitings(event.getStatus(), requestedStatus);
+
         event.update(
                 request.name(),
                 request.startDate(),
@@ -264,6 +274,10 @@ public class EventService {
                 request.thumbnailImageUrl(),
                 requestedStatus
         );
+
+        if (shouldCloseActiveWaitings) {
+            closeActiveWaitings(eventId);
+        }
 
         final Event saved = eventRepository.saveAndFlush(event);
 
@@ -394,6 +408,53 @@ public class EventService {
         if (!StringUtils.hasText(eventMap.getImagePath())) {
             throw new EventException(ErrorCode.MAP_IMAGE_REQUIRED_FOR_OPEN);
         }
+    }
+
+    private boolean shouldCloseActiveWaitings(final EventStatus currentStatus, final EventStatus requestedStatus) {
+        if (requestedStatus == null || currentStatus == requestedStatus) {
+            return false;
+        }
+
+        return requestedStatus == EventStatus.CLOSED || requestedStatus == EventStatus.CANCELED;
+    }
+
+    private void closeActiveWaitings(final Long eventId) {
+        final List<Long> boothIds = boothRepository.findAllByEventIdOrderByIdAsc(eventId).stream()
+                .map(Booth::getId)
+                .toList();
+
+        if (boothIds.isEmpty()) {
+            return;
+        }
+
+        final List<BoothWaiting> activeWaitings = boothWaitingRepository.findAllByBoothIdInAndStatusInOrderByBoothIdAscWaitingNumberAsc(
+                boothIds,
+                List.of(
+                        WaitingStatus.WAITING,
+                        WaitingStatus.CALLED,
+                        WaitingStatus.REGISTERED,
+                        WaitingStatus.ENTERED
+                )
+        );
+
+        if (activeWaitings.isEmpty()) {
+            return;
+        }
+
+        final LocalDateTime now = TimeUtils.nowDateTime();
+        final List<BoothWaiting> updatedWaitings = new ArrayList<>(activeWaitings.size());
+
+        for (BoothWaiting waiting : activeWaitings) {
+            if (waiting.getStatus() == WaitingStatus.ENTERED) {
+                waiting.updateStatus(WaitingStatus.EXITED);
+            } else {
+                waiting.updateStatus(WaitingStatus.CANCELED);
+            }
+            waiting.updateExitedAt(now);
+            updatedWaitings.add(waiting);
+        }
+
+        boothWaitingRepository.saveAll(updatedWaitings);
     }
 
     private EventStatus parseEventStatus(final String status) {

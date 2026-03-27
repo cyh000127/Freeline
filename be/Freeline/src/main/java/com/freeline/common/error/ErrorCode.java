@@ -59,6 +59,7 @@ public enum ErrorCode {
     MAP_IMAGE_REQUIRED_FOR_OPEN(HttpStatus.BAD_REQUEST, "E-004", "지도 이미지 등록 전에는 OPEN 상태로 변경할 수 없습니다."),
     CANNOT_DELETE_OPEN_EVENT(HttpStatus.CONFLICT, "E-005", "진행 중(OPEN)인 행사는 바로 삭제할 수 없습니다. 종료 처리 후 삭제해 주세요."),
     EVENT_NOT_OPEN_FOR_DASHBOARD(HttpStatus.BAD_REQUEST, "E-006", "진행 중(OPEN)인 행사만 대시보드를 조회할 수 있습니다."),
+    EVENT_NOT_OPEN_FOR_WAITING_OPERATION(HttpStatus.BAD_REQUEST, "E-007", "진행 중(OPEN)인 행사에서만 대기열을 운영할 수 있습니다."),
 
     /**
      * Booth Error (B-xxx)

@@ -67,9 +67,16 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDataFetching, setIsDataFetching] = useState(false);
   const [boothPolicy, setBoothPolicy] = useState<BoothPolicy | null>(null);
+  const [isOperationBlocked, setIsOperationBlocked] = useState(false);
+  const [blockedMessage, setBlockedMessage] = useState("종료된 행사에서는 부스 운영 대시보드를 사용할 수 없습니다.");
+
+  const extractApiErrorMessage = (error: any, fallback: string) =>
+    error?.response?.data?.error?.message ||
+    error?.response?.data?.message ||
+    fallback;
 
   const fetchData = useCallback(async (showLoading = false) => {
-    if (!user?.boothId) return;
+    if (!user?.boothId || isOperationBlocked) return;
     if (showLoading) setIsLoading(true);
     setIsDataFetching(true);
     try {
@@ -90,16 +97,27 @@ export default function DashboardPage() {
       if (policyRes.success && policyRes.data) {
         setBoothPolicy(policyRes.data);
       }
-    } catch (error) {
+      setIsOperationBlocked(false);
+    } catch (error: any) {
+      const message = extractApiErrorMessage(error, "운영 현황을 불러오지 못했습니다.");
       console.error("Failed to fetch dashboard or queue data:", error);
+      setDashboardData(null);
+      setFullQueue([]);
+      if (
+        message.includes("진행 중(OPEN)인 행사") ||
+        message.includes("행사에서만 대기열을 운영")
+      ) {
+        setIsOperationBlocked(true);
+        setBlockedMessage(message);
+      }
     } finally {
       setIsLoading(false);
       setIsDataFetching(false);
     }
-  }, [user?.boothId]);
+  }, [user?.boothId, isOperationBlocked]);
 
   useEffect(() => {
-    if (user?.boothId) {
+    if (user?.boothId && !isOperationBlocked) {
       fetchData(true);
 
       // Setup Polling every 10 seconds as a fallback/alternative for SSE
@@ -110,54 +128,54 @@ export default function DashboardPage() {
 
       return () => clearInterval(interval);
     }
-  }, [user?.boothId, fetchData]);
+  }, [user?.boothId, fetchData, isOperationBlocked]);
 
   // SSE Real-time updates (if connection works)
-  const { isConnected } = useWaitingSSE(user?.boothId, () => {
+  const { isConnected } = useWaitingSSE(isOperationBlocked ? undefined : user?.boothId, () => {
     console.log("[SSE] Triggering data refresh");
     fetchData(false);
   });
 
   const handleCall = async () => {
-    if (!user?.boothId) return;
+    if (!user?.boothId || isOperationBlocked) return;
     try {
       await waitingApi.callNext(user.boothId);
       showAlert("다음 대기자를 호출했습니다.");
       fetchData(false);
     } catch (error: any) {
-      showAlert(error.response?.data?.message || "호출에 실패했습니다.");
+      showAlert(extractApiErrorMessage(error, "호출에 실패했습니다."));
     }
   };
 
   const handleAdmit = async (waitingId: number) => {
-    if (!user?.boothId) return;
+    if (!user?.boothId || isOperationBlocked) return;
     try {
       await waitingApi.admitWaiting(user.boothId, waitingId);
       fetchData(false);
     } catch (error: any) {
-      showAlert(error.response?.data?.message || "입장 처리에 실패했습니다.");
+      showAlert(extractApiErrorMessage(error, "입장 처리에 실패했습니다."));
     }
   };
 
   const handleCancel = async (waitingId: number) => {
-    if (!user?.boothId) return;
+    if (!user?.boothId || isOperationBlocked) return;
     showConfirm("정말 이 대기를 취소하시겠습니까?", async () => {
       try {
         await waitingApi.cancelWaiting(user.boothId!, waitingId);
         fetchData(false);
       } catch (error: any) {
-        showAlert(error.response?.data?.message || "취소 처리에 실패했습니다.");
+        showAlert(extractApiErrorMessage(error, "취소 처리에 실패했습니다."));
       }
     });
   };
 
   const handleExit = async (waitingId: number) => {
-    if (!user?.boothId) return;
+    if (!user?.boothId || isOperationBlocked) return;
     try {
       await waitingApi.exitWaiting(user.boothId, waitingId);
       fetchData(false);
     } catch (error: any) {
-      showAlert(error.response?.data?.message || "퇴장 처리에 실패했습니다.");
+      showAlert(extractApiErrorMessage(error, "퇴장 처리에 실패했습니다."));
     }
   };
 
@@ -185,20 +203,26 @@ export default function DashboardPage() {
               <span className="px-2 py-1 bg-rose-500 text-white text-[10px] font-black rounded-lg animate-pulse">비상 마감</span>
             )}
             <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-100 rounded-lg">
-              {isConnected ? (
+              {isOperationBlocked ? (
+                <WifiOff className="w-3 h-3 text-rose-500" />
+              ) : isConnected ? (
                 <Wifi className="w-3 h-3 text-emerald-500" />
               ) : (
                 <WifiOff className="w-3 h-3 text-amber-500" />
               )}
-              <span className={`text-[10px] font-black ${isConnected ? 'text-emerald-700' : 'text-amber-700'}`}>
-                {isConnected ? '실시간 연결됨' : '자동 갱신 중'}
+              <span className={`text-[10px] font-black ${isOperationBlocked ? 'text-rose-700' : isConnected ? 'text-emerald-700' : 'text-amber-700'}`}>
+                {isOperationBlocked ? '운영 중지됨' : isConnected ? '실시간 연결됨' : '자동 갱신 중'}
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-full border border-emerald-100 w-fit">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-sm font-bold text-emerald-700">
-              부스 운영중
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border w-fit ${
+            isOperationBlocked
+              ? 'bg-rose-50 border-rose-100'
+              : 'bg-emerald-50 border-emerald-100'
+          }`}>
+            <span className={`flex h-2.5 w-2.5 rounded-full ${isOperationBlocked ? 'bg-rose-500' : 'bg-emerald-500 animate-pulse'}`}></span>
+            <span className={`text-sm font-bold ${isOperationBlocked ? 'text-rose-700' : 'text-emerald-700'}`}>
+              {isOperationBlocked ? '행사 종료로 운영 중지' : '부스 운영중'}
             </span>
           </div>
         </div>
@@ -217,7 +241,8 @@ export default function DashboardPage() {
 
           <button
             onClick={() => fetchData(true)}
-            className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:bg-gray-50 transition-colors"
+            disabled={isOperationBlocked}
+            className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:bg-gray-50 transition-colors disabled:cursor-not-allowed disabled:bg-gray-100"
             title="새로고침"
           >
             <RefreshCcw className={`w-6 h-6 text-gray-400 ${isDataFetching ? 'animate-spin' : ''}`} />
@@ -269,7 +294,7 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          {activeTab === 'WAITING' && (dashboardData?.summary?.waitingCount || fullQueue.length) > 0 && (
+          {!isOperationBlocked && activeTab === 'WAITING' && (dashboardData?.summary?.waitingCount || fullQueue.length) > 0 && (
             <button
               onClick={handleCall}
               className="group flex h-14 items-center gap-3 px-8 rounded-2xl bg-lime-400 hover:bg-lime-500 text-[#2D2A4A] font-black transition-all duration-300 hover:-translate-y-1 shadow-lg shadow-lime-400/20"
@@ -281,7 +306,15 @@ export default function DashboardPage() {
         </div>
 
         {/* List Content */}
-        {isLoading && fullQueue.length === 0 ? (
+        {isOperationBlocked ? (
+          <div className="flex-1 bg-rose-50 border border-rose-200 rounded-[32px] flex flex-col items-center justify-center text-center px-8">
+            <div className="p-6 bg-white rounded-full mb-4 shadow-sm">
+              <AlertCircle className="w-12 h-12 text-rose-400" />
+            </div>
+            <p className="text-xl font-black text-rose-700">운영 대시보드 비활성화</p>
+            <p className="mt-2 text-sm font-bold text-rose-600">{blockedMessage}</p>
+          </div>
+        ) : isLoading && fullQueue.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-gray-400 font-bold">대기열을 불러오는 중...</div>
         ) : filteredQueue.length === 0 ? (
           <div className="flex-1 bg-white/50 border-2 border-dashed border-gray-200 rounded-[32px] flex flex-col items-center justify-center text-gray-400">
