@@ -1,9 +1,10 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { router } from 'expo-router';
 import { authenticateEntryCode as authenticateEntryCodeApi, logout as logoutApi } from '@/features/api/auth';
 import { clearPushRegistrationCache } from '@/features/notifications/registration-cache';
 import { fetchMyEventDetail } from '@/features/api/event';
 import { usePushRegistration } from '@/features/notifications/register-push';
-import { getUserIdFromToken } from '@/utils/jwt';
+import { getTokenExpirationTime, getUserIdFromToken, isTokenExpired } from '@/utils/jwt';
 import { validateNickname } from '@/utils/nickname';
 import { getEventProfile, parseEventIdFromEntryCode, toEventProfile } from '@/utils/event';
 import { clearSessionStorage, emptySession, readSession, writeSession } from './storage';
@@ -40,11 +41,50 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function hydrate() {
       const stored = await readSession();
+
+      if (stored.accessToken && isTokenExpired(stored.accessToken)) {
+        await clearSessionStorage();
+        await clearPushRegistrationCache();
+        setSession({
+          ...emptySession,
+          hasSeenOnboarding: true,
+          isReady: true,
+        });
+        setEventProfile(null);
+        router.replace('/entry-code');
+        return;
+      }
+
       setSession(toRuntimeState(stored));
     }
 
     void hydrate();
   }, []);
+
+  useEffect(() => {
+    if (!session.isReady || !session.accessToken) {
+      return;
+    }
+
+    const expirationTime = getTokenExpirationTime(session.accessToken);
+
+    if (expirationTime == null) {
+      return;
+    }
+
+    const remaining = expirationTime - Date.now();
+
+    if (remaining <= 0) {
+      void resetAll(true);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      void resetAll(true);
+    }, remaining);
+
+    return () => clearTimeout(timer);
+  }, [session.accessToken, session.isReady]);
 
   useEffect(() => {
     if (!session.accessToken) {
@@ -151,7 +191,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setEventProfile(null);
   }
 
-  async function resetAll() {
+  async function resetAll(redirectToEntryCode = false) {
     await clearSessionStorage();
     await clearPushRegistrationCache();
     setSession({
@@ -160,6 +200,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isReady: true,
     });
     setEventProfile(null);
+
+    if (redirectToEntryCode) {
+      router.replace('/entry-code');
+    }
   }
 
   return (

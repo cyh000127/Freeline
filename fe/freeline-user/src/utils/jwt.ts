@@ -2,6 +2,7 @@ import { jwtDecode } from 'jwt-decode';
 
 type TokenPayload = {
   sub?: string;
+  exp?: number;
 };
 
 export function getUserIdFromToken(token: string) {
@@ -14,4 +15,24 @@ export function getUserIdFromToken(token: string) {
   }
 
   return parsed;
+}
+
+export function getTokenExpirationTime(token: string) {
+  const payload = jwtDecode<TokenPayload>(token);
+
+  if (typeof payload.exp !== 'number') {
+    return null;
+  }
+
+  return payload.exp * 1000;
+}
+
+export function isTokenExpired(token: string, now = Date.now()) {
+  const expirationTime = getTokenExpirationTime(token);
+
+  if (expirationTime == null) {
+    return false;
+  }
+
+  return expirationTime <= now;
 }
