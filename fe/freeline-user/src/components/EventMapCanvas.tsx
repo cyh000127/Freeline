@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image as RNImage, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Image } from 'expo-image';
 import type { BoothSummary } from '@/features/api/booths';
 import type { BoothMapArea } from '@/features/api/booth-map';
 import { palette } from '@/theme/colors';
@@ -30,12 +29,13 @@ export function EventMapCanvas({
   boothMap,
 }: Props) {
   const resolvedImageUrl = useMemo(() => normalizeImageUrl(imageUrl), [imageUrl]);
-  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [hasImageError, setHasImageError] = useState(false);
 
   useEffect(() => {
     if (!resolvedImageUrl) {
-      setAspectRatio(null);
+      setImageSize(null);
       setHasImageError(false);
       return;
     }
@@ -50,7 +50,7 @@ export function EventMapCanvas({
           return;
         }
 
-        setAspectRatio(width / height);
+        setImageSize({ width, height });
       },
       () => {
         if (cancelled) {
@@ -58,7 +58,7 @@ export function EventMapCanvas({
         }
 
         setHasImageError(true);
-        setAspectRatio(null);
+        setImageSize(null);
       },
     );
 
@@ -67,68 +67,105 @@ export function EventMapCanvas({
     };
   }, [resolvedImageUrl]);
 
+  const aspectRatio = imageSize ? imageSize.width / imageSize.height : null;
+
+  const effectiveSize = useMemo(() => {
+    if (!imageSize || containerSize.width <= 0 || containerSize.height <= 0) {
+      return null;
+    }
+
+    let width = containerSize.width;
+    let height = containerSize.height;
+    const containerRatio = containerSize.width / containerSize.height;
+    const imageRatio = imageSize.width / imageSize.height;
+
+    if (containerRatio > imageRatio) {
+      height = containerSize.height;
+      width = height * imageRatio;
+    } else {
+      width = containerSize.width;
+      height = width / imageRatio;
+    }
+
+    return { width, height };
+  }, [containerSize.height, containerSize.width, imageSize]);
+
   if (!resolvedImageUrl || !aspectRatio || hasImageError || !areas.length) {
     return null;
   }
 
   return (
     <View style={styles.card}>
-      <View style={[styles.mapWrap, { aspectRatio }]}>
-        <Image
-          contentFit="contain"
-          onError={() => setHasImageError(true)}
-          source={resolvedImageUrl}
-          style={StyleSheet.absoluteFillObject}
-        />
-
-        {areas.map((area) => {
-          const booth = boothMap[area.boothId];
-
-          if (!booth) {
-            return null;
-          }
-
-          const selected = selectedBoothId === area.boothId;
-          const congestion = getBoothCongestion(area.waitingCount, area.isEmergencyClosed);
-          const areaTint = selected
-            ? 'rgba(47, 44, 72, 0.20)'
-            : congestion.tone === 'busy'
-              ? 'rgba(255, 83, 83, 0.14)'
-              : congestion.tone === 'normal'
-                ? 'rgba(255, 188, 66, 0.18)'
-                : 'rgba(24, 193, 125, 0.12)';
-          const labelColor = selected ? palette.ink : congestion.textColor;
-
-          return (
-            <Pressable
-              key={area.areaId}
-              onPress={() => onPressArea(booth)}
-              style={[
-                styles.area,
-                {
-                  left: `${area.xRatio * 100}%`,
-                  top: `${area.yRatio * 100}%`,
-                  width: `${area.widthRatio * 100}%`,
-                  height: `${area.heightRatio * 100}%`,
-                  borderColor: selected ? palette.lime : congestion.outlineColor,
-                  backgroundColor: areaTint,
-                },
-              ]}
-            >
-              <View style={styles.areaLabel}>
-                <Text numberOfLines={1} style={[styles.areaCode, { color: labelColor }]}>
-                  {area.locationCode}
-                </Text>
-                <Text numberOfLines={2} style={styles.areaName}>
-                  {area.boothName}
-                </Text>
-                <Text numberOfLines={1} style={styles.areaMeta}>
-                  현재 대기 {area.waitingCount}명
-                </Text>
-              </View>
-            </Pressable>
+      <View
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          setContainerSize((current) =>
+            current.width === width && current.height === height ? current : { width, height },
           );
-        })}
+        }}
+        style={[styles.mapWrap, { aspectRatio }]}
+      >
+        {effectiveSize ? (
+          <View
+            pointerEvents="box-none"
+            style={[
+              styles.overlayStage,
+              {
+                width: effectiveSize.width,
+                height: effectiveSize.height,
+              },
+            ]}
+          >
+            {areas.map((area) => {
+              const booth = boothMap[area.boothId];
+
+              if (!booth) {
+                return null;
+              }
+
+              const selected = selectedBoothId === area.boothId;
+              const congestion = getBoothCongestion(area.waitingCount, area.isEmergencyClosed);
+              const areaTint = selected
+                ? 'rgba(47, 44, 72, 0.20)'
+                : congestion.tone === 'busy'
+                  ? 'rgba(255, 83, 83, 0.14)'
+                  : congestion.tone === 'normal'
+                    ? 'rgba(255, 188, 66, 0.18)'
+                    : 'rgba(24, 193, 125, 0.12)';
+              const labelColor = selected ? palette.ink : congestion.textColor;
+
+              return (
+                <Pressable
+                  key={area.areaId}
+                  onPress={() => onPressArea(booth)}
+                  style={[
+                    styles.area,
+                    {
+                      left: `${area.xRatio * 100}%`,
+                      top: `${area.yRatio * 100}%`,
+                      width: `${area.widthRatio * 100}%`,
+                      height: `${area.heightRatio * 100}%`,
+                      borderColor: selected ? palette.lime : congestion.outlineColor,
+                      backgroundColor: areaTint,
+                    },
+                  ]}
+                >
+                  <View style={styles.areaLabel}>
+                    <Text numberOfLines={1} style={[styles.areaCode, { color: labelColor }]}>
+                      {area.locationCode}
+                    </Text>
+                    <Text numberOfLines={2} style={styles.areaName}>
+                      {area.boothName}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.areaMeta}>
+                      현재 대기 {area.waitingCount}명
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -143,6 +180,11 @@ const styles = StyleSheet.create({
   mapWrap: {
     width: '100%',
     backgroundColor: '#D9D9D9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overlayStage: {
+    position: 'absolute',
   },
   area: {
     position: 'absolute',

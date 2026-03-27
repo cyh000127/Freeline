@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { ImageBackground, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ActionButton';
+import { AuthHero } from '@/components/AuthHero';
 import { BrandMark } from '@/components/BrandMark';
 import { Screen } from '@/components/Screen';
 import { TextField } from '@/components/TextField';
@@ -27,13 +28,7 @@ export default function NicknameScreen() {
 
   return (
     <Screen scroll={false}>
-      <ImageBackground
-        resizeMode="cover"
-        source={require('../assets/register/register_background.png')}
-        style={styles.hero}
-      >
-        <View style={styles.overlay} />
-      </ImageBackground>
+      <AuthHero />
 
       <View style={styles.card}>
         <View style={styles.logoWrap}>
@@ -59,14 +54,6 @@ export default function NicknameScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    height: 280,
-    marginHorizontal: -20,
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(47, 44, 72, 0.12)',
-  },
   card: {
     marginTop: -60,
     backgroundColor: palette.surface,
