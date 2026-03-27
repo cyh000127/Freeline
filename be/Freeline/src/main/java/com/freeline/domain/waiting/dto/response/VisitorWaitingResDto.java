@@ -13,6 +13,9 @@ public record VisitorWaitingResDto(
         @Schema(description = "대기 ID", example = "301")
         Long waitingId,
 
+        @Schema(description = "부스 ID", example = "55")
+        Long boothId,
+
         @Schema(description = "부스 이름", example = "SSAFY 굿즈 부스")
         String boothName,
 

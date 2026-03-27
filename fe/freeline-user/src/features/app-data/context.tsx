@@ -101,7 +101,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const waitings = await Promise.all(
       waitingPayload.waitings.map(async (waiting) => {
         const matchedBooth =
-          booths.find((booth) => booth.name === waiting.booth_name) ?? null;
+          waiting.booth_id != null
+            ? booths.find((booth) => booth.boothId === waiting.booth_id) ?? null
+            : null;
 
         let estimatedMinutes: number | null = null;
         let boothDetail = matchedBooth ? boothDetails[matchedBooth.boothId] : undefined;
@@ -125,7 +127,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
         const next: DecoratedWaiting = {
           ...waiting,
-          boothId: matchedBooth?.boothId ?? null,
+          boothId: waiting.booth_id ?? matchedBooth?.boothId ?? null,
           locationCode: matchedBooth?.locationCode ?? null,
           estimatedMinutes,
           boothDetail,

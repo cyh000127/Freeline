@@ -13,6 +13,7 @@ export type QueueStatus = 'FREE' | 'FRONT_QUEUE_OCCUPIED' | 'IN_BOOTH';
 
 export type WaitingItem = {
   waiting_id: number;
+  booth_id: number | null;
   booth_name: string;
   status: WaitingStatus;
   my_rank: number;

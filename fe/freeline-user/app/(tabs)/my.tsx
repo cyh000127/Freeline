@@ -80,7 +80,7 @@ export default function MyScreen() {
           <View style={styles.card}>
             <Text style={styles.cardTitle}>설정</Text>
             <ActionButton
-              label="진짜 세션 초기화"
+              label="초기화"
               onPress={() => {
                 setResetVisible(true);
               }}
@@ -91,12 +91,12 @@ export default function MyScreen() {
 
         <ConfirmDialog
           body="저장된 로그인 정보와 세션 데이터를 모두 지우고 엔트리코드 입력 화면으로 돌아갑니다."
-          confirmLabel="세션 초기화"
+          confirmLabel="초기화"
           onClose={() => setResetVisible(false)}
           onConfirm={() => {
             void handleResetAll();
           }}
-          title="세션을 초기화할까요?"
+          title="초기화할까요?"
           visible={resetVisible}
         />
 
