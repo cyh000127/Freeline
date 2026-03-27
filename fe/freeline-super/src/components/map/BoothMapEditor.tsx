@@ -7,6 +7,8 @@ interface AreaItem {
     boothId: number | null;
     boothName?: string;
     locationCode?: string;
+    waitingCount?: number;
+    estimatedWaitTime?: number;
     adminName?: string;
     contact?: string;
     color?: string;
@@ -23,6 +25,8 @@ interface BoothMapEditorProps {
     readonly isEditMode: boolean;
     readonly onOpenSearchModal: (localId: string) => void;
     readonly onAreasChange: (areas: AreaItem[]) => void;
+    readonly onAreaClick?: (area: AreaItem) => void;
+    readonly selectedLocalId?: string | null;
     readonly containerWidth: number;
     readonly containerHeight: number;
     readonly zoomLevel?: number;
@@ -44,6 +48,8 @@ export function BoothMapEditor({
                                    isEditMode,
                                    onOpenSearchModal,
                                    onAreasChange,
+                                   onAreaClick,
+                                   selectedLocalId = null,
                                    containerWidth,
                                    containerHeight,
                                    zoomLevel = 1,
@@ -379,10 +385,16 @@ export function BoothMapEditor({
                             !area.color && (area.boothId
                                 ? "border-blue-500 bg-blue-500/20"
                                 : "border-red-400 bg-red-400/20 border-dashed")
-                        } ${selectedLocalIds.includes(area.localId) ? "ring-2 ring-yellow-400 ring-offset-2 z-10" : ""}`}
+                        } ${selectedLocalIds.includes(area.localId) || selectedLocalId === area.localId ? "ring-2 ring-yellow-400 ring-offset-2 z-10" : ""}`}
                         style={{
                             backgroundColor: area.color ? `${area.color}33` : undefined,
                             borderColor: area.color || undefined,
+                        }}
+                        onClick={(e: MouseEvent | TouchEvent) => {
+                            if (isEditMode) return;
+                            e.stopPropagation();
+                            // [NEW] 보기 모드에서는 클릭한 부스 정보를 상위로 전달한다.
+                            onAreaClick?.(area);
                         }}
                         onMouseDown={(e: MouseEvent | TouchEvent) => {
                             if (!isEditMode) return;

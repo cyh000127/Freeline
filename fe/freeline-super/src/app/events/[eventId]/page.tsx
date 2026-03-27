@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { EditEventModal } from "@/components/EditEventModal";
 import {BoothMapEditor} from "@/components/map/BoothMapEditor";
 import {BoothSearchModal} from "@/components/map/BoothSearchModal";
+import type {BoothMapAreaInfo} from "@/lib/api/boothMap";
 import {eventApi, Event} from "@/lib/api/event";
 import { authApi } from "@/lib/api/auth";
 import {boothMapApi} from "@/lib/api/boothMap";
@@ -20,13 +21,16 @@ import {
     Save,
     ZoomIn,
     ZoomOut,
-    RotateCcw
+    RotateCcw,
+    X
 } from "lucide-react";
 
 interface AreaItem {
     readonly boothId: number | null;
     readonly boothName?: string;
     readonly locationCode?: string;
+    readonly waitingCount?: number;
+    readonly estimatedWaitTime?: number;
     readonly adminName?: string;
     readonly contact?: string;
     readonly color?: string;
@@ -35,6 +39,16 @@ interface AreaItem {
     readonly widthRatio: number;
     readonly heightRatio: number;
     readonly localId: string;
+}
+
+// [NEW] 보기 모드 플로팅 모달에 표시할 선택된 부스 정보 타입
+interface SelectedBoothInfo {
+    readonly localId: string;
+    readonly boothId: number;
+    readonly boothName: string;
+    readonly locationCode?: string;
+    readonly waitingCount: number;
+    readonly estimatedWaitTime: number;
 }
 
 export default function EventDetailPage() {
@@ -72,6 +86,7 @@ export default function EventDetailPage() {
     // Search Modal state
     const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
     const [activeLocalId, setActiveLocalId] = useState<string | null>(null);
+    const [selectedBoothInfo, setSelectedBoothInfo] = useState<SelectedBoothInfo | null>(null);
 
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -109,10 +124,13 @@ export default function EventDetailPage() {
             setEventMapId(data.eventMapId);
 
             if (data.booths?.length > 0) {
-                const mappedAreas = data.booths.map((b: any) => ({
+                const mappedAreas = data.booths.map((b: BoothMapAreaInfo) => ({
                     localId: `db-${b.areaId || b.boothId}`,
                     boothId: b.boothId,
                     boothName: b.boothName,
+                    locationCode: b.locationCode,
+                    waitingCount: b.waitingCount,
+                    estimatedWaitTime: b.estimatedWaitTime,
                     xRatio: b.xRatio,
                     yRatio: b.yRatio,
                     widthRatio: b.widthRatio,
@@ -121,6 +139,7 @@ export default function EventDetailPage() {
                 setAreas(mappedAreas);
                 setOriginalAreas(mappedAreas);
                 setMapStatus("PUBLISHED");
+                setSelectedBoothInfo(null);
             } else if (data.drafts?.length > 0) {
                 const newDrafts = data.drafts.map((d: any, idx: number) => ({
                     localId: `ai-draft-${idx}-${Date.now()}`,
@@ -133,10 +152,12 @@ export default function EventDetailPage() {
                 setAreas(newDrafts);
                 setOriginalAreas(newDrafts);
                 setMapStatus("DRAFT");
+                setSelectedBoothInfo(null);
             } else {
                 setAreas([]);
                 setOriginalAreas([]);
                 setMapStatus("NONE");
+                setSelectedBoothInfo(null);
             }
         } catch (mapErr) {
             console.log("No map data found for this event", mapErr);
@@ -184,6 +205,29 @@ export default function EventDetailPage() {
         };
     }, [layoutImageUrl]);
 
+    useEffect(() => {
+        // [NEW] 부스 정보가 새로 로드되거나 편집 반영될 때 모달 데이터도 최신 상태로 유지한다.
+        setSelectedBoothInfo((prev) => {
+            if (prev === null) {
+                return null;
+            }
+
+            const matchedArea = areas.find((area) => area.localId === prev.localId);
+            if (matchedArea === undefined || matchedArea.boothId === null || matchedArea.boothName === undefined) {
+                return null;
+            }
+
+            return {
+                localId: matchedArea.localId,
+                boothId: matchedArea.boothId,
+                boothName: matchedArea.boothName,
+                locationCode: matchedArea.locationCode,
+                waitingCount: matchedArea.waitingCount ?? 0,
+                estimatedWaitTime: matchedArea.estimatedWaitTime ?? 0,
+            };
+        });
+    }, [areas]);
+
     // Prevent default scroll when using Alt+Wheel on map container
     useEffect(() => {
         const handleWheel = (e: WheelEvent) => {
@@ -209,12 +253,15 @@ export default function EventDetailPage() {
                     setAreas(originalAreas);
                     setAreasHistory([]);
                     setHasUnsavedChanges(false);
+                    setSelectedBoothInfo(null);
                     setIsEditMode(false);
                 });
             } else {
+                setSelectedBoothInfo(null);
                 setIsEditMode(false);
             }
         } else {
+            setSelectedBoothInfo(null);
             setIsEditMode(true);
         }
     };
@@ -262,12 +309,14 @@ export default function EventDetailPage() {
                     setOriginalAreas(newDrafts);
                     setMapStatus("DRAFT");
                     setHasUnsavedChanges(true);
+                    setSelectedBoothInfo(null);
                     setIsEditMode(true); // Automatically enter edit mode
                 } else {
                     setAreas([]);
                     setOriginalAreas([]);
                     setMapStatus("NONE");
                     setHasUnsavedChanges(false);
+                    setSelectedBoothInfo(null);
                 }
             }
         } catch (err: any) {
@@ -308,6 +357,7 @@ export default function EventDetailPage() {
             setMapStatus("PUBLISHED");
             setIsEditMode(false);
             setHasUnsavedChanges(false);
+            setSelectedBoothInfo(null);
             showAlert("저장되었습니다.");
         } catch (err) {
             console.error("Failed to save map areas", err);
@@ -386,6 +436,22 @@ export default function EventDetailPage() {
 
         setIsSearchModalOpen(false);
         setActiveLocalId(null);
+    };
+
+    const handleAreaClick = (area: AreaItem) => {
+        if (isEditMode || area.boothId === null || area.boothName === undefined) {
+            return;
+        }
+
+        // [NEW] 보기 모드에서 클릭한 부스 정보를 플로팅 모달 상태에 저장한다.
+        setSelectedBoothInfo({
+            localId: area.localId,
+            boothId: area.boothId,
+            boothName: area.boothName,
+            locationCode: area.locationCode,
+            waitingCount: area.waitingCount ?? 0,
+            estimatedWaitTime: area.estimatedWaitTime ?? 0,
+        });
     };
 
     const handleDeleteArea = () => {
@@ -630,10 +696,12 @@ export default function EventDetailPage() {
                         layoutImageUrl={layoutImageUrl}
                         initialAreas={areas}
                         isEditMode={isEditMode}
+                        onAreaClick={handleAreaClick}
                         containerWidth={containerSize.width}
                         containerHeight={containerSize.height}
                         onOpenSearchModal={handleOpenSearchModal}
                         onAreasChange={handleAreasChange}
+                        selectedLocalId={selectedBoothInfo?.localId ?? null}
                         zoomLevel={zoomLevel}
                         hideBackground={!isEditMode && mapStatus === 'PUBLISHED'}
                     />
@@ -663,9 +731,79 @@ export default function EventDetailPage() {
                             <Upload className="w-6 h-6"/>
                             지도 업로드 및 자동 분석
                         </label>
+                    </div>
                 </div>
-              </div>
             )}
+
+                  {/* [NEW] 보기 모드 전용 부스 정보 플로팅 모달 */}
+                  {!isEditMode && selectedBoothInfo !== null && (
+                      <div className="absolute left-6 bottom-6 z-50 w-full max-w-sm">
+                          <div className="rounded-[28px] border border-white/70 bg-white/92 p-6 shadow-[0_24px_60px_rgba(45,42,74,0.18)] backdrop-blur-md">
+                              <div className="flex items-start justify-between gap-4">
+                                  <div>
+                                      <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#7C7A92]">
+                                          Booth Detail
+                                      </p>
+                                      <h3 className="mt-2 text-[28px] font-black leading-tight text-[#2D2A4A]">
+                                          {selectedBoothInfo.boothName}
+                                      </h3>
+                                      <p className="mt-2 text-sm font-bold text-gray-500">
+                                          {selectedBoothInfo.locationCode || "위치 코드 미등록"}
+                                      </p>
+                                  </div>
+                                  <div className="rounded-full bg-[#F3F1FF] px-3 py-1 text-xs font-black text-[#5A4EB2]">
+                                      실시간
+                                  </div>
+                              </div>
+
+                              <div className="mt-6 grid grid-cols-2 gap-3">
+                                  <div className="rounded-2xl bg-[#F6F7FB] px-4 py-4">
+                                      <p className="text-xs font-black uppercase tracking-[0.18em] text-gray-400">
+                                          Waiting
+                                      </p>
+                                      <p className="mt-2 text-3xl font-black text-[#2D2A4A]">
+                                          {selectedBoothInfo.waitingCount}
+                                      </p>
+                                      <p className="mt-1 text-xs font-bold text-gray-500">
+                                          현재 대기 인원
+                                      </p>
+                                  </div>
+                                  <div className="rounded-2xl bg-[#FFF7E8] px-4 py-4">
+                                      <p className="text-xs font-black uppercase tracking-[0.18em] text-[#C4881A]">
+                                          ETA
+                                      </p>
+                                      <p className="mt-2 text-3xl font-black text-[#9A5B00]">
+                                          {selectedBoothInfo.estimatedWaitTime}
+                                          <span className="ml-1 text-lg">분</span>
+                                      </p>
+                                      <p className="mt-1 text-xs font-bold text-[#B27619]">
+                                          예상 대기 시간
+                                      </p>
+                                  </div>
+                              </div>
+
+                              <div className="mt-5 rounded-2xl border border-[#E7E5F4] bg-[#FBFAFF] px-4 py-3">
+                                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8A86B0]">
+                                      Summary
+                                  </p>
+                                  <p className="mt-2 text-sm font-bold leading-6 text-[#4D496D]">
+                                      현재 이 부스에는 {selectedBoothInfo.waitingCount}명이 대기 중이며,
+                                      지금 줄을 설 경우 예상 대기 시간은 약 {selectedBoothInfo.estimatedWaitTime}분입니다.
+                                  </p>
+                              </div>
+
+                              <div className="mt-5 flex justify-end">
+                                  <button
+                                      onClick={() => setSelectedBoothInfo(null)}
+                                      className="inline-flex items-center gap-2 rounded-full bg-[#2D2A4A] px-4 py-2 text-sm font-black text-white transition-colors hover:bg-[#1D1A38]"
+                                  >
+                                      <X className="h-4 w-4"/>
+                                      닫기
+                                  </button>
+                              </div>
+                          </div>
+                      </div>
+                  )}
               </div>
 
               {/* Action Buttons (Save) */}

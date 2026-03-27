@@ -24,6 +24,10 @@ public record BoothMapAreaResDto(
         @Schema(description = "대기 인원 수", example = "12")
         long waitingCount,
 
+        // [NEW] 보기 모달에 노출할 예상 대기 시간(분) 필드
+        @Schema(description = "예상 대기 시간(분)", example = "24")
+        Long estimatedWaitTime,
+
         @Schema(description = "긴급 마감 여부", example = "false")
         boolean isEmergencyClosed,
 

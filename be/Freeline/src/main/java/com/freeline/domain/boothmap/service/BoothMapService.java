@@ -43,6 +43,7 @@ import com.freeline.domain.boothmap.repository.EventMapRepository;
 import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.exception.EventException;
 import com.freeline.domain.event.repository.EventRepository;
+import com.freeline.domain.waiting.service.WaitingPolicyResolver;
 
 import tools.jackson.databind.ObjectMapper;
 
@@ -53,11 +54,13 @@ import tools.jackson.databind.ObjectMapper;
 public class BoothMapService {
 
     private static final String MAP_DIRECTORY = "map";
+    private static final int DEFAULT_STAY_TIME_SECONDS = 0;
+    private static final int SECONDS_PER_MINUTE = 60;
 
+    // [MODIFIED] 대기 인원과 예상 대기 시간의 기준을 WAITING, CALLED 상태로 통일한다.
     private static final List<WaitingStatus> MAP_ACTIVE_WAITING_STATUSES = List.of(
             WaitingStatus.WAITING,
-            WaitingStatus.CALLED,
-            WaitingStatus.REGISTERED
+            WaitingStatus.CALLED
     );
 
     private final EventRepository eventRepository;
@@ -68,6 +71,7 @@ public class BoothMapService {
     private final FileService fileService;
     private final AiVisionClient aiVisionClient;
     private final ObjectMapper objectMapper;
+    private final WaitingPolicyResolver waitingPolicyResolver;
 
     public void bulkUpsertBoothMapAreas(final Long eventId, final BoothMapAreaBulkUpsertReqDto request) {
         validateEventOwnership(eventId);
@@ -230,6 +234,8 @@ public class BoothMapService {
         }
 
         final long waitingCount = boothWaitingRepository.countByBoothIdAndStatusIn(booth.getId(), MAP_ACTIVE_WAITING_STATUSES);
+        // [NEW] 지도 조회 응답에서 바로 사용할 수 있도록 예상 대기 시간을 함께 계산한다.
+        final Long estimatedWaitTime = calculateEstimatedWaitTime(booth.getId(), waitingCount);
 
         return BoothMapAreaResDto.builder()
                 .areaId(area.getId())
@@ -237,12 +243,27 @@ public class BoothMapService {
                 .boothName(booth.getName())
                 .locationCode(booth.getLocationCode())
                 .waitingCount(waitingCount)
+                .estimatedWaitTime(estimatedWaitTime)
                 .isEmergencyClosed(booth.isEmergencyClosed())
                 .xRatio(area.getXRatio())
                 .yRatio(area.getYRatio())
                 .widthRatio(area.getWidthRatio())
                 .heightRatio(area.getHeightRatio())
                 .build();
+    }
+
+    // [NEW] WAITING, CALLED 상태 인원 수와 체류 정책을 기준으로 예상 대기 시간을 계산한다.
+    private Long calculateEstimatedWaitTime(final Long boothId, final long waitingCount) {
+        if (waitingCount <= 0) {
+            return 0L;
+        }
+
+        final int stayTimeSeconds = waitingPolicyResolver.resolveStayTimeSeconds(boothId, DEFAULT_STAY_TIME_SECONDS);
+        if (stayTimeSeconds <= 0) {
+            return 0L;
+        }
+
+        return Math.ceilDiv(waitingCount * (long) stayTimeSeconds, SECONDS_PER_MINUTE);
     }
 
     private EventMap getValidatedEventMap(final Long eventId, final Long eventMapId) {
