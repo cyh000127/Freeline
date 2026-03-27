@@ -213,20 +213,29 @@ export default function ReportPage() {
 
   return (
     <div className="flex bg-[#F1F3F5] h-screen overflow-hidden">
-      <Sidebar userName={userName} role="총괄 팀장" eventId={eventId} />
+      <Sidebar userName={userName} role="총괄 팀장" eventId={eventId} eventName={event?.name}/>
 
       <main className="flex-1 flex flex-col overflow-y-auto">
         {/* Header */}
         <div className="px-8 pt-8 pb-4">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="p-2.5 bg-[#2D2A4A] rounded-xl">
-              <BarChart3 className="w-5 h-5 text-[#C4FF00]" />
-            </div>
+          <div className="mb-1 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 [&>div:last-child>*]:hidden">
+              <div className="rounded-xl bg-[#2D2A4A] p-2 shadow-lg">
+                <BarChart3 className="h-6 w-6 text-[#C4FF00]"/>
+              </div>
+              <div className="flex flex-col">
+                <h1 className="text-3xl font-black tracking-tight text-[#2D2A4A]">분석 리포트</h1>
+                <p className="ml-1 font-medium text-gray-500">
+                  {(event?.name || "행사")}의 운영 데이터와 방문 흐름을 확인합니다.
+                </p>
+              </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">분석 리포트</h1>
               <p className="text-sm text-gray-500 mt-0.5">
                 {event?.name || "행사"} 분석 결과
               </p>
+            </div>
+
             </div>
 
             {/* PDF Download Button */}

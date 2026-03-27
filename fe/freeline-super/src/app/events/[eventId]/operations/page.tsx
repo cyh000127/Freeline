@@ -24,10 +24,32 @@ type BoothOption = {
   locationCode: string;
 };
 
+interface BoothDetailRecord {
+  boothId?: number;
+  name?: string;
+  locationCode?: string;
+}
+
+interface ApiErrorShape {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
+
 type QueueTab = "WAITING" | "ENTERED" | "DONE";
 
 const isWaitingLike = (status: string) =>
   status === "REGISTERED" || status === "WAITING" || status === "CALLED";
+
+const hasBoothId = (booth: BoothDetailRecord): booth is BoothDetailRecord & { boothId: number } =>
+    typeof booth.boothId === "number";
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  const apiError = error as ApiErrorShape;
+  return apiError.response?.data?.message || fallback;
+};
 
 export default function EventOperationsPage() {
   const params = useParams();
@@ -52,8 +74,8 @@ export default function EventOperationsPage() {
     }
 
     const nextBooths = detailsRes.data.data
-      .filter((booth: any) => booth?.boothId)
-      .map((booth: any) => ({
+        .filter(hasBoothId)
+        .map((booth) => ({
         boothId: booth.boothId,
         boothName: booth.name || `부스 ${booth.boothId}`,
         locationCode: booth.locationCode || "-",
@@ -84,8 +106,8 @@ export default function EventOperationsPage() {
         if (queueRes.success && queueRes.data) {
           setFullQueue(queueRes.data.queueList || []);
         }
-      } catch (error: any) {
-        showAlert(error?.response?.data?.message || "부스 운영 현황을 불러오지 못했습니다.");
+      } catch (error) {
+        showAlert(getErrorMessage(error, "부스 운영 현황을 불러오지 못했습니다."));
       } finally {
         setIsLoading(false);
         setIsQueueLoading(false);
@@ -145,8 +167,8 @@ export default function EventOperationsPage() {
       await superWaitingApi.callNext(selectedBoothId);
       showAlert("다음 대기자를 호출했습니다.");
       fetchQueueData(selectedBoothId, false);
-    } catch (error: any) {
-      showAlert(error?.response?.data?.message || "다음 대기자 호출에 실패했습니다.");
+    } catch (error) {
+      showAlert(getErrorMessage(error, "다음 대기자 호출에 실패했습니다."));
     }
   };
 
@@ -155,8 +177,8 @@ export default function EventOperationsPage() {
     try {
       await superWaitingApi.admitWaiting(selectedBoothId, waitingId);
       fetchQueueData(selectedBoothId, false);
-    } catch (error: any) {
-      showAlert(error?.response?.data?.message || "입장 처리에 실패했습니다.");
+    } catch (error) {
+      showAlert(getErrorMessage(error, "입장 처리에 실패했습니다."));
     }
   };
 
@@ -166,8 +188,8 @@ export default function EventOperationsPage() {
       try {
         await superWaitingApi.cancelWaiting(selectedBoothId, waitingId);
         fetchQueueData(selectedBoothId, false);
-      } catch (error: any) {
-        showAlert(error?.response?.data?.message || "대기 취소에 실패했습니다.");
+      } catch (error) {
+        showAlert(getErrorMessage(error, "대기 취소에 실패했습니다."));
       }
     });
   };
@@ -177,8 +199,8 @@ export default function EventOperationsPage() {
     try {
       await superWaitingApi.exitWaiting(selectedBoothId, waitingId);
       fetchQueueData(selectedBoothId, false);
-    } catch (error: any) {
-      showAlert(error?.response?.data?.message || "퇴장 처리에 실패했습니다.");
+    } catch (error) {
+      showAlert(getErrorMessage(error, "퇴장 처리에 실패했습니다."));
     }
   };
 
@@ -215,15 +237,21 @@ export default function EventOperationsPage() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F1F3F5]">
-      <Sidebar userName={userName} role="총괄 팀장" eventId={eventId} />
+      <Sidebar userName={userName} role="총괄 팀장" eventId={eventId} eventName={event?.name}/>
 
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-7xl p-8">
-          <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="mb-2 flex items-center gap-3">
-                <div className="rounded-xl bg-[#2D2A4A] p-2.5">
-                  <Radio className="h-5 w-5 text-[#C4FF00]" />
+              <div className="mb-2 flex items-center gap-3 [&>div:last-child>*]:hidden">
+                <div className="rounded-xl bg-[#2D2A4A] p-2 shadow-lg">
+                  <Radio className="h-6 w-6 text-[#C4FF00]"/>
+                </div>
+                <div className="flex flex-col">
+                  <h1 className="text-3xl font-black tracking-tight text-[#2D2A4A]">부스 운영 관리</h1>
+                  <p className="ml-1 font-medium text-gray-500">
+                    {(event?.name || "행사")}의 부스 운영 현황을 실시간으로 확인하고 제어합니다.
+                  </p>
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">부스 운영 미리보기</h1>

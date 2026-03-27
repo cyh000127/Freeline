@@ -1,6 +1,6 @@
 "use client";
 
-import React, {useState, useEffect, useRef} from "react";
+import React, {useCallback, useEffect, useRef, useState} from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { EditEventModal } from "@/components/EditEventModal";
@@ -15,9 +15,15 @@ import {
   Map as MapIcon, 
   Upload,
     Calendar,
+    CircleHelp,
+    Eye,
     MapPin,
     Loader2,
+    Pencil,
+    Plus,
     Save,
+    FileClock,
+    Undo2,
     ZoomIn,
     ZoomOut,
     RotateCcw
@@ -35,6 +41,44 @@ interface AreaItem {
     readonly widthRatio: number;
     readonly heightRatio: number;
     readonly localId: string;
+}
+
+interface BoothMapPayloadArea {
+    readonly areaId?: number;
+    readonly boothId?: number | null;
+    readonly boothName?: string;
+    readonly locationCode?: string;
+    readonly adminName?: string;
+    readonly contact?: string;
+    readonly color?: string;
+    readonly xRatio: number;
+    readonly yRatio: number;
+    readonly widthRatio: number;
+    readonly heightRatio: number;
+}
+
+interface BoothMapResponseData {
+    readonly mapImageUrl: string;
+    readonly eventMapId: number;
+    readonly booths?: BoothMapPayloadArea[];
+    readonly drafts?: BoothMapPayloadArea[];
+}
+
+interface UploadedMapResponseData {
+    readonly imagePath: string;
+    readonly eventMapId: number;
+    readonly drafts?: BoothMapPayloadArea[];
+}
+
+interface ApiErrorShape {
+    readonly response?: {
+        readonly data?: {
+            readonly status?: string;
+            readonly error?: {
+                readonly status?: string;
+            };
+        };
+    };
 }
 
 export default function EventDetailPage() {
@@ -55,6 +99,7 @@ export default function EventDetailPage() {
     const [mapStatus, setMapStatus] = useState<"NONE" | "DRAFT" | "PUBLISHED">("NONE");
     const [areas, setAreas] = useState<AreaItem[]>([]);
     const [originalAreas, setOriginalAreas] = useState<AreaItem[]>([]);
+    const [publishedAreas, setPublishedAreas] = useState<AreaItem[]>([]);
     const [areasHistory, setAreasHistory] = useState<AreaItem[][]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -74,66 +119,93 @@ export default function EventDetailPage() {
     const [activeLocalId, setActiveLocalId] = useState<string | null>(null);
 
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [isUsageTooltipOpen, setIsUsageTooltipOpen] = useState(false);
+    const [isUsageTooltipHovered, setIsUsageTooltipHovered] = useState(false);
 
     // Warn before leaving if unsaved changes exist
     useLeaveConfirm(hasUnsavedChanges);
 
-    const fetchUserInfo = async () => {
+    const fetchUserInfo = useCallback(async () => {
         const userRes = await authApi.getMe();
         if (userRes.data?.success && userRes.data?.data?.name) {
             setUserName(userRes.data.data.name);
         }
-    };
+    }, []);
 
-    const fetchEventDetail = async () => {
+    const fetchEventDetail = useCallback(async () => {
         const eventRes = await eventApi.getEvent(eventId.toString());
         let detail = null;
         if (eventRes.data?.success && eventRes.data?.data) {
             detail = eventRes.data.data;
-        } else if ((eventRes.data as any)?.eventId) {
+        } else if (typeof eventRes.data === "object" && eventRes.data !== null && "eventId" in eventRes.data) {
             detail = eventRes.data;
         }
 
         if (detail !== null) {
             setEvent(detail as Event);
         }
-    };
+    }, [eventId]);
 
-    const fetchMapData = async () => {
+    const mapDraftArea = useCallback((area: BoothMapPayloadArea, localId: string): AreaItem => ({
+        localId,
+        boothId: area.boothId ?? null,
+        boothName: area.boothName,
+        locationCode: area.locationCode,
+        adminName: area.adminName,
+        contact: area.contact,
+        color: area.color,
+        xRatio: area.xRatio,
+        yRatio: area.yRatio,
+        widthRatio: area.widthRatio,
+        heightRatio: area.heightRatio,
+    }), []);
+
+    const mapPublishedArea = useCallback((area: BoothMapPayloadArea): AreaItem => ({
+        localId: `db-${area.areaId || area.boothId}`,
+        boothId: area.boothId ?? null,
+        boothName: area.boothName,
+        locationCode: area.locationCode,
+        adminName: area.adminName,
+        contact: area.contact,
+        color: area.color,
+        xRatio: area.xRatio,
+        yRatio: area.yRatio,
+        widthRatio: area.widthRatio,
+        heightRatio: area.heightRatio,
+    }), []);
+
+    const fetchMapData = useCallback(async () => {
         try {
             const mapRes = await boothMapApi.getBoothMap(eventId);
             if (!mapRes.data?.success || !mapRes.data?.data) return;
 
-            const data = mapRes.data.data;
+            const data = mapRes.data.data as BoothMapResponseData;
             setLayoutImageUrl(data.mapImageUrl);
             setEventMapId(data.eventMapId);
 
-            if (data.booths?.length > 0) {
-                const mappedAreas = data.booths.map((b: any) => ({
-                    localId: `db-${b.areaId || b.boothId}`,
-                    boothId: b.boothId,
-                    boothName: b.boothName,
-                    xRatio: b.xRatio,
-                    yRatio: b.yRatio,
-                    widthRatio: b.widthRatio,
-                    heightRatio: b.heightRatio,
-                }));
-                setAreas(mappedAreas);
-                setOriginalAreas(mappedAreas);
-                setMapStatus("PUBLISHED");
-            } else if (data.drafts?.length > 0) {
-                const newDrafts = data.drafts.map((d: any, idx: number) => ({
-                    localId: `ai-draft-${idx}-${Date.now()}`,
-                    boothId: null,
-                    xRatio: d.xRatio,
-                    yRatio: d.yRatio,
-                    widthRatio: d.widthRatio,
-                    heightRatio: d.heightRatio,
-                }));
-                setAreas(newDrafts);
-                setOriginalAreas(newDrafts);
+            const mappedPublishedAreas = data.booths?.map((area) => mapPublishedArea(area)) ?? [];
+            const mappedDraftAreas = data.drafts?.map((area, idx) =>
+                mapDraftArea(area, `ai-draft-${idx}-${Date.now()}`)
+            ) ?? [];
+
+            if (mappedPublishedAreas.length > 0) {
+                setPublishedAreas(mappedPublishedAreas);
+                if (mappedDraftAreas.length > 0) {
+                    setAreas(mappedDraftAreas);
+                    setOriginalAreas(mappedDraftAreas);
+                    setMapStatus("DRAFT");
+                } else {
+                    setAreas(mappedPublishedAreas);
+                    setOriginalAreas(mappedPublishedAreas);
+                    setMapStatus("PUBLISHED");
+                }
+            } else if (mappedDraftAreas.length > 0) {
+                setPublishedAreas([]);
+                setAreas(mappedDraftAreas);
+                setOriginalAreas(mappedDraftAreas);
                 setMapStatus("DRAFT");
             } else {
+                setPublishedAreas([]);
                 setAreas([]);
                 setOriginalAreas([]);
                 setMapStatus("NONE");
@@ -141,7 +213,7 @@ export default function EventDetailPage() {
         } catch (mapErr) {
             console.log("No map data found for this event", mapErr);
         }
-    };
+    }, [eventId, mapDraftArea, mapPublishedArea]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -158,7 +230,7 @@ export default function EventDetailPage() {
         if (eventId) {
             fetchData();
         }
-    }, [eventId]);
+    }, [eventId, fetchEventDetail, fetchMapData, fetchUserInfo]);
 
     useEffect(() => {
         const updateSize = () => {
@@ -184,23 +256,49 @@ export default function EventDetailPage() {
         };
     }, [layoutImageUrl]);
 
-    // Prevent default scroll when using Alt+Wheel on map container
     useEffect(() => {
-        const handleWheel = (e: WheelEvent) => {
-            if (e.altKey) {
-                e.preventDefault();
-            }
-        };
-        const el = containerRef.current;
-        if (el) {
-            el.addEventListener('wheel', handleWheel, {passive: false});
+        if (!isEditMode) {
+            setIsUsageTooltipOpen(false);
+            return;
         }
+
+        setIsUsageTooltipOpen(true);
+        const timeoutId = globalThis.setTimeout(() => {
+            setIsUsageTooltipOpen(false);
+        }, 2000);
+
         return () => {
-            if (el) {
-                el.removeEventListener('wheel', handleWheel);
-            }
+            globalThis.clearTimeout(timeoutId);
         };
-    }, []);
+    }, [isEditMode]);
+
+    // Handle Alt+Wheel zoom with a non-passive listener so page scrolling is blocked.
+    useEffect(() => {
+        const element = containerRef.current;
+        if (!element) return;
+
+        const handleWheel = (e: WheelEvent) => {
+            if (!e.altKey) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const rect = element.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+            setZoomOrigin({x: `${x}%`, y: `${y}%`});
+            setZoomLevel((prev) => {
+                const nextZoom = e.deltaY < 0 ? prev + 0.1 : prev - 0.1;
+                return Math.min(Math.max(0.5, nextZoom), 3);
+            });
+        };
+
+        element.addEventListener("wheel", handleWheel, {capture: true, passive: false});
+        return () => {
+            element.removeEventListener("wheel", handleWheel, {capture: true});
+        };
+    }, [layoutImageUrl, isEditMode]);
 
     const handleToggleEditMode = () => {
         if (isEditMode) {
@@ -244,34 +342,34 @@ export default function EventDetailPage() {
             const res = await boothMapApi.uploadMapImage(eventId, file, true);
 
             if (res.data?.success && res.data?.data) {
-                const data = res.data.data;
+                const data = res.data.data as UploadedMapResponseData;
                 setLayoutImageUrl(data.imagePath);
                 setEventMapId(data.eventMapId);
 
+                const uploadedDrafts = data.drafts ?? [];
+
                 // AI Drafts processing
-                if (data.drafts?.length > 0) {
-                    const newDrafts = data.drafts.map((d: any, idx: number) => ({
-                        localId: `ai-draft-${idx}-${Date.now()}`,
-                        boothId: null,
-                        xRatio: d.xRatio,
-                        yRatio: d.yRatio,
-                        widthRatio: d.widthRatio,
-                        heightRatio: d.heightRatio,
-                    }));
+                if (uploadedDrafts.length > 0) {
+                    const newDrafts = uploadedDrafts.map((draft, idx) =>
+                        mapDraftArea(draft, `ai-draft-${idx}-${Date.now()}`)
+                    );
+                    setPublishedAreas([]);
                     setAreas(newDrafts);
                     setOriginalAreas(newDrafts);
                     setMapStatus("DRAFT");
                     setHasUnsavedChanges(true);
                     setIsEditMode(true); // Automatically enter edit mode
                 } else {
+                    setPublishedAreas([]);
                     setAreas([]);
                     setOriginalAreas([]);
                     setMapStatus("NONE");
                     setHasUnsavedChanges(false);
                 }
             }
-        } catch (err: any) {
-            const errorStatus = err.response?.data?.status || err.response?.data?.error?.status;
+        } catch (err) {
+            const error = err as ApiErrorShape;
+            const errorStatus = error.response?.data?.status || error.response?.data?.error?.status;
             const message = errorStatus === "INVALID_IMAGE_FORMAT"
                 ? "지원하지 않는 이미지 포맷이거나 손상된 파일입니다."
                 : "지도 업로드에 실패했습니다.";
@@ -304,6 +402,7 @@ export default function EventDetailPage() {
         try {
             setIsSaving(true);
             await boothMapApi.updateBoothMapAreas(eventId, eventMapId, validAreas);
+            setPublishedAreas(areas);
             setOriginalAreas(areas);
             setMapStatus("PUBLISHED");
             setIsEditMode(false);
@@ -422,13 +521,15 @@ export default function EventDetailPage() {
     );
   }
 
+    const displayAreas = !isEditMode && publishedAreas.length > 0 ? publishedAreas : areas;
+    const shouldShowUsageTooltip = isEditMode && (isUsageTooltipOpen || isUsageTooltipHovered);
     const mappedBoothIds = areas.filter(a => a.boothId !== null).map(a => a.boothId as number);
     const currentActiveArea = areas.find(a => a.localId === activeLocalId);
     const currentBoothId = currentActiveArea?.boothId ?? null;
 
   return (
     <div className="flex bg-[#F1F3F5] h-screen overflow-hidden">
-        <Sidebar userName={userName} role="총괄 팀장" eventId={eventId.toString()}/>
+        <Sidebar userName={userName} role="총괄 팀장" eventId={eventId.toString()} eventName={event.name}/>
 
       <main className="flex-1 flex flex-col p-8 overflow-y-auto">
         {/* Header Section */}
@@ -474,15 +575,39 @@ export default function EventDetailPage() {
                                   <button
                                       onClick={handleUndo}
                                       disabled={areasHistory.length === 0}
-                                      className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-black text-[15px] hover:bg-gray-200 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                      className="flex items-center gap-2 rounded-xl bg-gray-100 px-5 py-2.5 font-black text-[0px] text-gray-700 shadow-sm transition-all hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 max-[1280px]:px-3 [&>span:not(.clean-visible)]:hidden"
                                   >
+                                      <Undo2 className="w-5 h-5"/>
+                                      <span className="clean-visible text-[15px] max-[1280px]:hidden">이전으로</span>
+                                      <span className="clean-label text-[15px] max-[1280px]:hidden">이전으로</span>
+                                      <span className="text-[15px]">이전으로</span>
                                       이전으로
                                   </button>
+                                  <div className="hidden">
+                                      <button
+                                          type="button"
+                                          aria-label="편집 도움말"
+                                          className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-700"
+                                      >
+                                          <CircleHelp className="h-5 w-5"/>
+                                      </button>
+                                      <div
+                                          className="pointer-events-none absolute right-0 top-[calc(100%+10px)] z-20 w-80 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-left text-[13px] font-semibold leading-6 text-gray-700 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                          <p>- Alt + 휠 : 확대 / 축소</p>
+                                          <p>- Alt + 드래그 : 캔버스 이동</p>
+                                          <p>- 부스 선택 후 Delete 또는 Backspace : 부스 삭제</p>
+                                          <p>- 다중 선택 + 드래그 : 다중 부스 이동</p>
+                                      </div>
+                                  </div>
                                   <button
                                       onClick={handleAddArea}
-                                      className="flex items-center gap-2 px-5 py-2.5 bg-blue-100 text-blue-700 rounded-xl font-black text-[15px] hover:bg-blue-200 transition-all shadow-sm"
+                                      className="flex items-center gap-2 rounded-xl bg-blue-100 px-5 py-2.5 font-black text-[0px] text-blue-700 shadow-sm transition-all hover:bg-blue-200 max-[1280px]:px-3 [&>span:not(.clean-visible)]:hidden"
                                   >
-                                      <MapPin className="w-5 h-5"/>
+                                      <Plus className="w-5 h-5"/>
+                                      <span className="clean-visible text-[15px] max-[1280px]:hidden">부스 추가</span>
+                                      <span className="clean-label text-[15px]">부스 추가</span>
+                                      <span className="text-[15px]">부스 추가</span>
+                                      <span className="text-[15px]">부스 추가</span>
                                       영역 추가
                                   </button>
                               </>
@@ -506,8 +631,13 @@ export default function EventDetailPage() {
                           )}
                           <button
                               onClick={handleToggleEditMode}
-                              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-[15px] transition-all shadow-sm ${isEditMode ? "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50" : "bg-[#DBFC53] text-[#2D2A4A] hover:bg-[#c9e846]"}`}
+                              className={`flex items-center gap-2 rounded-xl px-5 py-2.5 font-black text-[0px] shadow-sm transition-all max-[1280px]:px-3 [&>span:not(.clean-visible)]:hidden ${isEditMode ? "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50" : "bg-[#DBFC53] text-[#2D2A4A] hover:bg-[#c9e846]"}`}
                           >
+                              {isEditMode ? <Eye className="w-5 h-5"/> : <Pencil className="w-5 h-5"/>}
+                              <span
+                                  className="clean-visible text-[15px] max-[1280px]:hidden">{isEditMode ? "보기 모드" : "편집 모드"}</span>
+                              <span className="clean-label text-[15px]">{isEditMode ? "보기 모드" : "편집 모드"}</span>
+                              <span className="text-[15px]">{isEditMode ? "보기 모드" : "편집 모드"}</span>
                               {isEditMode ? "보기 모드" : "편집 모드"}
                           </button>
                       </>
@@ -521,25 +651,6 @@ export default function EventDetailPage() {
                   className="flex-1 bg-[#F1F3F5] rounded-[32px] flex items-center justify-center border-2 border-dashed border-gray-200 overflow-hidden relative group"
                   role="region"
                   aria-label="Map view"
-                  tabIndex={0}
-                  onWheel={(e) => {
-                      if (e.altKey) {
-                          e.preventDefault();
-                          if (!containerRef.current) return;
-
-                          const rect = containerRef.current.getBoundingClientRect();
-                          const x = ((e.clientX - rect.left) / rect.width) * 100;
-                          const y = ((e.clientY - rect.top) / rect.height) * 100;
-
-                          // Only set origin if we are actually zooming
-                          setZoomOrigin({x: `${x}%`, y: `${y}%`});
-
-                          setZoomLevel(prev => {
-                              const newZoom = e.deltaY < 0 ? prev + 0.1 : prev - 0.1;
-                              return Math.min(Math.max(0.5, newZoom), 3);
-                          });
-                      }
-                  }}
                   onMouseDown={(e) => {
                       if (e.altKey) {
                           e.preventDefault();
@@ -565,7 +676,8 @@ export default function EventDetailPage() {
                       isPanningRef.current = false;
                   }}
                   style={{
-                      cursor: isPanningRef.current ? 'grabbing' : 'default'
+                      cursor: isPanningRef.current ? 'grabbing' : 'default',
+                      overscrollBehavior: 'contain',
                   }}
               >
                   {/* Temporary Save Badge */}
@@ -628,14 +740,13 @@ export default function EventDetailPage() {
                 >
                     <BoothMapEditor
                         layoutImageUrl={layoutImageUrl}
-                        initialAreas={areas}
+                        initialAreas={displayAreas}
                         isEditMode={isEditMode}
                         containerWidth={containerSize.width}
                         containerHeight={containerSize.height}
                         onOpenSearchModal={handleOpenSearchModal}
                         onAreasChange={handleAreasChange}
-                        zoomLevel={zoomLevel}
-                        hideBackground={!isEditMode && mapStatus === 'PUBLISHED'}
+                        hideBackground={!isEditMode && publishedAreas.length > 0}
                     />
                 </div>
             ) : (
@@ -668,6 +779,37 @@ export default function EventDetailPage() {
             )}
               </div>
 
+              {layoutImageUrl && isEditMode && (
+                  <div
+                      className="absolute bottom-8 left-10 z-20 flex items-center gap-1.5 text-[0px] leading-none [&>span:not(.usage-label)]:hidden">
+                      <span className="text-xs font-bold text-gray-400">사용법</span>
+                      <span className="usage-label text-xs font-bold text-gray-400">사용법</span>
+                      <div
+                          className="relative"
+                          onMouseEnter={() => setIsUsageTooltipHovered(true)}
+                          onMouseLeave={() => setIsUsageTooltipHovered(false)}
+                      >
+                          <button
+                              type="button"
+                              aria-label="사용법"
+                              className="flex h-4 w-4 items-center justify-center text-gray-400 transition-colors hover:text-gray-600"
+                          >
+                              <CircleHelp className="h-4 w-4"/>
+                          </button>
+                          <div
+                              className={`pointer-events-none absolute bottom-[calc(100%+10px)] left-0 w-80 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-left text-[13px] font-semibold leading-6 text-gray-700 shadow-xl transition-all duration-200 ${
+                                  shouldShowUsageTooltip ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+                              }`}
+                          >
+                              <p>- Alt + 휠 : 확대 / 축소</p>
+                              <p>- Alt + 드래그 : 캔버스 이동</p>
+                              <p>- 부스 선택 후 Delete 또는 Backspace : 부스 삭제</p>
+                              <p>- 다중 선택 + 드래그 : 다중 부스 이동</p>
+                          </div>
+                      </div>
+                  </div>
+              )}
+
               {/* Action Buttons (Save) */}
               <div className="flex justify-end gap-3 mt-6 min-h-[56px]">
                   {layoutImageUrl && isEditMode && (
@@ -677,7 +819,8 @@ export default function EventDetailPage() {
                               disabled={isSaving}
                               className="flex items-center gap-2 px-6 py-3 bg-green-100 text-green-700 rounded-2xl font-black text-[16px] hover:bg-green-200 transition-all shadow-sm disabled:opacity-50"
                           >
-                              {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
+                              {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> :
+                                  <FileClock className="w-5 h-5"/>}
                               임시저장
                           </button>
                           <button
@@ -704,6 +847,7 @@ export default function EventDetailPage() {
       />
 
         <BoothSearchModal
+            key={isSearchModalOpen ? (activeLocalId ?? "open") : "closed"}
             isOpen={isSearchModalOpen}
             onClose={() => setIsSearchModalOpen(false)}
             eventId={eventId}

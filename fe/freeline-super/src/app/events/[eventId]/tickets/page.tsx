@@ -278,7 +278,7 @@ export default function VisitorTicketsPage() {
   if (isLoading) {
     return (
       <div className="flex bg-[#F1F3F5] h-screen overflow-hidden">
-        <Sidebar userName={userName} role="총괄 팀장" eventId={eventId.toString()} />
+        <Sidebar userName={userName} role="총괄 팀장" eventId={eventId.toString()} eventName={eventName}/>
         <main className="flex-1 flex items-center justify-center">
           <Loader2 className="w-10 h-10 animate-spin text-[#2D2A4A]" />
         </main>
@@ -292,7 +292,7 @@ export default function VisitorTicketsPage() {
 
   return (
     <div className="flex bg-[#F1F3F5] h-screen overflow-hidden">
-      <Sidebar userName={userName} role="총괄 팀장" eventId={eventId.toString()} />
+      <Sidebar userName={userName} role="총괄 팀장" eventId={eventId.toString()} eventName={eventName}/>
 
       <main className="flex-1 flex flex-col p-8 overflow-y-auto">
         {/* Header */}

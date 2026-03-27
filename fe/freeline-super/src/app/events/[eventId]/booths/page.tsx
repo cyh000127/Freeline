@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import {useParams} from "next/navigation";
 import * as XLSX from "xlsx";
 import { Sidebar } from "@/components/Sidebar";
 import { authApi } from "@/lib/api/auth";
@@ -13,12 +13,8 @@ import {
   CheckSquare,
   Square,
   Mail,
-  MailCheck,
   Loader2,
-  Eye,
-  EyeOff,
   Trash2,
-  RefreshCw,
   Users,
 } from "lucide-react";
 
@@ -36,70 +32,95 @@ interface BoothRow {
   status: "pending" | "registered" | "error";
 }
 
-const normalizeBoothName = (name: string) => name.trim().toLowerCase();
+type BoothSheetCell = string | number | null | undefined;
+type BoothSheetRow = BoothSheetCell[];
 
-function parseFile(file: File): Promise<BoothRow[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = e.target?.result;
-        let wb;
-        const isCsv = file.name.toLowerCase().endsWith(".csv");
+interface BoothAdminRecord {
+  adminId?: number;
+  boothId?: number;
+  boothName?: string;
+  name?: string;
+  email?: string;
+  company?: string;
+}
 
-        if (isCsv && data instanceof ArrayBuffer) {
-          // For CSV, try UTF-8 first, then fallback to EUC-KR
-          let str = "";
-          try {
-            const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
-            str = utf8Decoder.decode(new Uint8Array(data));
-          } catch {
-            const eucDecoder = new TextDecoder("euc-kr");
-            str = eucDecoder.decode(new Uint8Array(data));
-          }
-          wb = XLSX.read(str, { type: "string" });
-        } else {
-          wb = XLSX.read(data, { type: "array" });
-        }
+interface BoothDetailRecord {
+  boothId?: number;
+  locationCode?: string;
+  openTime?: string;
+  closeTime?: string;
+}
 
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const dataRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-
-        // Skip first row which is the header
-        const rows: BoothRow[] = dataRows.slice(1)
-          .filter((r) => {
-            // Requirement: boothName (index 0) and adminEmail (index 5) are required (Y)
-            const name = r[0]?.toString().trim() || "";
-            const email = r[5]?.toString().trim() || "";
-            return name && email;
-          })
-          .map((r) => ({
-            id: crypto.randomUUID(),
-            boothName: r[0]?.toString().trim() || "",
-            locationCode: r[1]?.toString().trim() || "",
-            openTime: r[2]?.toString().trim() || "",
-            closeTime: r[3]?.toString().trim() || "",
-            adminName: r[4]?.toString().trim() || "",
-            adminEmail: r[5]?.toString().trim() || "",
-            adminCompany: r[6]?.toString().trim() || "",
-            selected: true,
-            status: "pending" as const,
-          }));
-        resolve(rows);
-      } catch (err) {
-        reject(err);
-      }
+interface ApiErrorShape {
+  response?: {
+    data?: {
+      message?: string;
+      status?: string;
+      error?: {
+        status?: string;
+      };
     };
-    reader.onerror = reject;
-    reader.readAsArrayBuffer(file);
+  };
+  message?: string;
+}
+
+const normalizeBoothName = (name: string) => name.trim().toLowerCase();
+const getCellText = (row: BoothSheetRow, index: number) => String(row[index] ?? "").trim();
+const getErrorMessage = (error: unknown, fallback: string) => {
+  const apiError = error as ApiErrorShape;
+  return apiError.response?.data?.message || apiError.message || fallback;
+};
+
+const buildBoothRows = (dataRows: BoothSheetRow[]): BoothRow[] =>
+    dataRows
+        .slice(1)
+        .filter((row) => getCellText(row, 0) && getCellText(row, 5))
+        .map((row) => ({
+          id: crypto.randomUUID(),
+          boothName: getCellText(row, 0),
+          locationCode: getCellText(row, 1),
+          openTime: getCellText(row, 2),
+          closeTime: getCellText(row, 3),
+          adminName: getCellText(row, 4),
+          adminEmail: getCellText(row, 5),
+          adminCompany: getCellText(row, 6),
+          selected: true,
+          status: "pending" as const,
+        }));
+
+async function parseFile(file: File): Promise<BoothRow[]> {
+  const data = await file.arrayBuffer();
+  const isCsv = file.name.toLowerCase().endsWith(".csv");
+
+  const workbook = (() => {
+    if (!isCsv) {
+      return XLSX.read(data, {type: "array"});
+    }
+
+    try {
+      const utf8Decoder = new TextDecoder("utf-8", {fatal: true});
+      const content = utf8Decoder.decode(new Uint8Array(data));
+      return XLSX.read(content, {type: "string"});
+    } catch {
+      const eucDecoder = new TextDecoder("euc-kr");
+      const content = eucDecoder.decode(new Uint8Array(data));
+      return XLSX.read(content, {type: "string"});
+    }
+  })();
+
+  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+  const dataRows = XLSX.utils.sheet_to_json<BoothSheetRow>(worksheet, {
+    header: 1,
+    defval: "",
   });
+
+  return buildBoothRows(dataRows);
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function EventBoothsPage() {
   const params = useParams();
   const eventId = params.eventId as string;
-  const router = useRouter();
   const { showAlert, showConfirm } = useModal();
 
   const [userName, setUserName] = useState("관리자");
@@ -121,26 +142,26 @@ export default function EventBoothsPage() {
         eventApi.getBoothDetails(eventId),
       ]);
 
-      const detailsMap = new Map();
+      const detailsMap = new Map<string, BoothDetailRecord>();
       if (detailsRes.data?.success && Array.isArray(detailsRes.data.data)) {
-        detailsRes.data.data.forEach((d: any) => {
-          if (d.boothId) detailsMap.set(d.boothId.toString(), d);
+        detailsRes.data.data.forEach((detail: BoothDetailRecord) => {
+          if (detail.boothId) detailsMap.set(detail.boothId.toString(), detail);
         });
       }
 
       if (adminsRes.data?.success && Array.isArray(adminsRes.data.data)) {
-        const existingRows: BoothRow[] = adminsRes.data.data.map((b: any) => {
-          const detail = b.boothId ? detailsMap.get(b.boothId.toString()) : null;
+        const existingRows: BoothRow[] = adminsRes.data.data.map((admin: BoothAdminRecord) => {
+          const detail = admin.boothId ? detailsMap.get(admin.boothId.toString()) : null;
           return {
-            id: b.boothId ? b.boothId.toString() : crypto.randomUUID(),
-            adminId: b.adminId,
-            boothName: b.boothName || "",
+            id: admin.boothId ? admin.boothId.toString() : crypto.randomUUID(),
+            adminId: admin.adminId,
+            boothName: admin.boothName || "",
             locationCode: detail?.locationCode || "-",
             openTime: detail?.openTime || "-",
             closeTime: detail?.closeTime || "-",
-            adminName: b.name || "",
-            adminEmail: b.email || "",
-            adminCompany: b.company || "-",
+            adminName: admin.name || "",
+            adminEmail: admin.email || "",
+            adminCompany: admin.company || "-",
             selected: false,
             status: "registered" as const,
           };
@@ -161,8 +182,14 @@ export default function EventBoothsPage() {
         ]);
         if (userRes.data?.success && userRes.data?.data?.name)
           setUserName(userRes.data.data.name);
-        const detail = eventRes.data?.success ? eventRes.data.data : (eventRes.data as any);
-        if (detail?.eventId) setEvent(detail as Event);
+        const detail = eventRes.data?.success
+            ? eventRes.data.data
+            : typeof eventRes.data === "object" && eventRes.data !== null
+                ? eventRes.data
+                : null;
+        if (detail && typeof detail === "object" && "eventId" in detail) {
+          setEvent(detail as Event);
+        }
 
         await fetchBooths();
       } catch {
@@ -250,8 +277,8 @@ export default function EventBoothsPage() {
             setRows((p) => p.filter((r) => r.id !== id));
             showAlert("성공적으로 삭제되었습니다.");
           }
-        } catch (err: any) {
-          showAlert(err.response?.data?.message || err.message || "삭제에 실패했습니다.");
+        } catch (error) {
+          showAlert(getErrorMessage(error, "삭제에 실패했습니다."));
         }
       });
     } else {
@@ -281,12 +308,13 @@ export default function EventBoothsPage() {
         setSelectedFile(null);
         setFileName("");
       }
-    } catch (err: any) {
-      const errorStatus = err.response?.data?.status || err.response?.data?.error?.status;
+    } catch (error) {
+      const apiError = error as ApiErrorShape;
+      const errorStatus = apiError.response?.data?.status || apiError.response?.data?.error?.status;
       if (errorStatus === "INVALID_CSV_FORMAT") {
         showAlert("파일 형식이 올바르지 않거나 컬럼 양식이 다릅니다. 정상적인 CSV 파일인지 확인해 주세요.");
       } else {
-        showAlert(err.response?.data?.message || err.message || "테이블 등록에 실패했습니다.");
+        showAlert(getErrorMessage(error, "테이블 등록에 실패했습니다."));
       }
     } finally {
       setIsCreating(false);
@@ -310,15 +338,14 @@ export default function EventBoothsPage() {
           // optionally refresh UI or clear selection
           setRows((prev) => prev.map((r) => selected.some((s) => s.id === r.id) ? { ...r, selected: false } : r));
         }
-      } catch (err: any) {
-        showAlert(err.response?.data?.message || err.message || "이메일 전송에 실패했습니다.");
+      } catch (error) {
+        showAlert(getErrorMessage(error, "이메일 전송에 실패했습니다."));
       } finally {
         setIsSendingMail(false);
       }
     });
   };
 
-  const selectedEventId = eventId;
   const allSelected = rows.length > 0 && rows.every((r) => r.selected);
   const selectedRows = rows.filter((r) => r.selected);
 
@@ -338,15 +365,21 @@ export default function EventBoothsPage() {
 
   return (
     <div className="flex bg-[#F1F3F5] h-screen overflow-hidden">
-      <Sidebar userName={userName} role="총괄 팀장" eventId={eventId} />
+      <Sidebar userName={userName} role="총괄 팀장" eventId={eventId} eventName={event?.name}/>
 
       <main className="flex-1 flex flex-col overflow-y-auto">
         {/* ── Page Header ────────────────────────────────────────── */}
         <div className="sticky top-0 z-10 bg-[#F1F3F5] px-8 pt-8 pb-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#2D2A4A] rounded-xl">
-                <Users className="w-5 h-5 text-[#C4FF00]" />
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 [&>div:last-child>*]:hidden">
+              <div className="rounded-xl bg-[#2D2A4A] p-2 shadow-lg">
+                <Users className="h-6 w-6 text-[#C4FF00]"/>
+              </div>
+              <div className="flex flex-col">
+                <h1 className="text-3xl font-black tracking-tight text-[#2D2A4A]">부스 계정 관리</h1>
+                <p className="ml-1 font-medium text-gray-500">
+                  {(event?.name || "행사")}의 부스 관리자 계정을 등록하고 로그인 정보를 전송합니다.
+                </p>
               </div>
               <div>
                 <h1 className="text-xl font-black text-[#2D2A4A]">부스 관리자 계정 생성</h1>
@@ -379,7 +412,7 @@ export default function EventBoothsPage() {
             {/* Example Template Table */}
             <div className="mb-5 overflow-x-auto">
               <p className="text-[11px] font-bold text-gray-400 mb-2 ml-1 flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-red-400"></span>
+                <span className="wy-1 h-1 rounded-full bg-red-400"></span>
                 업로드 양식 예시 (CSV/XLSX)
               </p>
               <table className="w-full text-[10px] border border-gray-100 rounded-xl overflow-hidden shadow-sm">
@@ -410,7 +443,15 @@ export default function EventBoothsPage() {
                 * 부스 이름과 관리자 이메일은 필수 항목입니다.
               </p>
             </div>
-            <div
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+                onChange={onInputChange}
+            />
+            <button
+                type="button"
               className={`relative flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-2xl p-8 cursor-pointer transition-all ${isDragging
                 ? "border-[#2D2A4A] bg-indigo-50 scale-[1.01]"
                 : "border-gray-200 hover:border-[#2D2A4A] hover:bg-gray-50"
@@ -419,14 +460,8 @@ export default function EventBoothsPage() {
               onDragLeave={() => setIsDragging(false)}
               onDrop={onDrop}
               onClick={() => fileInputRef.current?.click()}
+                aria-describedby="booth-upload-help"
             >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                className="hidden"
-                onChange={onInputChange}
-              />
               {isParsing ? (
                 <Loader2 className="w-8 h-8 text-[#2D2A4A] animate-spin" />
               ) : (
@@ -439,14 +474,14 @@ export default function EventBoothsPage() {
                   <p className="text-sm font-bold text-gray-700">
                     {fileName ? `📄 ${fileName} (업로드됨)` : "파일을 드래그하거나 클릭하여 업로드"}
                   </p>
-                  <p className="text-xs text-gray-400">CSV, XLSX, XLS · 중복 부스명은 자동으로 차단됩니다</p>
+                  <p id="booth-upload-help" className="text-xs text-gray-400">CSV, XLSX, XLS · 중복 부스명은 자동으로 차단됩니다</p>
                   <div className="flex items-center gap-2 px-4 py-2 bg-[#2D2A4A] text-white text-xs font-bold rounded-xl">
                     <Upload className="w-3.5 h-3.5" />
                     파일 선택
                   </div>
                 </>
               )}
-            </div>
+            </button>
           </div>
 
           {/* ── Step 2: Table ─────────────────────────────────────── */}
@@ -454,19 +489,26 @@ export default function EventBoothsPage() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
               {/* Table toolbar */}
               <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 [&>h2]:hidden">
                   <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#2D2A4A] text-white text-xs font-black">
                     2
                   </span>
+                  <span className="text-sm font-bold text-gray-900">부스 관리자 목록</span>
+                  <h2 className="text-sm font-bold text-gray-900 not-sr-only!">부스 관리자 목록</h2>
                   <h2 className="text-sm font-bold text-gray-900">부스 목록</h2>
+                  <h2 className="text-sm font-bold text-gray-900">부스 관리자 목록</h2>
                   <span className="px-2 py-0.5 bg-gray-100 rounded-full text-xs font-bold text-gray-600">
                     {rows.length}개
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2">
-                  </div>
-                </div>
+                <p className="hidden text-[11px] text-gray-400 font-medium text-right">
+                  <span className="text-[#2D2A4A] font-bold uppercase tracking-widest mr-1">안내:</span>
+                  CSV 파일을 업로드하면 정보를 일괄 등록하고 로그인 정보를 발송할 수 있습니다.
+                </p>
+                <p className="text-[11px] text-gray-400 font-medium text-right">
+                  <span className="text-[#2D2A4A] font-bold uppercase tracking-widest mr-1">안내:</span>
+                  CSV 파일을 업로드하면 정보를 등록하고 로그인 정보를 발송할 수 있습니다.
+                </p>
               </div>
 
               {/* Table */}
@@ -475,7 +517,7 @@ export default function EventBoothsPage() {
                   <thead>
                     <tr className="bg-[#F8F9FA] text-gray-500 text-xs font-bold border-b border-gray-100">
                       <th className="w-12 px-4 py-3 text-center">
-                        <button onClick={toggleAll} className="flex items-center justify-center">
+                        <button type="button" onClick={toggleAll} className="flex items-center justify-center">
                           {allSelected ? (
                             <CheckSquare className="w-4 h-4 text-[#2D2A4A]" />
                           ) : (
@@ -500,7 +542,8 @@ export default function EventBoothsPage() {
                         className={`transition-colors ${row.selected ? "bg-indigo-50/40" : "bg-white"} hover:bg-gray-50`}
                       >
                         <td className="px-4 py-3 text-center">
-                          <button onClick={() => toggleRow(row.id)} className="flex items-center justify-center">
+                          <button type="button" onClick={() => toggleRow(row.id)}
+                                  className="flex items-center justify-center">
                             {row.selected ? (
                               <CheckSquare className="w-4 h-4 text-[#2D2A4A]" />
                             ) : (
@@ -520,6 +563,7 @@ export default function EventBoothsPage() {
                         <td className="px-4 py-2">
                           <div className="flex items-center justify-center gap-1">
                             <button
+                                type="button"
                               title="삭제"
                               onClick={() => deleteRow(row.id)}
                               className="p-1 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
@@ -535,17 +579,19 @@ export default function EventBoothsPage() {
               </div>
 
               {/* Action bar */}
-              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-[#F8F9FA]">
-                <p className="text-[11px] text-gray-400 font-medium">
+              <div className="flex items-center justify-end px-6 py-4 border-t border-gray-100 bg-[#F8F9FA]">
+                <p className="hidden text-[11px] text-gray-400 font-medium">
                   <span className="text-[#2D2A4A] font-bold uppercase tracking-widest mr-1">안내:</span> CSV 파일을 업로드하여 정보를 일괄 등록하고 로그인 정보를 발송하세요.
                 </p>
                 <div className="flex items-center gap-4">
                   <button
                     onClick={handleOnboarding}
                     disabled={isCreating || rows.length === 0}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2D2A4A] text-white text-xs font-bold hover:bg-[#3A375C] disabled:opacity-50 transition-all shadow-md active:scale-95 group"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2D2A4A] text-white text-[0px] font-bold hover:bg-[#3A375C] disabled:opacity-50 transition-all shadow-md active:scale-95 group [&>span:not(.visible-label-next)]:hidden"
                   >
                     {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />}
+                    <span className="visible-label-next text-xs">등록 및 ID/PW 생성</span>
+                    <span className="visible-label text-xs">등록 및 ID/PW 생성</span>
                     일괄 등록 및 ID/PW 생성
                   </button>
 
@@ -554,9 +600,11 @@ export default function EventBoothsPage() {
                   <button
                     onClick={handleSendMail}
                     disabled={isSendingMail || selectedRows.length === 0}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#C4FF00] text-[#2D2A4A] text-xs font-bold hover:bg-[#bcfd00] disabled:opacity-50 transition-all shadow-md active:scale-95"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#C4FF00] text-[#2D2A4A] text-[0px] font-bold hover:bg-[#bcfd00] disabled:opacity-50 transition-all shadow-md active:scale-95 [&>span:not(.visible-label-next)]:hidden"
                   >
                     {isSendingMail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                    <span className="visible-label-next text-xs">이메일 전송</span>
+                    <span className="visible-label text-xs">이메일 전송</span>
                     이메일 일괄 전송
                   </button>
                 </div>

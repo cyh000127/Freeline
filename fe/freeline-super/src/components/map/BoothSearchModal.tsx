@@ -50,18 +50,18 @@ export function BoothSearchModal({
     const [allBooths, setAllBooths] = useState<BoothInfo[]>([]);
     const [filteredBooths, setFilteredBooths] = useState<BoothInfo[]>([]);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
-    const [formData, setFormData] = useState({
+    const createInitialFormData = () => ({
         boothId: currentBoothId || null,
         boothName: currentData?.boothName || "",
         locationCode: currentData?.locationCode || "",
         adminName: currentData?.adminName || "",
         contact: currentData?.contact || "",
-        color: currentData?.color || "#3B82F6", // Default blue
+        color: currentData?.color || "#3B82F6",
     });
 
+    const [formData, setFormData] = useState(createInitialFormData);
+
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const prevIsOpenRef = useRef(false);
 
     const fetchAllData = useCallback(async () => {
         try {
@@ -101,28 +101,31 @@ export function BoothSearchModal({
                 });
 
                 setAllBooths(merged);
+                if (currentBoothId !== null && currentBoothId !== undefined) {
+                    const matchedBooth = merged.find((booth) => booth.boothId === currentBoothId);
+                    if (matchedBooth) {
+                        setFormData((prev) => ({
+                            boothId: prev.boothId ?? matchedBooth.boothId,
+                            boothName: prev.boothName || matchedBooth.boothName,
+                            locationCode: prev.locationCode || matchedBooth.locationCode,
+                            adminName: prev.adminName || matchedBooth.adminName,
+                            contact: prev.contact || matchedBooth.contact || "",
+                            color: prev.color || currentData?.color || "#3B82F6",
+                        }));
+                    }
+                }
             }
         } catch (err) {
             console.error("Failed to fetch booth data", err);
         }
-    }, [eventId]);
+    }, [currentBoothId, currentData?.color, eventId]);
     useEffect(() => {
         if (isOpen) {
-            fetchAllData();
-
-            if (!prevIsOpenRef.current) {
-                setFormData({
-                    boothId: currentBoothId || null,
-                    boothName: currentData?.boothName || "",
-                    locationCode: currentData?.locationCode || "",
-                    adminName: currentData?.adminName || "",
-                    contact: currentData?.contact || "",
-                    color: currentData?.color || "#3B82F6",
-                });
-            }
+            queueMicrotask(() => {
+                void fetchAllData();
+            });
         }
-        prevIsOpenRef.current = isOpen;
-    }, [isOpen, fetchAllData, currentBoothId, currentData, formData]);
+    }, [isOpen, fetchAllData]);
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -166,6 +169,12 @@ export function BoothSearchModal({
             ...formData,
             boothId: formData.boothId
         });
+        setIsDropdownOpen(false);
+        onClose();
+    };
+
+    const handleClose = () => {
+        setIsDropdownOpen(false);
         onClose();
     };
 
@@ -183,7 +192,7 @@ export function BoothSearchModal({
                         부스 설정
                     </h2>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                     >
                         <X className="w-6 h-6 text-gray-500"/>

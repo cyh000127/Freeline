@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   Store,
   BarChart3,
-  Settings,
   ArrowLeft,
   Ticket,
   Radio
@@ -18,9 +17,10 @@ interface SidebarProps {
   userName: string;
   role: string;
   eventId?: string;
+    eventName?: string;
 }
 
-export function Sidebar({ userName, role, eventId }: SidebarProps) {
+export function Sidebar({userName, role, eventId, eventName}: SidebarProps) {
   const pathname = usePathname();
 
   const navItems = [
@@ -36,15 +36,22 @@ export function Sidebar({ userName, role, eventId }: SidebarProps) {
       {/* Back to Home Button at the very top */}
       <Link
         href="/"
-        className="flex items-center gap-2 px-6 py-4 text-gray-400 hover:text-white transition-all bg-black/10 hover:bg-black/20 group border-b border-white/5"
+        className="flex items-center gap-2 px-6 py-4 text-gray-400 hover:text-white transition-all bg-black/10 hover:bg-black/20 group border-b border-white/5 [&>span:not(.sidebar-visible-text)]:hidden"
       >
         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          <span className="sidebar-visible-text text-[13px] font-bold">전체 행사 목록</span>
         <span className="text-[13px] font-bold">전체 행사 목록으로</span>
       </Link>
 
       {/* Brand Logo */}
-      <div className="p-8 pb-8 flex items-center gap-3">
+        <div className="relative p-8 pb-14 flex items-center gap-3 [&>span:not(.sidebar-brand-visible)]:hidden">
         <Image src="/super/assets/logo.png" alt="Logo" width={40} height={40} className="h-6 w-auto object-contain" />
+            <span className="sidebar-brand-visible text-2xl font-bold tracking-tight">줄서잇 매니저</span>
+            {eventName && (
+                <p className="absolute left-8 top-[4.25rem] max-w-[12rem] truncate text-sm font-semibold text-white/70">
+                    {eventName}
+                </p>
+            )}
         <span className="text-2xl font-bold tracking-tight">줄서잇 매니저</span>
       </div>
 
