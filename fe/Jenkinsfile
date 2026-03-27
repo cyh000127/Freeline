@@ -26,8 +26,6 @@ pipeline {
 
         DOCKER_TAG = "${env.BUILD_ID}"
 
-        APK_DIR = '/opt/freeline/apk'
-
         INFISICAL_URL = 'https://j14a207.p.ssafy.io:8443'
         INFISICAL_PROJECT_ID = credentials('infisical-project-id')
         INFISICAL_CLIENT_ID = credentials('infisical-client-id')
@@ -179,123 +177,6 @@ pipeline {
             }
         }
 
-        stage('Build APK') {
-            when {
-                allOf {
-                    expression { isMainBranch() }
-                    expression { env.BUILD_USER == 'true' }
-                }
-            }
-            steps {
-                dir('fe/freeline-user') {
-                    sh '''set +x
-                        export INFISICAL_TOKEN=$(infisical login --method=universal-auth \
-                            --client-id=$INFISICAL_CLIENT_ID \
-                            --client-secret=$INFISICAL_CLIENT_SECRET \
-                            --domain=$INFISICAL_URL/api \
-                            --silent --plain)
-                        set -x
-
-                        # Infisical에서 EXPO_TOKEN, EAS_PROJECT_ID 주입
-                        infisical run \
-                            --domain=$INFISICAL_URL/api \
-                            --projectId=$INFISICAL_PROJECT_ID \
-                            --env=prod --path=/fe \
-                            -- bash -s <<'EOF'
-set -euo pipefail
-
-: "${EXPO_TOKEN:?ERROR: EXPO_TOKEN is missing from Infisical /fe}"
-: "${EAS_PROJECT_ID:?ERROR: EAS_PROJECT_ID is missing from Infisical /fe}"
-command -v docker >/dev/null 2>&1 || { echo "ERROR: docker not found on Jenkins agent"; exit 1; }
-
-release_container=""
-publish_container=""
-release_script_path=""
-cleanup() {
-    [ -n "$release_container" ] && docker rm -f "$release_container" >/dev/null 2>&1 || true
-    [ -n "$publish_container" ] && docker rm -f "$publish_container" >/dev/null 2>&1 || true
-    [ -n "$release_script_path" ] && rm -f "$release_script_path" >/dev/null 2>&1 || true
-}
-trap cleanup EXIT
-
-release_script_path="$(mktemp)"
-cat > "$release_script_path" <<"INNER_EOF"
-set -euo pipefail
-
-npm ci
-mkdir -p ./build
-BUILD_JSON="$(EAS_NO_VCS=1 npx eas-cli build -p android \
-    --profile production \
-    --non-interactive \
-    --wait \
-    --json)"
-
-BUILD_URL="$(printf '%s' "$BUILD_JSON" | node -e 'const fs=require("fs"); const builds=JSON.parse(fs.readFileSync(0,"utf8")); const build=Array.isArray(builds)? builds[0] : builds; const url=build?.artifacts?.applicationArchiveUrl ?? build?.artifacts?.buildUrl; if(!url){console.error("ERROR: APK URL not found in EAS build result"); process.exit(1);} process.stdout.write(url);')"
-
-node -e '
-const fs = require("fs");
-const http = require("http");
-const https = require("https");
-const { URL } = require("url");
-const target = process.argv[1];
-const dest = process.argv[2];
-function fetch(url, redirects = 5) {
-  if (redirects < 0) {
-    console.error("ERROR: too many redirects while downloading APK");
-    process.exit(1);
-  }
-  const parsed = new URL(url);
-  const client = parsed.protocol === "http:" ? http : https;
-  const req = client.get(parsed, (res) => {
-    if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-      fetch(res.headers.location, redirects - 1);
-      return;
-    }
-    if (res.statusCode !== 200) {
-      console.error("ERROR: failed to download APK, status=" + res.statusCode);
-      process.exit(1);
-    }
-    const file = fs.createWriteStream(dest);
-    res.pipe(file);
-    file.on("finish", () => file.close());
-    file.on("close", () => process.exit(0));
-    file.on("error", (err) => {
-      console.error(err.message);
-      process.exit(1);
-    });
-  });
-  req.on("error", (err) => {
-    console.error(err.message);
-    process.exit(1);
-  });
-}
-fetch(target);
-' "$BUILD_URL" ./build/freeline.apk
-INNER_EOF
-
-release_container="$(docker create \
-    -e EXPO_TOKEN \
-    -e EAS_PROJECT_ID \
-    -w /app \
-    node:20-bullseye \
-    bash /tmp/release-apk.sh)"
-
-docker cp "$release_script_path" "$release_container:/tmp/release-apk.sh"
-docker cp ./. "$release_container:/app"
-docker start -a "$release_container"
-
-mkdir -p ./build
-docker cp "$release_container:/app/build/freeline.apk" ./build/freeline.apk
-
-publish_container="$(docker create -v "$APK_DIR:/dest" alpine:3.20 sh -c "mkdir -p /dest && sleep 30")"
-docker start "$publish_container" >/dev/null
-docker cp ./build/freeline.apk "$publish_container:/dest/freeline.apk"
-echo "APK deployed: https://j14a207.p.ssafy.io/app/freeline.apk"
-EOF
-                    '''
-                }
-            }
-        }
     }
 
     post {
