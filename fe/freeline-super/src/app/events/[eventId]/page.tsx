@@ -735,75 +735,6 @@ export default function EventDetailPage() {
                 </div>
             )}
 
-                  {/* [NEW] 보기 모드 전용 부스 정보 플로팅 모달 */}
-                  {!isEditMode && selectedBoothInfo !== null && (
-                      <div className="absolute left-6 bottom-6 z-50 w-full max-w-sm">
-                          <div className="rounded-[28px] border border-white/70 bg-white/92 p-6 shadow-[0_24px_60px_rgba(45,42,74,0.18)] backdrop-blur-md">
-                              <div className="flex items-start justify-between gap-4">
-                                  <div>
-                                      <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#7C7A92]">
-                                          Booth Detail
-                                      </p>
-                                      <h3 className="mt-2 text-[28px] font-black leading-tight text-[#2D2A4A]">
-                                          {selectedBoothInfo.boothName}
-                                      </h3>
-                                      <p className="mt-2 text-sm font-bold text-gray-500">
-                                          {selectedBoothInfo.locationCode || "위치 코드 미등록"}
-                                      </p>
-                                  </div>
-                                  <div className="rounded-full bg-[#F3F1FF] px-3 py-1 text-xs font-black text-[#5A4EB2]">
-                                      실시간
-                                  </div>
-                              </div>
-
-                              <div className="mt-6 grid grid-cols-2 gap-3">
-                                  <div className="rounded-2xl bg-[#F6F7FB] px-4 py-4">
-                                      <p className="text-xs font-black uppercase tracking-[0.18em] text-gray-400">
-                                          Waiting
-                                      </p>
-                                      <p className="mt-2 text-3xl font-black text-[#2D2A4A]">
-                                          {selectedBoothInfo.waitingCount}
-                                      </p>
-                                      <p className="mt-1 text-xs font-bold text-gray-500">
-                                          현재 대기 인원
-                                      </p>
-                                  </div>
-                                  <div className="rounded-2xl bg-[#FFF7E8] px-4 py-4">
-                                      <p className="text-xs font-black uppercase tracking-[0.18em] text-[#C4881A]">
-                                          ETA
-                                      </p>
-                                      <p className="mt-2 text-3xl font-black text-[#9A5B00]">
-                                          {selectedBoothInfo.estimatedWaitTime}
-                                          <span className="ml-1 text-lg">분</span>
-                                      </p>
-                                      <p className="mt-1 text-xs font-bold text-[#B27619]">
-                                          예상 대기 시간
-                                      </p>
-                                  </div>
-                              </div>
-
-                              <div className="mt-5 rounded-2xl border border-[#E7E5F4] bg-[#FBFAFF] px-4 py-3">
-                                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8A86B0]">
-                                      Summary
-                                  </p>
-                                  <p className="mt-2 text-sm font-bold leading-6 text-[#4D496D]">
-                                      현재 이 부스에는 {selectedBoothInfo.waitingCount}명이 대기 중이며,
-                                      지금 줄을 설 경우 예상 대기 시간은 약 {selectedBoothInfo.estimatedWaitTime}분입니다.
-                                  </p>
-                              </div>
-
-                              <div className="mt-5 flex justify-end">
-                                  <button
-                                      onClick={() => setSelectedBoothInfo(null)}
-                                      className="inline-flex items-center gap-2 rounded-full bg-[#2D2A4A] px-4 py-2 text-sm font-black text-white transition-colors hover:bg-[#1D1A38]"
-                                  >
-                                      <X className="h-4 w-4"/>
-                                      닫기
-                                  </button>
-                              </div>
-                          </div>
-                      </div>
-                  )}
               </div>
 
               {/* Action Buttons (Save) */}
@@ -830,6 +761,76 @@ export default function EventDetailPage() {
                   )}
               </div>
         </div>
+
+        {/* [FIXED] 플로팅 모달을 overflow-hidden 지도 컨테이너 밖으로 이동해 clipping을 방지하고 화면 좌하단에 고정한다. */}
+        {!isEditMode && selectedBoothInfo !== null && (
+          <div className="pointer-events-none fixed bottom-8 left-8 z-[70] w-[min(24rem,calc(100vw-3rem))] md:left-[calc(16rem+2rem)]">
+            <div className="pointer-events-auto rounded-[28px] border border-white/70 bg-white/92 p-6 shadow-[0_24px_60px_rgba(45,42,74,0.18)] backdrop-blur-md">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#7C7A92]">
+                    Booth Detail
+                  </p>
+                  <h3 className="mt-2 text-[28px] font-black leading-tight text-[#2D2A4A]">
+                    {selectedBoothInfo.boothName}
+                  </h3>
+                  <p className="mt-2 text-sm font-bold text-gray-500">
+                    {selectedBoothInfo.locationCode || "위치 코드 미등록"}
+                  </p>
+                </div>
+                <div className="rounded-full bg-[#F3F1FF] px-3 py-1 text-xs font-black text-[#5A4EB2]">
+                  실시간
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-[#F6F7FB] px-4 py-4">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-gray-400">
+                    Waiting
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-[#2D2A4A]">
+                    {selectedBoothInfo.waitingCount}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-gray-500">
+                    현재 대기 인원
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-[#FFF7E8] px-4 py-4">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#C4881A]">
+                    ETA
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-[#9A5B00]">
+                    {selectedBoothInfo.estimatedWaitTime}
+                    <span className="ml-1 text-lg">분</span>
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-[#B27619]">
+                    예상 대기 시간
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-[#E7E5F4] bg-[#FBFAFF] px-4 py-3">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8A86B0]">
+                  Summary
+                </p>
+                <p className="mt-2 text-sm font-bold leading-6 text-[#4D496D]">
+                  현재 이 부스에는 {selectedBoothInfo.waitingCount}명이 대기 중이며,
+                  지금 줄을 설 경우 예상 대기 시간은 약 {selectedBoothInfo.estimatedWaitTime}분입니다.
+                </p>
+              </div>
+
+              <div className="mt-5 flex justify-end">
+                <button
+                  onClick={() => setSelectedBoothInfo(null)}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#2D2A4A] px-4 py-2 text-sm font-black text-white transition-colors hover:bg-[#1D1A38]"
+                >
+                  <X className="h-4 w-4" />
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       <EditEventModal
