@@ -82,7 +82,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   async function loadBooths(token: string, targetEventId: number) {
     const booths = await fetchBooths(targetEventId, token);
-    return booths.sort((left, right) => left.locationCode.localeCompare(right.locationCode));
+    return booths.sort((left, right) => {
+      // [FIXED] boothmap 응답의 locationCode가 null일 수 있어 빈 문자열로 치환한 뒤 안전하게 정렬한다.
+      const leftLocationCode = left.locationCode ?? '';
+      const rightLocationCode = right.locationCode ?? '';
+
+      return leftLocationCode.localeCompare(rightLocationCode);
+    });
   }
 
   async function decorateWaitings(
