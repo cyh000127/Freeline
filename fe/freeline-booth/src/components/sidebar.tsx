@@ -78,12 +78,12 @@ export function Sidebar() {
 
       {/* Bottom Profile Section */}
       <div className="p-4">
-        <button 
+        {/* <button 
           onClick={() => showAlert("준비 중인 기능입니다.")}
           className="w-full rounded-xl bg-white/10 px-4 py-3 text-xs font-bold text-white transition-colors hover:bg-white/20"
         >
           총괄 관리자에게 문의하기
-        </button>
+        </button> */}
         
         <div className="mt-6 flex flex-col border-t border-white/10 pt-6">
           <div className="rounded-2xl bg-white/5 p-5 border border-white/5 shadow-2xl relative overflow-hidden group">
