@@ -10,7 +10,8 @@ import {
   BarChart3,
   Settings,
   ArrowLeft,
-  Ticket
+  Ticket,
+  Radio
 } from "lucide-react";
 
 interface SidebarProps {
@@ -25,6 +26,7 @@ export function Sidebar({ userName, role, eventId }: SidebarProps) {
   const navItems = [
     { name: "대시보드", icon: LayoutDashboard, href: `/events/${eventId || ''}`, exact: true },
     { name: "부스 계정 관리", icon: Store, href: `/events/${eventId || ''}/booths`, exact: false },
+    { name: "부스 운영 관리", icon: Radio, href: `/events/${eventId || ''}/operations`, exact: false },
     { name: "방문자 티켓 발급", icon: Ticket, href: `/events/${eventId || ''}/tickets`, exact: false },
     { name: "분석 리포트", icon: BarChart3, href: `/events/${eventId || ''}/report`, exact: false },
   ];

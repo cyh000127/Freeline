@@ -187,7 +187,7 @@ export function ReportGenerator({ eventId, eventStatus, onComplete }: Props) {
         <p className="text-sm text-gray-400 max-w-md">
           행사 기간 중 수집된 행동 로그와 대기열 데이터를 분석하여
           <br />
-          부스 성과, 시간대별 유입량, 동선, 문제 지점을 리포트로 제공합니다.
+          부스 성과, 시간대별 유입량, 동선, 이탈률 높은 부스를 리포트로 제공합니다.
         </p>
       </div>
 

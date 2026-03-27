@@ -45,7 +45,7 @@ export function ProblemSpots({ data }: Props) {
         <div className="p-2 bg-[#2D2A4A] rounded-xl">
           <AlertTriangle className="w-4 h-4 text-[#C4FF00]" />
         </div>
-        <h3 className="text-base font-bold text-gray-900">문제 지점 탐지</h3>
+        <h3 className="text-base font-bold text-gray-900">이탈률 높은 부스</h3>
         {data.length > 0 && (
           <span className="ml-2 px-2.5 py-0.5 bg-rose-100 rounded-full text-xs font-bold text-rose-700">
             {data.length}건
@@ -58,7 +58,7 @@ export function ProblemSpots({ data }: Props) {
           <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center">
             <span className="text-xl text-emerald-500 font-bold">OK</span>
           </div>
-          <span className="text-sm font-bold">탐지된 문제가 없습니다</span>
+          <span className="text-sm font-bold">이탈률이 높은 부스가 없습니다</span>
         </div>
       ) : (
         <div className="space-y-3">
