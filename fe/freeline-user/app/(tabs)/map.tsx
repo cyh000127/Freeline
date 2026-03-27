@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { BoothTile } from '@/components/BoothTile';
 import { BoothBottomSheet } from '@/components/BoothBottomSheet';
@@ -11,7 +11,6 @@ import { EventMapCanvas } from '@/components/EventMapCanvas';
 import { FloatingTabBar } from '@/components/FloatingTabBar';
 import { ReservationConfirmSheet } from '@/components/ReservationConfirmSheet';
 import { Screen } from '@/components/Screen';
-import { SectionTitle } from '@/components/SectionTitle';
 import {
   fetchBoothDetail,
   fetchExpectedTime,
@@ -35,6 +34,7 @@ const mapTabs = [
 ] as const;
 
 export default function MapScreen() {
+  const { width } = useWindowDimensions();
   usePageTracking('map');
   const { accessToken, eventId, eventProfile } = useSession();
   const { trackEvent } = useTracking();
@@ -69,6 +69,7 @@ export default function MapScreen() {
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(eventProfile?.mapImageUrl ?? null);
   const [mapAreas, setMapAreas] = useState<BoothMapArea[]>([]);
   const [mapLoadState, setMapLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const isCompactViewport = width <= 390;
 
   useEffect(() => {
     if (!registerErrorPending || confirmVisible) {
@@ -372,17 +373,20 @@ export default function MapScreen() {
   return (
     <Screen padded={false} scroll={false}>
       <View style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.pageHeader}>
+        <ScrollView
+          contentContainerStyle={[styles.content, isCompactViewport ? styles.contentCompact : null]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.pageHeader, isCompactViewport ? styles.pageHeaderCompact : null]}>
             <View style={styles.pageHeaderCopy}>
-              <Text style={styles.pageTitle}>배치도</Text>
+              <Text style={[styles.pageTitle, isCompactViewport ? styles.pageTitleCompact : null]}>배치도</Text>
             </View>
-            <Pressable style={styles.iconButton}>
-              <Feather color={palette.text} name="bell" size={24} />
+            <Pressable style={[styles.iconButton, isCompactViewport ? styles.iconButtonCompact : null]}>
+              <Feather color={palette.text} name="bell" size={isCompactViewport ? 20 : 24} />
             </Pressable>
           </View>
 
-          <View style={styles.tabRow}>
+          <View style={[styles.tabRow, isCompactViewport ? styles.tabRowCompact : null]}>
             {mapTabs.map((tab) => {
               const active = activeTab === tab.key;
 
@@ -390,9 +394,19 @@ export default function MapScreen() {
                 <Pressable
                   key={tab.key}
                   onPress={() => setActiveTab(tab.key)}
-                  style={[styles.tabButton, active ? styles.tabButtonActive : null]}
+                  style={[
+                    styles.tabButton,
+                    isCompactViewport ? styles.tabButtonCompact : null,
+                    active ? styles.tabButtonActive : null,
+                  ]}
                 >
-                  <Text style={[styles.tabLabel, active ? styles.tabLabelActive : null]}>
+                  <Text
+                    style={[
+                      styles.tabLabel,
+                      isCompactViewport ? styles.tabLabelCompact : null,
+                      active ? styles.tabLabelActive : null,
+                    ]}
+                  >
                     {tab.label}
                   </Text>
                 </Pressable>
@@ -433,14 +447,14 @@ export default function MapScreen() {
               )
             ) : (
               <>
-                <View style={styles.searchCard}>
-                  <View style={styles.searchInputWrap}>
-                    <Feather color={palette.textMuted} name="search" size={18} />
+                <View style={[styles.searchCard, isCompactViewport ? styles.cardCompact : null]}>
+                  <View style={[styles.searchInputWrap, isCompactViewport ? styles.searchInputWrapCompact : null]}>
+                    <Feather color={palette.textMuted} name="search" size={isCompactViewport ? 16 : 18} />
                     <TextInput
                       onChangeText={setSearchQuery}
                       placeholder="부스명 또는 위치 코드로 검색"
                       placeholderTextColor={palette.textMuted}
-                      style={styles.searchInput}
+                      style={[styles.searchInput, isCompactViewport ? styles.searchInputCompact : null]}
                       value={searchQuery}
                     />
                     {searchQuery ? (
@@ -449,27 +463,27 @@ export default function MapScreen() {
                       </Pressable>
                     ) : null}
                   </View>
-                  <Text style={styles.searchHint}>
+                  <Text style={[styles.searchHint, isCompactViewport ? styles.searchHintCompact : null]}>
                     {filteredBooths.length}개 부스가 검색되었습니다.
                   </Text>
                 </View>
 
-                <View style={styles.legendCard}>
+                <View style={[styles.legendCard, isCompactViewport ? styles.cardCompact : null]}>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: palette.success }]} />
-                    <Text style={styles.legendText}>원활 {statusSummary.smooth}</Text>
+                    <Text style={[styles.legendText, isCompactViewport ? styles.legendTextCompact : null]}>원활 {statusSummary.smooth}</Text>
                   </View>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: palette.warning }]} />
-                    <Text style={styles.legendText}>보통 {statusSummary.normal}</Text>
+                    <Text style={[styles.legendText, isCompactViewport ? styles.legendTextCompact : null]}>보통 {statusSummary.normal}</Text>
                   </View>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: palette.danger }]} />
-                    <Text style={styles.legendText}>혼잡 {statusSummary.busy}</Text>
+                    <Text style={[styles.legendText, isCompactViewport ? styles.legendTextCompact : null]}>혼잡 {statusSummary.busy}</Text>
                   </View>
                 </View>
 
-                <View style={styles.list}>
+                <View style={[styles.list, isCompactViewport ? styles.listCompact : null]}>
                   {filteredBooths.map((booth) => (
                     <BoothListCard
                       booth={booth}
@@ -569,12 +583,20 @@ const styles = StyleSheet.create({
     gap: 18,
     paddingBottom: 148,
   },
+  contentCompact: {
+    paddingTop: 18,
+    gap: 14,
+  },
   pageHeader: {
     paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 16,
+  },
+  pageHeaderCompact: {
+    paddingHorizontal: 16,
+    gap: 12,
   },
   pageHeaderCopy: {
     gap: 4,
@@ -584,6 +606,9 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '900',
   },
+  pageTitleCompact: {
+    fontSize: 24,
+  },
   iconButton: {
     width: 44,
     height: 44,
@@ -591,12 +616,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconButtonCompact: {
+    width: 38,
+    height: 38,
+  },
   searchCard: {
     marginHorizontal: 20,
     backgroundColor: palette.surface,
     borderRadius: 24,
     padding: 18,
     gap: 10,
+  },
+  cardCompact: {
+    marginHorizontal: 16,
+    borderRadius: 18,
+    padding: 14,
   },
   searchInputWrap: {
     flexDirection: 'row',
@@ -607,11 +641,20 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surfaceAlt,
     paddingHorizontal: 14,
   },
+  searchInputWrapCompact: {
+    minHeight: 44,
+    borderRadius: 14,
+    gap: 8,
+    paddingHorizontal: 12,
+  },
   searchInput: {
     flex: 1,
     color: palette.text,
     fontSize: 15,
     paddingVertical: 0,
+  },
+  searchInputCompact: {
+    fontSize: 14,
   },
   searchClear: {
     width: 28,
@@ -624,6 +667,9 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     fontSize: 12,
   },
+  searchHintCompact: {
+    fontSize: 11,
+  },
   tabRow: {
     paddingHorizontal: 20,
     flexDirection: 'row',
@@ -632,8 +678,16 @@ const styles = StyleSheet.create({
     borderBottomColor: palette.border,
     paddingBottom: 12,
   },
+  tabRowCompact: {
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingBottom: 10,
+  },
   tabButton: {
     paddingVertical: 6,
+  },
+  tabButtonCompact: {
+    paddingVertical: 4,
   },
   tabButtonActive: {
     borderBottomWidth: 2,
@@ -643,6 +697,9 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     fontSize: 16,
     fontWeight: '800',
+  },
+  tabLabelCompact: {
+    fontSize: 14,
   },
   tabLabelActive: {
     color: palette.text,
@@ -671,6 +728,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  legendTextCompact: {
+    fontSize: 12,
+  },
   mapBoard: {
     backgroundColor: '#D9D9D9',
   },
@@ -685,5 +745,9 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: 20,
     gap: 14,
+  },
+  listCompact: {
+    paddingHorizontal: 16,
+    gap: 12,
   },
 });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image as RNImage, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image as RNImage, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { BoothSummary } from '@/features/api/booths';
 import type { BoothMapArea } from '@/features/api/booth-map';
 import { palette } from '@/theme/colors';
@@ -28,10 +28,12 @@ export function EventMapCanvas({
   onPressArea,
   boothMap,
 }: Props) {
+  const { width: viewportWidth } = useWindowDimensions();
   const resolvedImageUrl = useMemo(() => normalizeImageUrl(imageUrl), [imageUrl]);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [hasImageError, setHasImageError] = useState(false);
+  const isCompactViewport = viewportWidth <= 390;
 
   useEffect(() => {
     if (!resolvedImageUrl) {
@@ -125,6 +127,13 @@ export function EventMapCanvas({
 
               const selected = selectedBoothId === area.boothId;
               const congestion = getBoothCongestion(area.waitingCount, area.isEmergencyClosed);
+              const areaWidth = effectiveSize.width * area.widthRatio;
+              const areaHeight = effectiveSize.height * area.heightRatio;
+              const isTinyArea = areaWidth < 68 || areaHeight < 34;
+              const isSmallArea = areaWidth < 96 || areaHeight < 48;
+              const isMediumArea = areaWidth < 132 || areaHeight < 68;
+              const showBoothName = !isTinyArea;
+              const showMeta = !isSmallArea && areaHeight >= 60;
               const areaTint = selected
                 ? 'rgba(47, 44, 72, 0.20)'
                 : congestion.tone === 'busy'
@@ -133,6 +142,7 @@ export function EventMapCanvas({
                     ? 'rgba(255, 188, 66, 0.18)'
                     : 'rgba(24, 193, 125, 0.12)';
               const labelColor = selected ? palette.ink : congestion.textColor;
+              const compactLabel = isCompactViewport || isSmallArea;
 
               return (
                 <Pressable
@@ -140,6 +150,8 @@ export function EventMapCanvas({
                   onPress={() => onPressArea(booth)}
                   style={[
                     styles.area,
+                    compactLabel ? styles.areaCompact : null,
+                    isTinyArea ? styles.areaTiny : null,
                     {
                       left: `${area.xRatio * 100}%`,
                       top: `${area.yRatio * 100}%`,
@@ -150,16 +162,30 @@ export function EventMapCanvas({
                     },
                   ]}
                 >
-                  <View style={styles.areaLabel}>
-                    <Text numberOfLines={1} style={[styles.areaCode, { color: labelColor }]}>
+                  <View style={[styles.areaLabel, compactLabel ? styles.areaLabelCompact : null]}>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.areaCode,
+                        compactLabel ? styles.areaCodeCompact : null,
+                        { color: labelColor },
+                      ]}
+                    >
                       {area.locationCode}
                     </Text>
-                    <Text numberOfLines={2} style={styles.areaName}>
-                      {area.boothName}
-                    </Text>
-                    <Text numberOfLines={1} style={styles.areaMeta}>
-                      현재 대기 {area.waitingCount}명
-                    </Text>
+                    {showBoothName ? (
+                      <Text
+                        numberOfLines={isMediumArea ? 1 : 2}
+                        style={[styles.areaName, compactLabel ? styles.areaNameCompact : null]}
+                      >
+                        {area.boothName}
+                      </Text>
+                    ) : null}
+                    {showMeta ? (
+                      <Text numberOfLines={1} style={[styles.areaMeta, compactLabel ? styles.areaMetaCompact : null]}>
+                        현재 대기 {area.waitingCount}명
+                      </Text>
+                    ) : null}
                   </View>
                 </Pressable>
               );
@@ -192,18 +218,34 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 10,
     justifyContent: 'center',
+    overflow: 'hidden',
     shadowColor: '#000000',
     shadowOpacity: 0.06,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
+  areaCompact: {
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+  },
+  areaTiny: {
+    paddingHorizontal: 4,
+    paddingVertical: 3,
+  },
   areaLabel: {
     gap: 8,
+  },
+  areaLabelCompact: {
+    gap: 3,
   },
   areaCode: {
     fontSize: 11,
     fontWeight: '800',
+  },
+  areaCodeCompact: {
+    fontSize: 9,
   },
   areaName: {
     color: palette.text,
@@ -211,9 +253,16 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '800',
   },
+  areaNameCompact: {
+    fontSize: 11,
+    lineHeight: 14,
+  },
   areaMeta: {
     color: palette.textMuted,
     fontSize: 11,
     fontWeight: '700',
+  },
+  areaMetaCompact: {
+    fontSize: 9,
   },
 });
