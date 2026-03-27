@@ -201,7 +201,7 @@ export default function EventBoothsPage() {
 
       if (duplicateBoothNames.size > 0) {
         const duplicateList = Array.from(duplicateBoothNames).join(", ");
-        alert(`동일 이벤트 내 중복 부스명은 등록할 수 없습니다.\n중복 이름: ${duplicateList}`);
+        showAlert(`동일 이벤트 내 중복 부스명은 등록할 수 없습니다.\n중복 이름: ${duplicateList}`);
         return;
       }
 

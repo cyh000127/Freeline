@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { Card } from "@/components/ui/card";
@@ -11,11 +11,8 @@ import {
   Ticket,
   Plus,
   Printer,
-  Download,
-  Trash2,
   Loader2,
   CheckCircle2,
-  ExternalLink,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
@@ -29,6 +26,19 @@ interface TicketData {
   entryCode: string;
   isActive: boolean;
 }
+
+const TICKETS_PAGE_SIZE = 30;
+const MAX_VISIBLE_PAGE_BUTTONS = 5;
+
+const getVisiblePageNumbers = (currentPage: number, totalPages: number) => {
+  const visibleCount = Math.min(MAX_VISIBLE_PAGE_BUTTONS, totalPages);
+  const startPage = Math.max(
+    0,
+    Math.min(currentPage - Math.floor(visibleCount / 2), totalPages - visibleCount),
+  );
+
+  return Array.from({ length: visibleCount }, (_, index) => startPage + index);
+};
 
 export default function VisitorTicketsPage() {
   const params = useParams();
@@ -48,22 +58,31 @@ export default function VisitorTicketsPage() {
   const [totalElements, setTotalElements] = useState(0);
   const [isFetchingTickets, setIsFetchingTickets] = useState(false);
 
-  const fetchTickets = async (pageNum: number) => {
+  const fetchTickets = useCallback(async (pageNum: number) => {
     setIsFetchingTickets(true);
     try {
-      const res = await eventApi.getVisitorTickets(eventId, pageNum, 30);
+      const res = await eventApi.getVisitorTickets(eventId, pageNum, TICKETS_PAGE_SIZE);
       if (res.data) {
-        setTickets(res.data.content);
-        setTotalPages(res.data.totalPages);
-        setTotalElements(res.data.totalElements);
-        setPage(res.data.page);
+        const nextTickets = Array.isArray(res.data.content) ? res.data.content : [];
+        const nextTotalPages = Number.isFinite(res.data.totalPages) ? res.data.totalPages : 0;
+        const nextTotalElements = Number.isFinite(res.data.totalElements) ? res.data.totalElements : 0;
+
+        setTickets(nextTickets);
+        setTotalPages(nextTotalPages);
+        setTotalElements(nextTotalElements);
+
+        if (nextTotalPages === 0 && pageNum !== 0) {
+          setPage(0);
+        } else if (nextTotalPages > 0 && pageNum > nextTotalPages - 1) {
+          setPage(nextTotalPages - 1);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch tickets:", err);
     } finally {
       setIsFetchingTickets(false);
     }
-  };
+  }, [eventId]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -75,8 +94,6 @@ export default function VisitorTicketsPage() {
 
         if (meRes.data?.success) setUserName(meRes.data.data.name);
         if (eventRes.data?.success) setEventName(eventRes.data.data.name);
-        
-        await fetchTickets(0);
       } catch (err) {
         console.error(err);
       } finally {
@@ -88,9 +105,9 @@ export default function VisitorTicketsPage() {
 
   useEffect(() => {
     if (!isLoading) {
-      fetchTickets(page);
+      void fetchTickets(page);
     }
-  }, [page]);
+  }, [fetchTickets, isLoading, page]);
 
   const handleGenerate = async () => {
     if (quantity <= 0) {
@@ -110,11 +127,28 @@ export default function VisitorTicketsPage() {
       if (res.data?.success) {
         setGeneratedAt(new Date().toLocaleString());
         showAlert(`${res.data.data.createdCount}개의 티켓이 성공적으로 생성되었습니다.`);
-        setPage(0);
-        await fetchTickets(0);
+        if (page === 0) {
+          await fetchTickets(0);
+        } else {
+          setPage(0);
+        }
       }
-    } catch (err: any) {
-      showAlert(err.response?.data?.message || "티켓 생성에 실패했습니다.");
+    } catch (err: unknown) {
+      const errorMessage =
+        typeof err === "object" &&
+        err !== null &&
+        "response" in err &&
+        typeof err.response === "object" &&
+        err.response !== null &&
+        "data" in err.response &&
+        typeof err.response.data === "object" &&
+        err.response.data !== null &&
+        "message" in err.response.data &&
+        typeof err.response.data.message === "string"
+          ? err.response.data.message
+          : "티켓 생성에 실패했습니다.";
+
+      showAlert(errorMessage);
     } finally {
       setIsGenerating(false);
     }
@@ -233,6 +267,10 @@ export default function VisitorTicketsPage() {
     );
   }
 
+  const visiblePageNumbers = getVisiblePageNumbers(page, totalPages);
+  const currentPageStart = totalElements === 0 ? 0 : page * TICKETS_PAGE_SIZE + 1;
+  const currentPageEnd = totalElements === 0 ? 0 : Math.min(totalElements, (page + 1) * TICKETS_PAGE_SIZE);
+
   return (
     <div className="flex bg-[#F1F3F5] h-screen overflow-hidden">
       <Sidebar userName={userName} role="총괄 팀장" eventId={eventId.toString()} />
@@ -337,7 +375,10 @@ export default function VisitorTicketsPage() {
               <div className="p-8 border-b border-gray-50 flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-[#2D2A4A]">생성된 티켓 목록</h2>
-                  <p className="text-sm text-gray-400 mt-1">총 {totalElements}개의 티켓이 발급되었습니다.</p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    총 {totalElements}개의 티켓이 발급되었습니다.
+                    {totalElements > 0 && ` · ${currentPageStart}-${currentPageEnd}번 표시 중`}
+                  </p>
                 </div>
 
                 {tickets.length > 0 && (
@@ -346,7 +387,7 @@ export default function VisitorTicketsPage() {
                     className="bg-[#C4FF00] hover:bg-[#b5eb00] text-[#2D2A4A] px-6 h-12 rounded-xl font-black shadow-lg shadow-[#C4FF00]/20 transition-all active:scale-95 flex gap-2"
                   >
                     <Printer className="w-5 h-5" />
-                    티켓 일괄 인쇄
+                    현재 페이지 인쇄
                   </Button>
                 )}
               </div>
@@ -410,32 +451,26 @@ export default function VisitorTicketsPage() {
                     <ChevronLeft className="w-5 h-5" />
                   </Button>
                   
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      // Adjust to show page numbers around current page
-                      let pageNum = i;
-                      if (totalPages > 5) {
-                        if (page > 2) pageNum = page - 2 + i;
-                        if (pageNum >= totalPages) pageNum = totalPages - 5 + i;
-                        if (pageNum < 0) pageNum = i;
-                      }
-                      
-                      return (
-                        <Button
-                          key={pageNum}
-                          variant={page === pageNum ? "default" : "ghost"}
-                          onClick={() => setPage(pageNum)}
-                          disabled={isFetchingTickets}
-                          className={`w-10 h-10 rounded-xl font-bold ${
-                            page === pageNum 
-                              ? "bg-[#2D2A4A] text-white hover:bg-[#2D2A4A]" 
-                              : "text-gray-500 hover:bg-gray-100"
-                          }`}
-                        >
-                          {pageNum + 1}
-                        </Button>
-                      );
-                    })}
+                  <div className="flex max-w-full items-center gap-1 overflow-x-auto">
+                    {visiblePageNumbers.map((pageNum) => (
+                      <Button
+                        key={`ticket-page-${pageNum}`}
+                        variant={page === pageNum ? "default" : "ghost"}
+                        onClick={() => setPage(pageNum)}
+                        disabled={isFetchingTickets}
+                        className={`w-10 h-10 shrink-0 rounded-xl font-bold ${
+                          page === pageNum
+                            ? "bg-[#2D2A4A] text-white hover:bg-[#2D2A4A]"
+                            : "text-gray-500 hover:bg-gray-100"
+                        }`}
+                      >
+                        {pageNum + 1}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="min-w-[88px] text-right text-sm font-semibold text-gray-400">
+                    {page + 1} / {totalPages}
                   </div>
 
                   <Button
