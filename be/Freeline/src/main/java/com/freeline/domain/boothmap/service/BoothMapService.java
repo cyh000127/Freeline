@@ -1,12 +1,18 @@
 package com.freeline.domain.boothmap.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +31,7 @@ import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
 import com.freeline.domain.boothmap.client.AiVisionClient;
 import com.freeline.domain.boothmap.dto.request.BoothMapAreaBulkUpsertReqDto;
+import com.freeline.domain.boothmap.dto.request.MappingSnapshotUpdateReqDto;
 import com.freeline.domain.boothmap.dto.response.BoothAreaDraftDto;
 import com.freeline.domain.boothmap.dto.response.BoothMapAreaResDto;
 import com.freeline.domain.boothmap.dto.response.BoothMapResDto;
@@ -62,83 +69,63 @@ public class BoothMapService {
     private final AiVisionClient aiVisionClient;
     private final ObjectMapper objectMapper;
 
-    @Transactional
     public void bulkUpsertBoothMapAreas(final Long eventId, final BoothMapAreaBulkUpsertReqDto request) {
         validateEventOwnership(eventId);
 
-        final EventMap eventMap = eventMapRepository.findById(request.eventMapId())
-                .orElseThrow(() -> new EventException(ErrorCode.EVENT_MAP_NOT_FOUND));
+        final EventMap eventMap = getValidatedEventMap(eventId, request.eventMapId());
+        final Set<Long> validBoothIds = boothRepository.findAllByEventIdOrderByIdAsc(eventId)
+                .stream()
+                .map(Booth::getId)
+                .collect(Collectors.toSet());
 
-        if (!eventMap.getEventId().equals(eventId)) {
-            throw new BoothException(ErrorCode.BOOTH_EVENT_MISMATCH);
-        }
-
-        // Validate boothIds belong to event
-        List<Long> requestedBoothIds = request.areas().stream()
+        final boolean allValid = request.areas().stream()
                 .map(BoothMapAreaBulkUpsertReqDto.AreaItem::boothId)
-                .toList();
-        List<Booth> validBooths = boothRepository.findAllByEventIdOrderByIdAsc(eventId);
-        List<Long> validBoothIds = validBooths.stream().map(Booth::getId).toList();
-
-        boolean allValid = new java.util.HashSet<>(validBoothIds).containsAll(requestedBoothIds);
+                .allMatch(validBoothIds::contains);
         if (!allValid) {
             throw new BoothException(ErrorCode.BOOTH_NOT_FOUND);
         }
 
-        // Sync Logic
-        List<BoothMapArea> existingAreas = boothMapAreaRepository.findAllByEventMapIdOrderByIdAsc(eventMap.getId());
-        Map<Long, BoothMapArea> existingAreaMap = existingAreas.stream()
+        final Map<Long, BoothMapArea> existingAreaMap = boothMapAreaRepository.findAllByEventMapIdOrderByIdAsc(eventMap.getId())
+                .stream()
                 .collect(Collectors.toMap(BoothMapArea::getBoothId, Function.identity()));
 
-        List<BoothMapArea> newAreas = new java.util.ArrayList<>();
-        List<BoothMapArea> areasToDelete = new java.util.ArrayList<>();
-
-        for (BoothMapAreaBulkUpsertReqDto.AreaItem item : request.areas()) {
-            BoothMapArea existing = existingAreaMap.remove(item.boothId());
-            if (existing != null) {
-                existing.updateRect(item.xRatio(), item.yRatio(), item.widthRatio(), item.heightRatio());
-                newAreas.add(existing);
-            } else {
-                newAreas.add(BoothMapArea.builder()
-                        .eventMapId(eventMap.getId())
-                        .boothId(item.boothId())
-                        .xRatio(item.xRatio())
-                        .yRatio(item.yRatio())
-                        .widthRatio(item.widthRatio())
-                        .heightRatio(item.heightRatio())
-                        .build());
+        final List<BoothMapArea> areasToSave = new ArrayList<>();
+        for (final BoothMapAreaBulkUpsertReqDto.AreaItem item : request.areas()) {
+            final BoothMapArea existingArea = existingAreaMap.remove(item.boothId());
+            if (existingArea != null) {
+                existingArea.updateRect(item.xRatio(), item.yRatio(), item.widthRatio(), item.heightRatio());
+                areasToSave.add(existingArea);
+                continue;
             }
+
+            areasToSave.add(BoothMapArea.builder()
+                    .eventMapId(eventMap.getId())
+                    .boothId(item.boothId())
+                    .xRatio(item.xRatio())
+                    .yRatio(item.yRatio())
+                    .widthRatio(item.widthRatio())
+                    .heightRatio(item.heightRatio())
+                    .build());
         }
 
-        areasToDelete.addAll(existingAreaMap.values());
+        final List<BoothMapArea> areasToDelete = new ArrayList<>(existingAreaMap.values());
         boothMapAreaRepository.deleteAll(areasToDelete);
-        boothMapAreaRepository.saveAll(newAreas);
+        boothMapAreaRepository.saveAll(areasToSave);
 
-        // 3. 대표 지도 설정 로직 (기존 딱지 떼기)
-        if (!eventMap.isVisible()) {
-            eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(eventId)
-                    .ifPresent(visibleMap -> visibleMap.update(visibleMap.getImagePath(), false));
-            eventMap.update(eventMap.getImagePath(), true);
-        }
+        promoteVisibleMapIfNeeded(eventId, eventMap);
 
         log.info("[BoothMap] 일괄 영역 저장 및 대표지도 설정 완료 {eventId: {}, eventMapId: {}, areaCount: {}}",
-                eventId, eventMap.getId(), newAreas.size());
+                eventId, eventMap.getId(), areasToSave.size());
     }
 
-    @Transactional
-    public void updateMappingSnapshot(final Long eventId, final com.freeline.domain.boothmap.dto.request.MappingSnapshotUpdateReqDto request) {
+    public void updateMappingSnapshot(final Long eventId, final MappingSnapshotUpdateReqDto request) {
         validateEventOwnership(eventId);
 
-        final EventMap eventMap = eventMapRepository.findById(request.eventMapId())
-                .orElseThrow(() -> new EventException(ErrorCode.EVENT_MAP_NOT_FOUND));
-
-        if (!eventMap.getEventId().equals(eventId)) {
-            throw new BoothException(ErrorCode.BOOTH_EVENT_MISMATCH);
-        }
+        final EventMap eventMap = getValidatedEventMap(eventId, request.eventMapId());
 
         try {
             objectMapper.readTree(request.mappingSnapshot());
-        } catch (Exception e) {
+        } catch (final Exception exception) {
             throw new EventException(ErrorCode.JSON_PARSING_ERROR);
         }
 
@@ -163,72 +150,53 @@ public class BoothMapService {
                 .map(area -> toBoothMapAreaResDto(area, boothsById.get(area.getBoothId())))
                 .toList();
 
-        List<BoothAreaDraftDto> drafts = Collections.emptyList();
-        if (booths.isEmpty() && eventMap.getMappingSnapshot() != null && !eventMap.getMappingSnapshot().isBlank()) {
-            try {
-                drafts = objectMapper.readValue(
-                        eventMap.getMappingSnapshot(),
-                        objectMapper.getTypeFactory().constructCollectionType(List.class, BoothAreaDraftDto.class)
-                );
-            } catch (Exception e) {
-                log.warn("[BoothMap] 스냅샷 파싱 실패 {eventMapId: {}}", eventMap.getId(), e);
-            }
-        }
-
         return BoothMapResDto.builder()
                 .eventId(eventId)
                 .eventMapId(eventMap.getId())
                 .mapImageUrl(eventMap.getImagePath())
                 .booths(booths)
-                .drafts(drafts)
+                .drafts(parseDrafts(eventMap))
                 .build();
     }
 
     public EventMapUploadResDto upsertEventMap(final Long eventId, final MultipartFile file, final boolean visible) {
         validateEventOwnership(eventId);
-        final FileInfo uploadedFile = fileService.uploadFile(file, MAP_DIRECTORY);
 
-        // 1. 기존 로직 (DB에 이미지 정보 저장 및 대표지도 체크 떼기)
-        final EventMap eventMap = eventMapRepository.findFirstByEventIdOrderByIdDesc(eventId)
-                .map(existing -> {
-                    existing.update(uploadedFile.fileUrl(), visible);
-                    return existing;
-                })
-                .orElseGet(() -> EventMap.builder()
-                        .eventId(eventId)
-                        .imagePath(uploadedFile.fileUrl())
-                        .visible(visible)
-                        .build());
+        final FileInfo uploadedFile = fileService.uploadFile(file, MAP_DIRECTORY);
+        final Optional<EventMap> previousVisibleMap = visible
+                ? eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(eventId)
+                : Optional.empty();
+
+        final EventMap eventMap = EventMap.builder()
+                .eventId(eventId)
+                .imagePath(uploadedFile.fileUrl())
+                .visible(visible)
+                .build();
 
         final EventMap saved = eventMapRepository.save(eventMap);
 
-        if (visible) {
-            eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(eventId)
-                    .filter(visibleMap -> !visibleMap.getId().equals(saved.getId()))
-                    .ifPresent(visibleMap -> visibleMap.update(visibleMap.getImagePath(), false));
-        }
+        previousVisibleMap
+                .filter(visibleMap -> !visibleMap.getId().equals(saved.getId()))
+                .ifPresent(visibleMap -> visibleMap.update(visibleMap.getImagePath(), false));
 
-        // 2. AI 분석 요청 및 예외 처리 (실패 시에도 업로드는 유지)
         List<BoothAreaDraftDto> drafts = Collections.emptyList();
         try {
-            AiVisionClient.AiAnalysisResult aiResult = aiVisionClient.analyzeMapImage(saved.getImagePath());
+            final AiVisionClient.AiAnalysisResult aiResult = aiVisionClient.analyzeMapImage(saved.getImagePath());
             drafts = convertToRatioDrafts(aiResult);
             log.info("[BoothMap] AI 분석 성공: {}개의 부스 감지", drafts.size());
 
-            // AI 분석 결과를 JSON String으로 변환하여 임시 스냅샷으로 저장
             if (!drafts.isEmpty()) {
-                String snapshotJson = objectMapper.writeValueAsString(drafts);
+                final String snapshotJson = objectMapper.writeValueAsString(drafts);
                 saved.updateMappingSnapshot(snapshotJson);
-                eventMapRepository.save(saved); // Update the snapshot in DB
+                eventMapRepository.save(saved);
             }
-        } catch (Exception e) {
-            log.error("[BoothMap] AI 이미지 분석 실패 (지도는 정상 저장됨) {eventMapId: {}}", saved.getId(), e);
+        } catch (final Exception exception) {
+            log.error("[BoothMap] AI 이미지 분석 실패 (지도는 정상 저장됨) {eventMapId: {}}", saved.getId(), exception);
         }
 
         log.info("[BoothMap] 행사 지도 저장 완료 {eventMapId: {}, eventId: {}, visible: {}}",
                 saved.getId(), saved.getEventId(), saved.isVisible());
 
-        // 3. 임시 부스 영역을 담아서 응답
         return EventMapUploadResDto.builder()
                 .eventMapId(saved.getId())
                 .eventId(saved.getEventId())
@@ -238,10 +206,7 @@ public class BoothMapService {
                 .build();
     }
 
-    /**
-     * 픽셀(Pixel) 좌표를 DECIMAL(7, 4) 규격의 비율(Ratio)로 변환
-     */
-    private List<BoothAreaDraftDto> convertToRatioDrafts(AiVisionClient.AiAnalysisResult aiResult) {
+    private List<BoothAreaDraftDto> convertToRatioDrafts(final AiVisionClient.AiAnalysisResult aiResult) {
         final BigDecimal imageWidth = BigDecimal.valueOf(aiResult.imageWidth());
         final BigDecimal imageHeight = BigDecimal.valueOf(aiResult.imageHeight());
 
@@ -249,19 +214,14 @@ public class BoothMapService {
             return Collections.emptyList();
         }
 
-        return aiResult.booths().stream().map(rect -> {
-            BigDecimal xRatio = BigDecimal.valueOf(rect.x()).divide(imageWidth, 4, java.math.RoundingMode.HALF_UP);
-            BigDecimal yRatio = BigDecimal.valueOf(rect.y()).divide(imageHeight, 4, java.math.RoundingMode.HALF_UP);
-            BigDecimal widthRatio = BigDecimal.valueOf(rect.width()).divide(imageWidth, 4, java.math.RoundingMode.HALF_UP);
-            BigDecimal heightRatio = BigDecimal.valueOf(rect.height()).divide(imageHeight, 4, java.math.RoundingMode.HALF_UP);
-
-            return BoothAreaDraftDto.builder()
-                    .xRatio(xRatio)
-                    .yRatio(yRatio)
-                    .widthRatio(widthRatio)
-                    .heightRatio(heightRatio)
-                    .build();
-        }).toList();
+        return aiResult.booths().stream()
+                .map(rect -> BoothAreaDraftDto.builder()
+                        .xRatio(BigDecimal.valueOf(rect.x()).divide(imageWidth, 4, RoundingMode.HALF_UP))
+                        .yRatio(BigDecimal.valueOf(rect.y()).divide(imageHeight, 4, RoundingMode.HALF_UP))
+                        .widthRatio(BigDecimal.valueOf(rect.width()).divide(imageWidth, 4, RoundingMode.HALF_UP))
+                        .heightRatio(BigDecimal.valueOf(rect.height()).divide(imageHeight, 4, RoundingMode.HALF_UP))
+                        .build())
+                .toList();
     }
 
     private BoothMapAreaResDto toBoothMapAreaResDto(final BoothMapArea area, final Booth booth) {
@@ -285,28 +245,59 @@ public class BoothMapService {
                 .build();
     }
 
-    private void validateEventExists(final Long eventId) {
-        if (!eventRepository.existsById(eventId)) {
-            throw new EventException(ErrorCode.EVENT_NOT_FOUND);
+    private EventMap getValidatedEventMap(final Long eventId, final Long eventMapId) {
+        final EventMap eventMap = eventMapRepository.findById(eventMapId)
+                .orElseThrow(() -> new EventException(ErrorCode.EVENT_MAP_NOT_FOUND));
+
+        if (!eventMap.getEventId().equals(eventId)) {
+            throw new BoothException(ErrorCode.BOOTH_EVENT_MISMATCH);
+        }
+
+        return eventMap;
+    }
+
+    private List<BoothAreaDraftDto> parseDrafts(final EventMap eventMap) {
+        if (eventMap.getMappingSnapshot() == null || eventMap.getMappingSnapshot().isBlank()) {
+            return Collections.emptyList();
+        }
+
+        try {
+            final BoothAreaDraftDto[] drafts = objectMapper.readValue(
+                    eventMap.getMappingSnapshot(),
+                    BoothAreaDraftDto[].class
+            );
+            return Arrays.stream(drafts).toList();
+        } catch (final Exception exception) {
+            log.warn("[BoothMap] 스냅샷 파싱 실패 {eventMapId: {}}", eventMap.getId(), exception);
+            return Collections.emptyList();
         }
     }
 
+    private void promoteVisibleMapIfNeeded(final Long eventId, final EventMap eventMap) {
+        if (eventMap.isVisible()) {
+            return;
+        }
+
+        eventMapRepository.findFirstByEventIdAndVisibleTrueOrderByIdDesc(eventId)
+                .ifPresent(visibleMap -> visibleMap.update(visibleMap.getImagePath(), false));
+        eventMap.update(eventMap.getImagePath(), true);
+    }
+
     private void validateEventOwnership(final Long eventId) {
-        validateEventExists(eventId);
-        Event event = eventRepository.findById(eventId)
+        final Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new EventException(ErrorCode.EVENT_NOT_FOUND));
 
-        org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null || auth.getName().equals("anonymousUser")) {
+        final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || authentication.getName().equals("anonymousUser")) {
             throw new EventException(ErrorCode.ACCESS_DENIED);
         }
 
         try {
-            Long currentUserId = Long.parseLong(auth.getName());
+            final Long currentUserId = Long.parseLong(authentication.getName());
             if (!event.getEventAdminId().equals(currentUserId)) {
                 throw new EventException(ErrorCode.ACCESS_DENIED);
             }
-        } catch (NumberFormatException e) {
+        } catch (final NumberFormatException exception) {
             throw new EventException(ErrorCode.ACCESS_DENIED);
         }
     }

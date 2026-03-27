@@ -21,7 +21,7 @@ public record BoothMapResDto(
         @Schema(description = "부스 영역 목록")
         List<BoothMapAreaResDto> booths,
 
-        @Schema(description = "AI 분석 임시 부스 영역 목록 (저장된 매핑이 없을 때 제공될 수 있음)")
+        @Schema(description = "임시 부스 영역 목록 (스냅샷)")
         List<BoothAreaDraftDto> drafts
 ) {
 }

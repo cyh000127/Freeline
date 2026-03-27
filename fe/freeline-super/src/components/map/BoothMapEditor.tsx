@@ -26,7 +26,17 @@ interface BoothMapEditorProps {
     readonly containerWidth: number;
     readonly containerHeight: number;
     readonly zoomLevel?: number;
+    readonly hideBackground?: boolean;
 }
+
+// 비율(Ratio) -> 픽셀(Pixel) 변환
+const toPixel = (ratio: number, max: number) => Math.round(ratio * max);
+
+// 픽셀(Pixel) -> 비율(Ratio) 변환
+const toRatio = (pixel: number, max: number) => {
+    if (max === 0) return 0;
+    return Number((pixel / max).toFixed(4));
+};
 
 export function BoothMapEditor({
                                    layoutImageUrl,
@@ -37,6 +47,7 @@ export function BoothMapEditor({
                                    containerWidth,
                                    containerHeight,
                                    zoomLevel = 1,
+                                   hideBackground = false,
                                }: BoothMapEditorProps) {
     const [areas, setAreas] = useState<AreaItem[]>(initialAreas);
     const [imageSize, setImageSize] = useState({width: 0, height: 0});
@@ -92,15 +103,6 @@ export function BoothMapEditor({
         }
     }
 
-    // 비율(Ratio) -> 픽셀(Pixel) 변환
-    const toPixel = (ratio: number, max: number) => Math.round(ratio * max);
-
-    // 픽셀(Pixel) -> 비율(Ratio) 변환
-    const toRatio = (pixel: number, max: number) => {
-        if (max === 0) return 0;
-        return Number((pixel / max).toFixed(4));
-    };
-
     const dragStartPositions = useRef<{ [key: string]: { xRatio: number, yRatio: number } }>({});
 
     const handleDragStart = (localId: string) => {
@@ -148,7 +150,7 @@ export function BoothMapEditor({
         if (!isEditMode) return;
 
         const startPos = dragStartPositions.current[localId];
-        let newAreas = areas;
+        let calculatedAreas: AreaItem[];
 
         if (startPos) {
             const newXRatio = toRatio(d.x, effectiveWidth);
@@ -160,7 +162,7 @@ export function BoothMapEditor({
             const isSelected = selectedLocalIds.includes(localId);
             const idsToMove = isSelected ? selectedLocalIds : [localId];
 
-            newAreas = areas.map((area) => {
+            calculatedAreas = areas.map((area) => {
                 if (idsToMove.includes(area.localId)) {
                     const initial = dragStartPositions.current[area.localId] || area;
                     return {
@@ -172,7 +174,7 @@ export function BoothMapEditor({
                 return area;
             });
         } else {
-            newAreas = areas.map((area) => {
+            calculatedAreas = areas.map((area) => {
                 if (area.localId === localId) {
                     return {
                         ...area,
@@ -184,8 +186,8 @@ export function BoothMapEditor({
             });
         }
 
-        setAreas(newAreas);
-        onAreasChange(newAreas);
+        setAreas(calculatedAreas);
+        onAreasChange(calculatedAreas);
         dragStartPositions.current = {};
         setTimeout(() => {
             isDraggingRef.current = false;
@@ -276,6 +278,15 @@ export function BoothMapEditor({
         setSelectionBox(null);
     };
 
+    const handleDeleteSelected = () => {
+        if (!isEditMode || selectedLocalIds.length === 0) return;
+
+        const newAreas = areas.filter(area => !selectedLocalIds.includes(area.localId));
+        setAreas(newAreas);
+        onAreasChange(newAreas);
+        setSelectedLocalIds([]);
+    };
+
     // --- Delete / Backspace 키보드 삭제 ---
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -283,17 +294,16 @@ export function BoothMapEditor({
             // 입력 폼에서 삭제하는 경우는 무시
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedLocalIds.length > 0) {
-                e.preventDefault(); // 뒤로가기 등 기본 동작 방지
-                const newAreas = areas.filter(area => !selectedLocalIds.includes(area.localId));
-                setAreas(newAreas);
-                onAreasChange(newAreas);
-                setSelectedLocalIds([]);
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedLocalIds.length > 0) {
+                    e.preventDefault(); // 뒤로가기 등 기본 동작 방지
+                    handleDeleteSelected();
+                }
             }
         };
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
+        globalThis.addEventListener('keydown', handleKeyDown);
+        return () => globalThis.removeEventListener('keydown', handleKeyDown);
     }, [isEditMode, selectedLocalIds, areas, onAreasChange]);
 
     return (
@@ -305,10 +315,13 @@ export function BoothMapEditor({
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
+                role="region"
+                aria-label="Booth map editor"
+                tabIndex={0}
                 style={{
                     width: effectiveWidth,
                     height: effectiveHeight,
-                    backgroundImage: `url(${layoutImageUrl})`,
+                    backgroundImage: hideBackground ? 'none' : `url(${layoutImageUrl})`,
                     backgroundSize: "100% 100%",
                     backgroundRepeat: "no-repeat",
                     backgroundPosition: "center",
@@ -373,7 +386,7 @@ export function BoothMapEditor({
                         }}
                         onMouseDown={(e: MouseEvent | TouchEvent) => {
                             if (!isEditMode) return;
-                            if (e.shiftKey) {
+                            if (e instanceof MouseEvent && e.shiftKey) {
                                 setSelectedLocalIds(prev =>
                                     prev.includes(area.localId)
                                         ? prev.filter(id => id !== area.localId)
@@ -387,7 +400,8 @@ export function BoothMapEditor({
                         onMouseUp={(e: MouseEvent | TouchEvent) => {
                             if (!isEditMode) return;
                             // 드래그가 발생하지 않았고 Shift 키도 누르지 않았을 때 선택 해제 (단순 클릭 뗐을 때 해제)
-                            if (!isDraggingRef.current && !e.shiftKey) {
+                            const isShiftKey = e instanceof MouseEvent && e.shiftKey;
+                            if (!isDraggingRef.current && !isShiftKey) {
                                 setSelectedLocalIds([]);
                             }
                         }}
@@ -402,7 +416,6 @@ export function BoothMapEditor({
                         {area.boothName && (
                             <div
                                 className="flex flex-col items-center justify-center bg-white/90 text-gray-800 px-2 py-1 rounded shadow-sm overflow-hidden max-w-full pointer-events-none"
-                                style={{pointerEvents: 'none'}} // 드래그/리사이즈 방해 방지
                             >
                                 {area.locationCode && (
                                     <span

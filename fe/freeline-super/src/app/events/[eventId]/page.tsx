@@ -10,6 +10,7 @@ import {eventApi, Event} from "@/lib/api/event";
 import { authApi } from "@/lib/api/auth";
 import {boothMapApi} from "@/lib/api/boothMap";
 import { useModal } from "@/context/ModalContext";
+import {useLeaveConfirm} from "@/hooks/useLeaveConfirm";
 import { 
   Map as MapIcon, 
   Upload,
@@ -51,6 +52,7 @@ export default function EventDetailPage() {
     const [layoutImageUrl, setLayoutImageUrl] = useState<string | null>(null);
     const [eventMapId, setEventMapId] = useState<number | null>(null);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [mapStatus, setMapStatus] = useState<"NONE" | "DRAFT" | "PUBLISHED">("NONE");
     const [areas, setAreas] = useState<AreaItem[]>([]);
     const [originalAreas, setOriginalAreas] = useState<AreaItem[]>([]);
     const [areasHistory, setAreasHistory] = useState<AreaItem[][]>([]);
@@ -73,85 +75,90 @@ export default function EventDetailPage() {
 
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-    // Prevent leaving if unsaved changes exist
+    // Warn before leaving if unsaved changes exist
+    useLeaveConfirm(hasUnsavedChanges);
+
+    const fetchUserInfo = async () => {
+        const userRes = await authApi.getMe();
+        if (userRes.data?.success && userRes.data?.data?.name) {
+            setUserName(userRes.data.data.name);
+        }
+    };
+
+    const fetchEventDetail = async () => {
+        const eventRes = await eventApi.getEvent(eventId.toString());
+        let detail = null;
+        if (eventRes.data?.success && eventRes.data?.data) {
+            detail = eventRes.data.data;
+        } else if ((eventRes.data as any)?.eventId) {
+            detail = eventRes.data;
+        }
+
+        if (detail !== null) {
+            setEvent(detail as Event);
+        }
+    };
+
+    const fetchMapData = async () => {
+        try {
+            const mapRes = await boothMapApi.getBoothMap(eventId);
+            if (!mapRes.data?.success || !mapRes.data?.data) return;
+
+            const data = mapRes.data.data;
+            setLayoutImageUrl(data.mapImageUrl);
+            setEventMapId(data.eventMapId);
+
+            if (data.booths?.length > 0) {
+                const mappedAreas = data.booths.map((b: any) => ({
+                    localId: `db-${b.areaId || b.boothId}`,
+                    boothId: b.boothId,
+                    boothName: b.boothName,
+                    xRatio: b.xRatio,
+                    yRatio: b.yRatio,
+                    widthRatio: b.widthRatio,
+                    heightRatio: b.heightRatio,
+                }));
+                setAreas(mappedAreas);
+                setOriginalAreas(mappedAreas);
+                setMapStatus("PUBLISHED");
+            } else if (data.drafts?.length > 0) {
+                const newDrafts = data.drafts.map((d: any, idx: number) => ({
+                    localId: `ai-draft-${idx}-${Date.now()}`,
+                    boothId: null,
+                    xRatio: d.xRatio,
+                    yRatio: d.yRatio,
+                    widthRatio: d.widthRatio,
+                    heightRatio: d.heightRatio,
+                }));
+                setAreas(newDrafts);
+                setOriginalAreas(newDrafts);
+                setMapStatus("DRAFT");
+            } else {
+                setAreas([]);
+                setOriginalAreas([]);
+                setMapStatus("NONE");
+            }
+        } catch (mapErr) {
+            console.log("No map data found for this event", mapErr);
+        }
+    };
+
     useEffect(() => {
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (hasUnsavedChanges) {
-                e.preventDefault();
+        const fetchData = async () => {
+            try {
+                setIsLoading(true);
+                await Promise.all([fetchUserInfo(), fetchEventDetail(), fetchMapData()]);
+            } catch (error) {
+                console.error("Failed to fetch event detail:", error);
+            } finally {
+                setIsLoading(false);
             }
         };
 
-        globalThis.addEventListener("beforeunload", handleBeforeUnload);
-        return () => globalThis.removeEventListener("beforeunload", handleBeforeUnload);
-    }, [hasUnsavedChanges]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Fetch User Info
-        const userRes = await authApi.getMe();
-        if (userRes.data?.success && userRes.data?.data?.name) {
-          setUserName(userRes.data.data.name);
+        if (eventId) {
+            fetchData();
         }
-
-        // Fetch Event Detail
-          const eventRes = await eventApi.getEvent(eventId.toString());
-        let detail = null;
-        if (eventRes.data?.success && eventRes.data?.data) {
-          detail = eventRes.data.data;
-        } else if (eventRes.data && (eventRes.data as { eventId?: number }).eventId) {
-          detail = eventRes.data;
-        }
-
-          if (detail !== null) {
-          setEvent(detail as Event);
-        }
-
-          // Fetch Map Data
-          try {
-              const mapRes = await boothMapApi.getBoothMap(eventId);
-              if (mapRes.data?.success && mapRes.data?.data) {
-                  setLayoutImageUrl(mapRes.data.data.mapImageUrl);
-                  setEventMapId(mapRes.data.data.eventMapId);
-
-                  if (mapRes.data.data.booths) {
-                      const mappedAreas = mapRes.data.data.booths.map((b: {
-                          areaId?: number;
-                          boothId: number;
-                          boothName: string;
-                          xRatio: number;
-                          yRatio: number;
-                          widthRatio: number;
-                          heightRatio: number
-                      }) => ({
-                          localId: `db-${b.areaId || b.boothId}`,
-                          boothId: b.boothId,
-                          boothName: b.boothName,
-                          xRatio: b.xRatio,
-                          yRatio: b.yRatio,
-                          widthRatio: b.widthRatio,
-                          heightRatio: b.heightRatio,
-                      }));
-                      setAreas(mappedAreas);
-                      setOriginalAreas(mappedAreas);
-                  }
-              }
-          } catch (mapErr) {
-              console.log("No map data found for this event", mapErr);
-          }
-      } catch (error) {
-        console.error("Failed to fetch event detail:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (eventId) {
-      fetchData();
-    }
-  }, [eventId]);
+    }, [eventId]);
 
     useEffect(() => {
         const updateSize = () => {
@@ -167,6 +174,14 @@ export default function EventDetailPage() {
         setTimeout(updateSize, 100);
         globalThis.addEventListener("resize", updateSize);
         return () => globalThis.removeEventListener("resize", updateSize);
+    }, [layoutImageUrl]);
+
+    useEffect(() => {
+        return () => {
+            if (layoutImageUrl?.startsWith('blob:')) {
+                URL.revokeObjectURL(layoutImageUrl);
+            }
+        };
     }, [layoutImageUrl]);
 
     // Prevent default scroll when using Alt+Wheel on map container
@@ -212,34 +227,30 @@ export default function EventDetailPage() {
 
     const handleUndo = () => {
         if (areasHistory.length === 0) return;
-        const previousAreas = areasHistory[areasHistory.length - 1];
-        setAreas(previousAreas);
-        setAreasHistory(prev => prev.slice(0, -1));
-        setHasUnsavedChanges(true);
+        const previousAreas = areasHistory.at(-1);
+        if (previousAreas) {
+            setAreas(previousAreas);
+            setAreasHistory(prev => prev.slice(0, -1));
+            setHasUnsavedChanges(true);
+        }
     };
 
     const handleLayoutUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file === undefined) {
-            return;
-        }
+        if (!file) return;
 
         try {
             setIsLoading(true);
             const res = await boothMapApi.uploadMapImage(eventId, file, true);
 
             if (res.data?.success && res.data?.data) {
-                setLayoutImageUrl(res.data.data.imagePath);
-                setEventMapId(res.data.data.eventMapId);
+                const data = res.data.data;
+                setLayoutImageUrl(data.imagePath);
+                setEventMapId(data.eventMapId);
 
                 // AI Drafts processing
-                if (res.data.data.drafts && res.data.data.drafts.length > 0) {
-                    const newDrafts = res.data.data.drafts.map((d: {
-                        xRatio: number;
-                        yRatio: number;
-                        widthRatio: number;
-                        heightRatio: number
-                    }, idx: number) => ({
+                if (data.drafts?.length > 0) {
+                    const newDrafts = data.drafts.map((d: any, idx: number) => ({
                         localId: `ai-draft-${idx}-${Date.now()}`,
                         boothId: null,
                         xRatio: d.xRatio,
@@ -248,22 +259,23 @@ export default function EventDetailPage() {
                         heightRatio: d.heightRatio,
                     }));
                     setAreas(newDrafts);
-                    setOriginalAreas([]);
+                    setOriginalAreas(newDrafts);
+                    setMapStatus("DRAFT");
                     setHasUnsavedChanges(true);
                     setIsEditMode(true); // Automatically enter edit mode
                 } else {
                     setAreas([]);
                     setOriginalAreas([]);
+                    setMapStatus("NONE");
                     setHasUnsavedChanges(false);
                 }
             }
         } catch (err: any) {
             const errorStatus = err.response?.data?.status || err.response?.data?.error?.status;
-            if (errorStatus === "INVALID_IMAGE_FORMAT") {
-                showAlert("지원하지 않는 이미지 포맷이거나 손상된 파일입니다.");
-            } else {
-                showAlert("지도 업로드에 실패했습니다.");
-            }
+            const message = errorStatus === "INVALID_IMAGE_FORMAT"
+                ? "지원하지 않는 이미지 포맷이거나 손상된 파일입니다."
+                : "지도 업로드에 실패했습니다.";
+            showAlert(message);
         } finally {
             setIsLoading(false);
         }
@@ -293,6 +305,7 @@ export default function EventDetailPage() {
             setIsSaving(true);
             await boothMapApi.updateBoothMapAreas(eventId, eventMapId, validAreas);
             setOriginalAreas(areas);
+            setMapStatus("PUBLISHED");
             setIsEditMode(false);
             setHasUnsavedChanges(false);
             showAlert("저장되었습니다.");
@@ -310,6 +323,7 @@ export default function EventDetailPage() {
             setIsSaving(true);
             await boothMapApi.updateBoothMapSnapshot(eventId, eventMapId, {areas});
             setOriginalAreas(areas);
+            setMapStatus("DRAFT");
             setHasUnsavedChanges(false);
             showAlert("임시저장되었습니다.");
         } catch (err) {
@@ -410,7 +424,7 @@ export default function EventDetailPage() {
 
     const mappedBoothIds = areas.filter(a => a.boothId !== null).map(a => a.boothId as number);
     const currentActiveArea = areas.find(a => a.localId === activeLocalId);
-    const currentBoothId = currentActiveArea ? currentActiveArea.boothId : null;
+    const currentBoothId = currentActiveArea?.boothId ?? null;
 
   return (
     <div className="flex bg-[#F1F3F5] h-screen overflow-hidden">
@@ -505,6 +519,9 @@ export default function EventDetailPage() {
               <div
                   ref={containerRef}
                   className="flex-1 bg-[#F1F3F5] rounded-[32px] flex items-center justify-center border-2 border-dashed border-gray-200 overflow-hidden relative group"
+                  role="region"
+                  aria-label="Map view"
+                  tabIndex={0}
                   onWheel={(e) => {
                       if (e.altKey) {
                           e.preventDefault();
@@ -551,6 +568,15 @@ export default function EventDetailPage() {
                       cursor: isPanningRef.current ? 'grabbing' : 'default'
                   }}
               >
+                  {/* Temporary Save Badge */}
+                  {!isEditMode && mapStatus === 'DRAFT' && layoutImageUrl && (
+                      <div
+                          className="absolute top-4 left-4 z-50 bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full shadow-md font-bold text-sm flex items-center gap-2 border border-yellow-300">
+                          <span>⚠️</span>
+                          임시 저장된 데이터가 있습니다.
+                      </div>
+                  )}
+
                   {/* Floating Zoom Controls */}
                   {layoutImageUrl && (
                       <div
@@ -609,6 +635,7 @@ export default function EventDetailPage() {
                         onOpenSearchModal={handleOpenSearchModal}
                         onAreasChange={handleAreasChange}
                         zoomLevel={zoomLevel}
+                        hideBackground={!isEditMode && mapStatus === 'PUBLISHED'}
                     />
                 </div>
             ) : (
