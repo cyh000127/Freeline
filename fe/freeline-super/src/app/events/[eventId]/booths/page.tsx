@@ -4,8 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import { Sidebar } from "@/components/Sidebar";
+import { BoothAdminCredentialsModal } from "@/components/BoothAdminCredentialsModal";
 import { authApi } from "@/lib/api/auth";
-import { eventApi, Event } from "@/lib/api/event";
+import { eventApi, Event, CreatedBoothAdminCredential } from "@/lib/api/event";
 import { useModal } from "@/context/ModalContext";
 import {
   Upload,
@@ -113,6 +114,7 @@ export default function EventBoothsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isSendingMail, setIsSendingMail] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState<CreatedBoothAdminCredential[]>([]);
 
   const fetchBooths = useCallback(async () => {
     try {
@@ -276,7 +278,12 @@ export default function EventBoothsPage() {
     try {
       const res = await eventApi.onboardBooths(eventId, selectedFile);
       if (res.data?.success || res.status === 201) {
-        showAlert("계정이 성공적으로 일괄 생성되었습니다.\n이제 '이메일 일괄 전송'을 통해 계정 정보를 발송할 수 있습니다.");
+        const createdAdmins = res.data?.data?.createdAdmins ?? [];
+        if (createdAdmins.length > 0) {
+          setCreatedCredentials(createdAdmins);
+        } else {
+          showAlert("계정이 성공적으로 일괄 생성되었습니다.\n이제 '이메일 일괄 전송'을 통해 계정 정보를 발송할 수 있습니다.");
+        }
         await fetchBooths();
         setSelectedFile(null);
         setFileName("");
@@ -321,6 +328,10 @@ export default function EventBoothsPage() {
   const selectedEventId = eventId;
   const allSelected = rows.length > 0 && rows.every((r) => r.selected);
   const selectedRows = rows.filter((r) => r.selected);
+
+  const handleCloseCredentialsModal = () => {
+    setCreatedCredentials([]);
+  };
 
   const statusBadge = (s: BoothRow["status"]) => {
     const map = {
@@ -537,7 +548,7 @@ export default function EventBoothsPage() {
               {/* Action bar */}
               <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-[#F8F9FA]">
                 <p className="text-[11px] text-gray-400 font-medium">
-                  <span className="text-[#2D2A4A] font-bold uppercase tracking-widest mr-1">안내:</span> CSV 파일을 업로드하여 정보를 일괄 등록하고 로그인 정보를 발송하세요.
+                  <span className="text-[#2D2A4A] font-bold uppercase tracking-widest mr-1">안내:</span> CSV 업로드 후 생성된 ID/PW를 바로 확인하거나, 필요 시 이메일로 전달하세요.
                 </p>
                 <div className="flex items-center gap-4">
                   <button
@@ -565,6 +576,12 @@ export default function EventBoothsPage() {
           )}
         </div>
       </main>
+      <BoothAdminCredentialsModal
+        open={createdCredentials.length > 0}
+        eventName={event?.name}
+        credentials={createdCredentials}
+        onClose={handleCloseCredentialsModal}
+      />
     </div>
   );
 }
