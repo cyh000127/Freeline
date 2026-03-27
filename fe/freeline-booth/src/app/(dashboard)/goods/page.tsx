@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Card } from "@/components/ui/card";
-import { PauseCircle, XCircle, Plus, X, Trash2 } from "lucide-react";
+import { PauseCircle, XCircle, Plus, X, Trash2, RefreshCcw, Wifi, WifiOff } from "lucide-react";
 import { getGoodsList, createGoods, updateGoodsStatus, deleteGoods, Goods } from "@/lib/api/goods";
 import { useAuth } from "@/context/AuthContext";
 import { useModal } from "@/context/ModalContext";
+import { waitingApi, WaitingInfo, DashboardResponse } from "@/lib/api/waiting";
+import { useWaitingSSE } from "@/hooks/useWaitingSSE";
+import { useCallback } from "react";
 
 export default function GoodsPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -19,30 +22,51 @@ export default function GoodsPage() {
   const [newGoodsImage, setNewGoodsImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isDataFetching, setIsDataFetching] = useState(false);
+  const [dashboardData, setDashboardData] = useState<DashboardResponse['data'] | null>(null);
+  const [fullQueue, setFullQueue] = useState<WaitingInfo[]>([]);
 
-  useEffect(() => {
-    if (boothId) {
-      fetchGoods();
-    }
-  }, [boothId]);
-
-  const fetchGoods = async () => {
+  const fetchData = useCallback(async (showLoading = false) => {
+    if (!boothId) return;
+    if (showLoading) setIsLoading(true);
+    setIsDataFetching(true);
     try {
-      setIsLoading(true);
-      const res = await getGoodsList(boothId);
-      if (res.success && res.data) {
-        setGoods(res.data);
+      const [goodsRes, dashRes, queueRes] = await Promise.all([
+        getGoodsList(boothId),
+        waitingApi.getDashboard(boothId),
+        waitingApi.getQueue()
+      ]);
+
+      if (goodsRes.success && goodsRes.data) {
+        setGoods(goodsRes.data);
+      }
+      if (dashRes.success && dashRes.data) {
+        setDashboardData(dashRes.data);
+      }
+      if (queueRes.success && queueRes.data) {
+        setFullQueue(queueRes.data.queueList || []);
       }
     } catch (error: any) {
+      console.error("Failed to fetch data:", error);
       if (error.response?.status === 404) {
         setGoods([]);
-      } else {
-        console.error("Failed to fetch goods:", error);
       }
     } finally {
       setIsLoading(false);
+      setIsDataFetching(false);
     }
-  };
+  }, [boothId]);
+
+  useEffect(() => {
+    if (boothId) {
+      fetchData(true);
+    }
+  }, [boothId, fetchData]);
+
+  // SSE Real-time updates
+  const { isConnected } = useWaitingSSE(boothId, () => {
+    fetchData(false);
+  });
 
   const handleToggleStatus = async (item: Goods) => {
     try {
@@ -88,7 +112,7 @@ export default function GoodsPage() {
       setNewGoodsName("");
       setNewGoodsImage(null);
       setPreviewUrl("");
-      fetchGoods(); // Refresh list
+      fetchData(); // Refresh list
     } catch (error: any) {
       const errorStatus = error.response?.data?.status || error.response?.data?.error?.status;
       if (errorStatus === "INVALID_IMAGE_FORMAT") {
@@ -100,6 +124,12 @@ export default function GoodsPage() {
     }
   };
 
+  const calculatedCount = {
+    waiting: fullQueue.filter(w => w.status === 'REGISTERED' || w.status === 'WAITING' || w.status === 'CALLED').length,
+    inUse: fullQueue.filter(w => w.status === 'ENTERED').length,
+  };
+  const totalActive = calculatedCount.waiting + calculatedCount.inUse;
+
   const filteredGoods = goods.filter((item) => {
     if (filter === "ALL") return true;
     if (filter === "ON_SALE") return !item.isSoldOut;
@@ -108,31 +138,55 @@ export default function GoodsPage() {
   });
 
   return (
-    <div className="p-8">
-      {/* Header Area (Shared with Dashboard roughly) */}
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-8 max-w-7xl mx-auto min-h-full flex flex-col text-black">
+      {/* Header Area */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 mb-2">
-            실시간 대기 현황
-          </h1>
-          <div className="flex items-center gap-2">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-            <span className="text-sm font-medium text-gray-700">현재 부스 정상 운영 중</span>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-black tracking-tight text-gray-900">실시간 대기 현황</h1>
+            {dashboardData?.booth?.emergencyClosed && (
+              <span className="px-2 py-1 bg-rose-500 text-white text-[10px] font-black rounded-lg animate-pulse">비상 마감</span>
+            )}
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-100 rounded-lg">
+              {isConnected ? (
+                <Wifi className="w-3 h-3 text-emerald-500" />
+              ) : (
+                <WifiOff className="w-3 h-3 text-amber-500" />
+              )}
+              <span className={`text-[10px] font-black ${isConnected ? 'text-emerald-700' : 'text-amber-700'}`}>
+                {isConnected ? '실시간 연결됨' : '자동 갱신 중'}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-full border border-emerald-100 w-fit">
+            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-sm font-bold text-emerald-700">
+              부스 운영중
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <Card className="flex h-14 items-center px-5 shadow-sm border-0 bg-white">
-            <div className="flex items-center gap-4">
-              <span className="text-xs font-semibold text-gray-500">예상 대기 시간</span>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-bold tracking-tighter text-gray-900">0</span>
-                <span className="text-sm font-medium text-gray-900">분</span>
-              </div>
+        <div className="flex items-center gap-3">
+          <div className="grid grid-cols-2 gap-3 mr-4">
+            <div className="flex flex-col items-center justify-center px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm">
+              <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">대기+입장</span>
+              <span className="text-xl font-black text-gray-900">{totalActive}</span>
             </div>
-          </Card>
+            <div className="flex flex-col items-center justify-center px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm">
+              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">부스 체험 중</span>
+              <span className="text-xl font-black text-gray-900">{calculatedCount.inUse}</span>
+            </div>
+          </div>
 
-          <button className="flex h-14 items-center justify-center gap-2 rounded-xl bg-[#F59E0B] px-6 font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#FBBF24] hover:shadow-md">
+          <button
+            onClick={() => fetchData(true)}
+            className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:bg-gray-50 transition-colors"
+            title="새로고침"
+          >
+            <RefreshCcw className={`w-6 h-6 text-gray-400 ${isDataFetching ? 'animate-spin' : ''}`} />
+          </button>
+
+          {/* <button className="flex h-14 items-center justify-center gap-2 rounded-xl bg-[#F59E0B] px-6 font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#FBBF24] hover:shadow-md">
             <PauseCircle className="h-5 w-5" />
             운영중지
           </button>
@@ -140,7 +194,7 @@ export default function GoodsPage() {
           <button className="flex h-14 items-center justify-center gap-2 rounded-xl bg-[#EF4444] px-6 font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F87171] hover:shadow-md">
             <XCircle className="h-5 w-5" />
             운영종료
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -148,33 +202,33 @@ export default function GoodsPage() {
       <div className="flex flex-col flex-1 mt-2">
         {/* Filters and Actions */}
         <div className="flex items-center justify-between mb-6">
-          <div className="inline-flex h-14 items-center justify-center rounded-2xl bg-white p-1.5 shadow-sm border border-gray-100">
+          <div className="inline-flex h-14 items-center justify-center rounded-[20px] bg-white p-1.5 shadow-sm border border-gray-100">
             <button
               onClick={() => setFilter("ALL")}
-              className={`inline-flex h-full items-center justify-center rounded-xl px-8 text-sm font-bold transition-all duration-200 ${
+              className={`inline-flex h-full items-center justify-center rounded-[14px] px-8 text-sm font-black transition-all duration-300 ${
                 filter === "ALL"
-                  ? "bg-[#2D2A4A] text-white shadow hover:-translate-y-0.5 hover:bg-[#3A375C] hover:shadow-md"
-                  : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                  ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20"
+                  : "text-gray-400 hover:text-gray-900 hover:bg-gray-50"
               }`}
             >
               전체
             </button>
             <button
               onClick={() => setFilter("ON_SALE")}
-              className={`inline-flex h-full items-center justify-center rounded-xl px-8 text-sm font-bold transition-all duration-200 ${
+              className={`inline-flex h-full items-center justify-center rounded-[14px] px-8 text-sm font-black transition-all duration-300 ${
                 filter === "ON_SALE"
-                  ? "bg-[#2D2A4A] text-white shadow hover:-translate-y-0.5 hover:bg-[#3A375C] hover:shadow-md"
-                  : "text-gray-500 hover:text-gray-900 hover:bg-gray-50 whitespace-nowrap"
+                  ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20"
+                  : "text-gray-400 hover:text-gray-900 hover:bg-gray-50 whitespace-nowrap"
               }`}
             >
               판매 중
             </button>
             <button
               onClick={() => setFilter("SOLD_OUT")}
-              className={`inline-flex h-full items-center justify-center rounded-xl px-8 text-sm font-bold transition-all duration-200 ${
+              className={`inline-flex h-full items-center justify-center rounded-[14px] px-8 text-sm font-black transition-all duration-300 ${
                 filter === "SOLD_OUT"
-                  ? "bg-[#2D2A4A] text-white shadow hover:-translate-y-0.5 hover:bg-[#3A375C] hover:shadow-md"
-                  : "text-gray-500 hover:text-gray-900 hover:bg-gray-50 whitespace-nowrap"
+                  ? "bg-[#2D2A4A] text-white shadow-lg shadow-[#2D2A4A]/20"
+                  : "text-gray-400 hover:text-gray-900 hover:bg-gray-50 whitespace-nowrap"
               }`}
             >
               품절

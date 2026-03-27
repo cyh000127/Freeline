@@ -119,6 +119,7 @@ export default function LoginPage() {
               )}
             </div>
 
+{/* 
             <div className="flex items-center justify-between pt-2">
               <div className="flex items-center space-x-2">
                 <Checkbox id="remember" className="rounded-[4px] border-gray-300 data-[state=checked]:bg-[#2D2A4A] data-[state=checked]:border-[#2D2A4A]" />
@@ -133,6 +134,7 @@ export default function LoginPage() {
                 아이디/비밀번호 찾기
               </a>
             </div>
+            */}
 
             <div className="pt-4">
               <Button 
