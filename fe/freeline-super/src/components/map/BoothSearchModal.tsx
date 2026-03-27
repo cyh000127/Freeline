@@ -61,13 +61,14 @@ export function BoothSearchModal({
     });
 
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const prevIsOpenRef = useRef(false);
 
     const fetchAllData = useCallback(async () => {
         try {
             // Fetch booth list and admin list to merge them
             const [adminsRes, detailsRes] = await Promise.all([
-                api.get(`/api/v1/auth/booth-admins/events/${eventId}`),
-                api.get(`/api/v1/booths/events/${eventId}`)
+                api.get(`/v1/auth/booth-admins/events/${eventId}`),
+                api.get(`/v1/booths/events/${eventId}`)
             ]);
 
             if (detailsRes.data.success && adminsRes.data.success) {
@@ -109,31 +110,18 @@ export function BoothSearchModal({
         if (isOpen) {
             fetchAllData();
 
-            const newBoothId = currentBoothId || null;
-            const newBoothName = currentData?.boothName || "";
-            const newLocationCode = currentData?.locationCode || "";
-            const newAdminName = currentData?.adminName || "";
-            const newContact = currentData?.contact || "";
-            const newColor = currentData?.color || "#3B82F6";
-
-            if (
-                formData.boothId !== newBoothId ||
-                formData.boothName !== newBoothName ||
-                formData.locationCode !== newLocationCode ||
-                formData.adminName !== newAdminName ||
-                formData.contact !== newContact ||
-                formData.color !== newColor
-            ) {
+            if (!prevIsOpenRef.current) {
                 setFormData({
-                    boothId: newBoothId,
-                    boothName: newBoothName,
-                    locationCode: newLocationCode,
-                    adminName: newAdminName,
-                    contact: newContact,
-                    color: newColor,
+                    boothId: currentBoothId || null,
+                    boothName: currentData?.boothName || "",
+                    locationCode: currentData?.locationCode || "",
+                    adminName: currentData?.adminName || "",
+                    contact: currentData?.contact || "",
+                    color: currentData?.color || "#3B82F6",
                 });
             }
         }
+        prevIsOpenRef.current = isOpen;
     }, [isOpen, fetchAllData, currentBoothId, currentData, formData]);
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
