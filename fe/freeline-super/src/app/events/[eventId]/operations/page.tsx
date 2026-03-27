@@ -29,6 +29,14 @@ type QueueTab = "WAITING" | "ENTERED" | "DONE";
 const isWaitingLike = (status: string) =>
   status === "REGISTERED" || status === "WAITING" || status === "CALLED";
 
+function extractApiErrorMessage(error: any, fallback: string) {
+  return (
+    error?.response?.data?.error?.message ||
+    error?.response?.data?.message ||
+    fallback
+  );
+}
+
 export default function EventOperationsPage() {
   const params = useParams();
   const eventId = params.eventId as string;
@@ -43,6 +51,7 @@ export default function EventOperationsPage() {
   const [activeTab, setActiveTab] = useState<QueueTab>("WAITING");
   const [isLoading, setIsLoading] = useState(true);
   const [isQueueLoading, setIsQueueLoading] = useState(false);
+  const boothStorageKey = useMemo(() => `super:selectedBooth:${eventId}`, [eventId]);
 
   const fetchBooths = useCallback(async () => {
     const detailsRes = await eventApi.getBoothDetails(eventId);
@@ -61,12 +70,23 @@ export default function EventOperationsPage() {
 
     setBooths(nextBooths);
     setSelectedBoothId((prev) => {
+      const savedBoothId =
+        typeof window !== "undefined"
+          ? Number(window.localStorage.getItem(boothStorageKey))
+          : null;
+
       if (prev && nextBooths.some((booth) => booth.boothId === prev)) {
         return prev;
       }
+      if (
+        savedBoothId &&
+        nextBooths.some((booth) => booth.boothId === savedBoothId)
+      ) {
+        return savedBoothId;
+      }
       return nextBooths[0]?.boothId ?? null;
     });
-  }, [eventId]);
+  }, [boothStorageKey, eventId]);
 
   const fetchQueueData = useCallback(
     async (boothId: number, withLoading = false) => {
@@ -126,13 +146,17 @@ export default function EventOperationsPage() {
       return;
     }
 
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(boothStorageKey, String(selectedBoothId));
+    }
+
     fetchQueueData(selectedBoothId, true);
     const interval = setInterval(() => {
       fetchQueueData(selectedBoothId, false);
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [selectedBoothId, fetchQueueData]);
+  }, [selectedBoothId, fetchQueueData, boothStorageKey]);
 
   const handleRefresh = async () => {
     if (!selectedBoothId) return;
@@ -146,7 +170,7 @@ export default function EventOperationsPage() {
       showAlert("다음 대기자를 호출했습니다.");
       fetchQueueData(selectedBoothId, false);
     } catch (error: any) {
-      showAlert(error?.response?.data?.message || "다음 대기자 호출에 실패했습니다.");
+      showAlert(extractApiErrorMessage(error, "다음 대기자 호출에 실패했습니다."));
     }
   };
 
@@ -156,7 +180,7 @@ export default function EventOperationsPage() {
       await superWaitingApi.admitWaiting(selectedBoothId, waitingId);
       fetchQueueData(selectedBoothId, false);
     } catch (error: any) {
-      showAlert(error?.response?.data?.message || "입장 처리에 실패했습니다.");
+      showAlert(extractApiErrorMessage(error, "입장 처리에 실패했습니다."));
     }
   };
 
@@ -167,7 +191,7 @@ export default function EventOperationsPage() {
         await superWaitingApi.cancelWaiting(selectedBoothId, waitingId);
         fetchQueueData(selectedBoothId, false);
       } catch (error: any) {
-        showAlert(error?.response?.data?.message || "대기 취소에 실패했습니다.");
+        showAlert(extractApiErrorMessage(error, "대기 취소에 실패했습니다."));
       }
     });
   };
@@ -178,7 +202,7 @@ export default function EventOperationsPage() {
       await superWaitingApi.exitWaiting(selectedBoothId, waitingId);
       fetchQueueData(selectedBoothId, false);
     } catch (error: any) {
-      showAlert(error?.response?.data?.message || "퇴장 처리에 실패했습니다.");
+      showAlert(extractApiErrorMessage(error, "퇴장 처리에 실패했습니다."));
     }
   };
 
