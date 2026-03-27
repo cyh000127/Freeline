@@ -296,7 +296,12 @@ export default function BoothManagementPage() {
     try {
       const res = await eventApi.onboardBooths(selectedEventId, selectedFile);
       if (res.data?.success || res.status === 201) {
-        setCreatedCredentials(res.data?.data?.createdAdmins ?? []);
+        const createdAdmins = res.data?.data?.createdAdmins ?? [];
+        if (createdAdmins.length > 0) {
+          setCreatedCredentials(createdAdmins);
+        } else {
+          showAlert("계정이 성공적으로 일괄 생성되었습니다.\n이제 '이메일 일괄 전송'을 통해 계정 정보를 발송할 수 있습니다.");
+        }
         await fetchBooths(selectedEventId);
         setSelectedFile(null);
         setFileName("");

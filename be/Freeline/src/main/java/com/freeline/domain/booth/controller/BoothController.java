@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -87,6 +88,7 @@ public class BoothController {
     }
 
     @Operation(summary = "부스 CSV 일괄 등록", description = "행사에 속한 부스 목록을 CSV 파일로 업로드하여 일괄 등록합니다.")
+    @PreAuthorize("hasRole('EVENT_ADMIN')")
     @PostMapping(value = "/events/{eventId}/booths/csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BaseResponse<BoothCsvUploadResDto>> uploadBoothsByCsv(
             @PathVariable("eventId") final Long eventId,

@@ -3,9 +3,9 @@ package com.freeline.domain.booth.service;
 import java.util.List;
 
 import org.assertj.core.api.Assertions;
-import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
