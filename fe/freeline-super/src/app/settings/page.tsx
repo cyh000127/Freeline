@@ -71,7 +71,7 @@ export default function SettingsPage() {
       await authApi.updateMe(payload);
       showAlert("입력하신 정보가 수정되었습니다.");
     } catch (err: any) {
-      showAlert(err.response?.data?.message || "수정 실패. 네트워크 로그를 확인하세요.");
+      showAlert(err.response?.data?.message || err.message || "수정 실패. 네트워크 로그를 확인하세요.");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -93,7 +93,7 @@ export default function SettingsPage() {
       setNewPassword("");
       setNewPasswordConfirm("");
     } catch (err: any) {
-      showAlert(err.response?.data?.message || "비밀번호 변경 실패.");
+      showAlert(err.response?.data?.message || err.message || "비밀번호 변경 실패.");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -109,7 +109,7 @@ export default function SettingsPage() {
         localStorage.removeItem("accessToken");
         router.push("/login");
       } catch (err: any) {
-        showAlert(err.response?.data?.message || "탈퇴 실패.");
+        showAlert(err.response?.data?.message || err.message || "탈퇴 실패.");
         console.error(err);
       } finally {
         setIsLoading(false);

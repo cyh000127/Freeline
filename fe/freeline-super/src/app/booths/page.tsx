@@ -307,7 +307,19 @@ export default function BoothManagementPage() {
         setFileName("");
       }
     } catch (err: any) {
-      showAlert(err.response?.data?.message || err.message || "테이블 등록에 실패했습니다.");
+      let msg = err.response?.data?.message || err.message || "테이블 등록에 실패했습니다.";
+
+      // Robust regex to catch various formats like "중복 이름: A, B" or "중복 부스번호: 1, 2"
+      const duplicateRegex = /([\s\S]*?)(?:중복\s*(?:이름|부스명|번호)\s*:\s*)([\s\S]*)/;
+      const match = msg.match(duplicateRegex);
+
+      if (err.response?.status === 409 && match) {
+        const intro = match[1].trim() || "중복된 데이터가 존재합니다.";
+        const names = match[2].split(",").map((n: string) => n.trim()).filter((n: string) => n);
+        msg = `${intro}\n${names.map((n: string) => `• ${n}`).join("\n")}`;
+      }
+
+      showAlert(msg);
     } finally {
       setIsCreating(false);
     }
