@@ -435,11 +435,11 @@ export default function VisitorTicketsPage() {
                           <div className="flex items-center gap-2">
                             {ticket.isActive ? (
                               <span className="px-3 py-1 rounded-full bg-white text-[10px] font-bold text-emerald-500 shadow-sm border border-emerald-50">
-                                ACTIVE
+                                사용가능
                               </span>
                             ) : (
                               <span className="px-3 py-1 rounded-full bg-white text-[10px] font-bold text-rose-500 shadow-sm border border-rose-50">
-                                INACTIVE
+                                사용중
                               </span>
                             )}
                           </div>

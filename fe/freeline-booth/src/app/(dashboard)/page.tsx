@@ -198,7 +198,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-full border border-emerald-100 w-fit">
             <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
             <span className="text-sm font-bold text-emerald-700">
-              {dashboardData?.booth?.boothName || "부스"} · {dashboardData?.booth?.locationCode || "위치 코드 없음"}
+              부스 운영중
             </span>
           </div>
         </div>
@@ -223,7 +223,7 @@ export default function DashboardPage() {
             <RefreshCcw className={`w-6 h-6 text-gray-400 ${isDataFetching ? 'animate-spin' : ''}`} />
           </button>
 
-          <button className="flex h-16 items-center justify-center gap-3 rounded-2xl bg-amber-500 px-6 font-black text-white shadow-lg shadow-amber-500/20 transition-all duration-300 hover:-translate-y-1 hover:bg-amber-600 active:translate-y-0">
+          {/* <button className="flex h-16 items-center justify-center gap-3 rounded-2xl bg-amber-500 px-6 font-black text-white shadow-lg shadow-amber-500/20 transition-all duration-300 hover:-translate-y-1 hover:bg-amber-600 active:translate-y-0">
             <PauseCircle className="h-6 w-6" />
             <span>운영중지</span>
           </button>
@@ -231,7 +231,7 @@ export default function DashboardPage() {
           <button className="flex h-16 items-center justify-center gap-3 rounded-2xl bg-rose-500 px-6 font-black text-white shadow-lg shadow-rose-500/20 transition-all duration-300 hover:-translate-y-1 hover:bg-rose-600 active:translate-y-0">
             <XCircle className="h-6 w-6" />
             <span>운영종료</span>
-          </button>
+          </button> */}
         </div>
       </div>
 
