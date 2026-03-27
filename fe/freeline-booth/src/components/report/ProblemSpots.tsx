@@ -69,7 +69,7 @@ export function ProblemSpots({ data }: Props) {
                 key={i}
                 className={`border-l-4 ${style.border} bg-gray-50 rounded-xl rounded-l-none p-4`}
               >
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2">
                   <span
                     className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${style.badgeBg} ${style.badge}`}
                   >
@@ -82,7 +82,6 @@ export function ProblemSpots({ data }: Props) {
                     {(issue.issueMetric * 100).toFixed(1)}%
                   </span>
                 </div>
-                <p className="text-[13px] text-gray-500">{issue.description}</p>
               </div>
             );
           })}
