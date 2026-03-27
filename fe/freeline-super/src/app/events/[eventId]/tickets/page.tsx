@@ -54,6 +54,7 @@ export default function VisitorTicketsPage() {
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
 
   const [page, setPage] = useState(0);
+  const [pageInput, setPageInput] = useState("1");
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [isFetchingTickets, setIsFetchingTickets] = useState(false);
@@ -108,6 +109,10 @@ export default function VisitorTicketsPage() {
       void fetchTickets(page);
     }
   }, [fetchTickets, isLoading, page]);
+
+  useEffect(() => {
+    setPageInput(totalPages > 0 ? String(page + 1) : "1");
+  }, [page, totalPages]);
 
   const handleGenerate = async () => {
     if (quantity <= 0) {
@@ -254,6 +259,20 @@ export default function VisitorTicketsPage() {
       </html>
     `);
     printWindow.document.close();
+  };
+
+  const handlePageJump = () => {
+    if (totalPages <= 1) return;
+
+    const targetPage = Number(pageInput);
+    if (!Number.isInteger(targetPage) || targetPage < 1 || targetPage > totalPages) {
+      showAlert(`이동할 페이지는 1부터 ${totalPages} 사이여야 합니다.`);
+      setPageInput(String(page + 1));
+      return;
+    }
+
+    if (targetPage - 1 === page) return;
+    setPage(targetPage - 1);
   };
 
   if (isLoading) {
@@ -440,7 +459,7 @@ export default function VisitorTicketsPage() {
               </div>
 
               {totalPages > 1 && (
-                <div className="px-8 py-4 border-t border-gray-50 flex items-center justify-center gap-4">
+                <div className="px-8 py-4 border-t border-gray-50 flex flex-wrap items-center justify-center gap-4">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -471,6 +490,31 @@ export default function VisitorTicketsPage() {
 
                   <div className="min-w-[88px] text-right text-sm font-semibold text-gray-400">
                     {page + 1} / {totalPages}
+                  </div>
+
+                  <div className="flex items-center gap-2 rounded-xl bg-[#F8F9FA] px-3 py-2">
+                    <span className="text-sm font-semibold text-gray-500">페이지 이동</span>
+                    <Input
+                      value={pageInput}
+                      onChange={(e) => setPageInput(e.target.value.replace(/[^0-9]/g, ""))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handlePageJump();
+                        }
+                      }}
+                      inputMode="numeric"
+                      className="h-9 w-16 border border-gray-200 bg-white px-3 text-center text-sm font-bold text-[#2D2A4A]"
+                      disabled={isFetchingTickets}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={handlePageJump}
+                      disabled={isFetchingTickets}
+                      className="h-9 rounded-lg px-3 text-sm font-bold text-[#2D2A4A] hover:bg-white"
+                    >
+                      이동
+                    </Button>
                   </div>
 
                   <Button
