@@ -52,6 +52,13 @@ export default function EventOperationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isQueueLoading, setIsQueueLoading] = useState(false);
   const boothStorageKey = useMemo(() => `super:selectedBooth:${eventId}`, [eventId]);
+  const isOperationsBlocked = event?.status ? event.status !== "OPEN" : false;
+  const blockedReason =
+    event?.status === "CLOSED"
+      ? "종료된 행사는 부스 운영 대시보드를 사용할 수 없습니다."
+      : event?.status === "CANCELED"
+        ? "취소된 행사는 부스 운영 대시보드를 사용할 수 없습니다."
+        : "진행 중인 행사에서만 부스 운영 대시보드를 사용할 수 있습니다.";
 
   const fetchBooths = useCallback(async () => {
     const detailsRes = await eventApi.getBoothDetails(eventId);
@@ -105,7 +112,9 @@ export default function EventOperationsPage() {
           setFullQueue(queueRes.data.queueList || []);
         }
       } catch (error: any) {
-        showAlert(error?.response?.data?.message || "부스 운영 현황을 불러오지 못했습니다.");
+        setDashboardData(null);
+        setFullQueue([]);
+        showAlert(extractApiErrorMessage(error, "부스 운영 현황을 불러오지 못했습니다."));
       } finally {
         setIsLoading(false);
         setIsQueueLoading(false);
@@ -141,8 +150,20 @@ export default function EventOperationsPage() {
   }, [eventId, fetchBooths]);
 
   useEffect(() => {
+    if (!event) {
+      return;
+    }
+
     if (!selectedBoothId) {
       setIsLoading(false);
+      return;
+    }
+
+    if (isOperationsBlocked) {
+      setDashboardData(null);
+      setFullQueue([]);
+      setIsLoading(false);
+      setIsQueueLoading(false);
       return;
     }
 
@@ -156,15 +177,15 @@ export default function EventOperationsPage() {
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [selectedBoothId, fetchQueueData, boothStorageKey]);
+  }, [selectedBoothId, fetchQueueData, boothStorageKey, isOperationsBlocked, event]);
 
   const handleRefresh = async () => {
-    if (!selectedBoothId) return;
+    if (!selectedBoothId || isOperationsBlocked) return;
     await fetchQueueData(selectedBoothId, true);
   };
 
   const handleCallNext = async () => {
-    if (!selectedBoothId) return;
+    if (!selectedBoothId || isOperationsBlocked) return;
     try {
       await superWaitingApi.callNext(selectedBoothId);
       showAlert("다음 대기자를 호출했습니다.");
@@ -175,7 +196,7 @@ export default function EventOperationsPage() {
   };
 
   const handleAdmit = async (waitingId: number) => {
-    if (!selectedBoothId) return;
+    if (!selectedBoothId || isOperationsBlocked) return;
     try {
       await superWaitingApi.admitWaiting(selectedBoothId, waitingId);
       fetchQueueData(selectedBoothId, false);
@@ -185,7 +206,7 @@ export default function EventOperationsPage() {
   };
 
   const handleCancel = async (waitingId: number) => {
-    if (!selectedBoothId) return;
+    if (!selectedBoothId || isOperationsBlocked) return;
     showConfirm("이 대기를 취소하시겠습니까?", async () => {
       try {
         await superWaitingApi.cancelWaiting(selectedBoothId, waitingId);
@@ -197,7 +218,7 @@ export default function EventOperationsPage() {
   };
 
   const handleExit = async (waitingId: number) => {
-    if (!selectedBoothId) return;
+    if (!selectedBoothId || isOperationsBlocked) return;
     try {
       await superWaitingApi.exitWaiting(selectedBoothId, waitingId);
       fetchQueueData(selectedBoothId, false);
@@ -262,7 +283,8 @@ export default function EventOperationsPage() {
               <select
                 value={selectedBoothId ?? ""}
                 onChange={(e) => setSelectedBoothId(Number(e.target.value))}
-                className="h-12 min-w-72 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 shadow-sm"
+                className="h-12 min-w-72 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 shadow-sm disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                disabled={isOperationsBlocked}
               >
                 {booths.length === 0 && <option value="">부스가 없습니다</option>}
                 {booths.map((booth) => (
@@ -274,7 +296,8 @@ export default function EventOperationsPage() {
 
               <button
                 onClick={handleRefresh}
-                className="flex h-12 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-bold text-gray-700 shadow-sm hover:bg-gray-50"
+                disabled={isOperationsBlocked}
+                className="flex h-12 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-bold text-gray-700 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
               >
                 <RefreshCcw className={`h-4 w-4 ${isQueueLoading ? "animate-spin" : ""}`} />
                 새로고침
@@ -285,6 +308,14 @@ export default function EventOperationsPage() {
           {!selectedBooth ? (
             <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center text-sm font-semibold text-gray-500 shadow-sm">
               운영할 부스가 없습니다.
+            </div>
+          ) : isOperationsBlocked ? (
+            <div className="rounded-3xl border border-rose-200 bg-rose-50 p-10 text-center shadow-sm">
+              <div className="text-lg font-black text-rose-700">운영 대시보드 비활성화</div>
+              <p className="mt-2 text-sm font-semibold text-rose-600">{blockedReason}</p>
+              <p className="mt-1 text-xs font-semibold text-rose-500">
+                행사 상태를 다시 `OPEN`으로 변경하기 전에는 큐 조회와 운영 액션을 사용할 수 없습니다.
+              </p>
             </div>
           ) : (
             <>
@@ -331,6 +362,7 @@ export default function EventOperationsPage() {
 
                 <button
                   onClick={handleCallNext}
+                  disabled={isOperationsBlocked}
                   className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-[#2D2A4A] px-6 text-sm font-black text-white shadow-lg shadow-[#2D2A4A]/20 hover:bg-[#3A375C]"
                 >
                   <Bell className="h-5 w-5" />

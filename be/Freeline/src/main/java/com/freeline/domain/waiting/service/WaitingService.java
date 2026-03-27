@@ -21,6 +21,10 @@ import com.freeline.domain.booth.entity.WaitingStatus;
 import com.freeline.domain.booth.exception.BoothException;
 import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
+import com.freeline.domain.event.entity.Event;
+import com.freeline.domain.event.entity.EventStatus;
+import com.freeline.domain.event.exception.EventException;
+import com.freeline.domain.event.repository.EventRepository;
 import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
 import com.freeline.domain.waiting.converter.WaitingConverter;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
@@ -94,12 +98,13 @@ public class WaitingService {
 
     private final BoothRepository boothRepository;
     private final BoothWaitingRepository boothWaitingRepository;
+    private final EventRepository eventRepository;
     private final WaitingEventDispatcher waitingEventDispatcher;
     private final WaitingEventSnapshotAssembler waitingEventSnapshotAssembler;
     private final WaitingPolicyResolver waitingPolicyResolver;
 
     public WaitingCreateResDto createWaiting(final Long boothId, final Long visitorId) {
-        getBoothEntity(boothId);
+        validateEventIsOpen(getBoothEntity(boothId));
         validateDuplicateWaitingAtBooth(boothId, visitorId);
         validateActiveWaitingCount(visitorId);
         validateBoothWaitingCapacity(boothId);
@@ -132,7 +137,7 @@ public class WaitingService {
     }
 
     public WaitingCallResDto callNextWaiting(final Long boothId) {
-        getBoothEntity(boothId);
+        validateEventIsOpen(getBoothEntity(boothId));
         final int remainingCallSlots = resolveRemainingCallSlots(boothId);
         if (remainingCallSlots <= 0) {
             throw new WaitingException(ErrorCode.FRONT_QUEUE_FULL);
@@ -246,12 +251,14 @@ public class WaitingService {
     public WaitingExitResDto exitWaitingByAdmin(final Long waitingId, final Long boothId) {
         final BoothWaiting waiting = getWaitingEntity(waitingId);
         validateWaitingBooth(waiting, boothId);
+        validateEventIsOpen(getBoothEntity(boothId));
         return exitWaitingInternal(waiting);
     }
 
     public WaitingAdmitResDto admitWaiting(final Long waitingId, final Long boothId) {
         final BoothWaiting waiting = getWaitingEntity(waitingId);
         validateWaitingBooth(waiting, boothId);
+        validateEventIsOpen(getBoothEntity(boothId));
         if (waiting.getStatus() != WaitingStatus.REGISTERED) {
             throw new WaitingException(ErrorCode.INVALID_STATUS_FOR_ADMIT);
         }
@@ -273,7 +280,7 @@ public class WaitingService {
 
     @Transactional(readOnly = true)
     public WaitingDashboardResDto getBoothQueueDashboard(final Long boothId) {
-        getBoothEntity(boothId);
+        validateEventIsOpen(getBoothEntity(boothId));
 
         final List<WaitingQueueItemDto> queueList = boothWaitingRepository
                 .findWithVisitorByBoothIdAndStatusInOrderByWaitingNumberAsc(boothId, ACTIVE_WAITING_STATUSES)
@@ -287,6 +294,7 @@ public class WaitingService {
     public void cancelWaitingByAdmin(final Long waitingId, final Long boothId) {
         final BoothWaiting waiting = getWaitingEntity(waitingId);
         validateWaitingBooth(waiting, boothId);
+        validateEventIsOpen(getBoothEntity(boothId));
         if (ADMIN_CANCEL_BLOCKED_STATUSES.contains(waiting.getStatus())) {
             throw new WaitingException(ErrorCode.INVALID_WAITING_STATUS_FOR_CANCEL);
         }
@@ -322,7 +330,7 @@ public class WaitingService {
 
     @Transactional(readOnly = true)
     public WaitingExpectedTimeResDto getExpectedWaitingTime(final Long boothId) {
-        getBoothEntity(boothId);
+        validateEventIsOpen(getBoothEntity(boothId));
 
         final int currentRank = Math.toIntExact(boothWaitingRepository.countByBoothIdAndStatusIn(
                 boothId,
@@ -408,6 +416,15 @@ public class WaitingService {
     private Booth getBoothEntity(final Long boothId) {
         return boothRepository.findById(boothId)
                 .orElseThrow(() -> new BoothException(ErrorCode.BOOTH_NOT_FOUND));
+    }
+
+    private void validateEventIsOpen(final Booth booth) {
+        final Event event = eventRepository.findById(booth.getEventId())
+                .orElseThrow(() -> new EventException(ErrorCode.EVENT_NOT_FOUND));
+
+        if (event.getStatus() != EventStatus.OPEN) {
+            throw new EventException(ErrorCode.EVENT_NOT_OPEN_FOR_WAITING_OPERATION);
+        }
     }
 
     private BoothWaiting getWaitingEntity(final Long waitingId) {

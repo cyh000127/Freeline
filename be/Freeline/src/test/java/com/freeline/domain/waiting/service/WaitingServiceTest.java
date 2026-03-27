@@ -30,7 +30,10 @@ import com.freeline.domain.booth.repository.BoothRepository;
 import com.freeline.domain.booth.repository.BoothWaitingRepository;
 import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.entity.EventPolicy;
+import com.freeline.domain.event.entity.EventStatus;
+import com.freeline.domain.event.exception.EventException;
 import com.freeline.domain.event.repository.EventPolicyRepository;
+import com.freeline.domain.event.repository.EventRepository;
 import com.freeline.domain.waiting.assembler.WaitingEventSnapshotAssembler;
 import com.freeline.domain.waiting.dto.response.VisitorWaitingListResDto;
 import com.freeline.domain.waiting.dto.response.WaitingAdmitResDto;
@@ -84,6 +87,9 @@ class WaitingServiceTest {
     private BoothWaitingRepository boothWaitingRepository;
 
     @Mock
+    private EventRepository eventRepository;
+
+    @Mock
     private BoothPolicyRepository boothPolicyRepository;
 
     @Mock
@@ -108,6 +114,7 @@ class WaitingServiceTest {
         waitingService = new WaitingService(
                 boothRepository,
                 boothWaitingRepository,
+                eventRepository,
                 waitingEventDispatcher,
                 waitingEventSnapshotAssembler,
                 new WaitingPolicyResolver(
@@ -116,6 +123,12 @@ class WaitingServiceTest {
                         eventPolicyRepository
                 )
         );
+        Mockito.lenient().when(eventRepository.findById(3L)).thenReturn(Optional.of(
+                Event.builder()
+                        .id(3L)
+                        .status(EventStatus.OPEN)
+                        .build()
+        ));
     }
 
     @AfterEach
@@ -220,6 +233,23 @@ class WaitingServiceTest {
         Assertions.assertThatThrownBy(() -> waitingService.createWaiting(12L, 21L))
                 .isInstanceOf(WaitingException.class)
                 .hasMessage(ErrorCode.BOOTH_MAX_WAITING_EXCEEDED.getMessage());
+    }
+
+    @Test
+    void createWaiting_fail_whenEventNotOpen() {
+        final Booth booth = createBooth(12L, "Goods Booth");
+
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
+        Mockito.when(eventRepository.findById(3L)).thenReturn(Optional.of(
+                Event.builder()
+                        .id(3L)
+                        .status(EventStatus.CLOSED)
+                        .build()
+        ));
+
+        Assertions.assertThatThrownBy(() -> waitingService.createWaiting(12L, 21L))
+                .isInstanceOf(EventException.class)
+                .hasMessage(ErrorCode.EVENT_NOT_OPEN_FOR_WAITING_OPERATION.getMessage());
     }
 
     @Test
@@ -418,7 +448,9 @@ class WaitingServiceTest {
 
     @Test
     void cancelWaitingByAdmin_success() {
+        final Booth booth = createBooth(12L, "Goods Booth");
         final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.CALLED, 4, 0, null);
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
         Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
 
         waitingService.cancelWaitingByAdmin(301L, 12L);
@@ -429,7 +461,9 @@ class WaitingServiceTest {
 
     @Test
     void cancelWaitingByAdmin_fail_whenInvalidStatus() {
+        final Booth booth = createBooth(12L, "Goods Booth");
         final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.ENTERED, 4, 0, null);
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
         Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
 
         Assertions.assertThatThrownBy(() -> waitingService.cancelWaitingByAdmin(301L, 12L))
@@ -521,7 +555,9 @@ class WaitingServiceTest {
 
     @Test
     void admitWaiting_success_whenRegistered() {
+        final Booth booth = createBooth(12L, "Goods Booth");
         final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.REGISTERED, 4, 0, null);
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
         Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
 
         final WaitingAdmitResDto result = waitingService.admitWaiting(301L, 12L);
@@ -535,7 +571,9 @@ class WaitingServiceTest {
 
     @Test
     void admitWaiting_fail_whenStatusIsWaiting() {
+        final Booth booth = createBooth(12L, "Goods Booth");
         final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.WAITING, 4, 0, null);
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
         Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
 
         Assertions.assertThatThrownBy(() -> waitingService.admitWaiting(301L, 12L))
@@ -545,7 +583,9 @@ class WaitingServiceTest {
 
     @Test
     void admitWaiting_fail_whenStatusIsCalled() {
+        final Booth booth = createBooth(12L, "Goods Booth");
         final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.CALLED, 4, 0, null);
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
         Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
 
         Assertions.assertThatThrownBy(() -> waitingService.admitWaiting(301L, 12L))
@@ -579,7 +619,9 @@ class WaitingServiceTest {
 
     @Test
     void exitWaitingByAdmin_success() {
+        final Booth booth = createBooth(12L, "Goods Booth");
         final BoothWaiting waiting = createWaiting(301L, 12L, 21L, WaitingStatus.ENTERED, 4, 0, null);
+        Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
         Mockito.when(boothWaitingRepository.findById(301L)).thenReturn(Optional.of(waiting));
 
         final WaitingExitResDto result = waitingService.exitWaitingByAdmin(301L, 12L);
