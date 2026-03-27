@@ -20,6 +20,7 @@
 #   ENTRY_CODE_POOL — entry code 생성 수 (기본: SPIKE_VUS, VU당 1개)
 #   OPERATOR_VUS   — 부스 운영자 시나리오 동시 VU 수 (기본: 3)
 #   OPERATOR_DURATION — 운영자 시나리오 실행 시간 (기본: 8m)
+#   BOOTH_ADMIN_PASSWORD_PREFIX — 부스 관리자 고정 비밀번호 prefix (기본: StressBooth!)
 #   NO_SHOW_RATE   — CALLED 후 QR 미스캔 비율 (기본: 0.25)
 #   CANCEL_RATE    — WAITING 상태 취소 비율 (기본: 0.10)
 #   POSTPONE_RATE  — WAITING 상태 미루기 비율 (기본: 0.05)
@@ -41,6 +42,7 @@ TEST_DURATION="${TEST_DURATION:-3m}"
 ENTRY_CODE_POOL="${ENTRY_CODE_POOL:-${SPIKE_VUS}}"
 OPERATOR_VUS="${OPERATOR_VUS:-3}"
 OPERATOR_DURATION="${OPERATOR_DURATION:-8m}"
+BOOTH_ADMIN_PASSWORD_PREFIX="${BOOTH_ADMIN_PASSWORD_PREFIX:-StressBooth!}"
 NO_SHOW_RATE="${NO_SHOW_RATE:-0.25}"
 CANCEL_RATE="${CANCEL_RATE:-0.10}"
 POSTPONE_RATE="${POSTPONE_RATE:-0.05}"
@@ -102,6 +104,154 @@ parse_response() {
 extract_json_field() {
   local json="$1" field="$2"
   echo "$json" | grep -o "\"${field}\"[[:space:]]*:[[:space:]]*[^,}]*" | head -1 | sed 's/.*:[[:space:]]*//' | tr -d '"' | tr -d ' '
+}
+
+find_booth_name_by_id() {
+  local target_id="$1"
+  for i in "${!BOOTH_IDS[@]}"; do
+    if [ "${BOOTH_IDS[$i]}" = "$target_id" ]; then
+      echo "${BOOTH_NAMES[$i]}"
+      return 0
+    fi
+  done
+  echo "Unknown Booth"
+}
+
+create_booth_admin_accounts() {
+  BOOTH_ADMIN_TSV_FILE="/tmp/stress_booth_admins_${EVENT_ID}.tsv"
+  BOOTH_ADMIN_JSON_FILE="/tmp/stress_booth_admins_${EVENT_ID}.json"
+  : > "$BOOTH_ADMIN_TSV_FILE"
+
+  if [ "${#BOOTH_IDS[@]}" -eq 0 ]; then
+    log_warn "부스가 없어 부스 관리자 계정 생성을 건너뜁니다"
+    return 1
+  fi
+
+  local admin_items=""
+  for i in "${!BOOTH_IDS[@]}"; do
+    local booth_id="${BOOTH_IDS[$i]}"
+    local email="stress.booth$((i + 1)).event${EVENT_ID}@freeline.demo"
+    if [ -n "$admin_items" ]; then
+      admin_items="${admin_items},"
+    fi
+    admin_items="${admin_items}{\"boothId\":${booth_id},\"email\":\"${email}\"}"
+  done
+
+  local payload="{\"eventId\":${EVENT_ID},\"admins\":[${admin_items}]}"
+  local admin_resp
+  admin_resp=$(api_post "/api/v1/auth/booth-admins/bulk" "$payload" "$ADMIN_TOKEN")
+  parse_response "$admin_resp"
+
+  if [ "$RESP_CODE" != "200" ] && [ "$RESP_CODE" != "201" ]; then
+    log_fail "부스 관리자 일괄 생성 실패 (HTTP ${RESP_CODE}): ${RESP_BODY}"
+    return 1
+  fi
+
+  local raw_json_file="/tmp/stress_booth_admins_raw_${EVENT_ID}.json"
+  echo "$RESP_BODY" > "$raw_json_file"
+
+  python3 - "$raw_json_file" "$BOOTH_ADMIN_TSV_FILE" <<'PY'
+import json
+import sys
+
+src = sys.argv[1]
+dst = sys.argv[2]
+
+with open(src, "r", encoding="utf-8") as f:
+    body = json.load(f)
+
+data = body.get("data", body)
+if not isinstance(data, list):
+    data = []
+
+with open(dst, "w", encoding="utf-8") as out:
+    out.write("booth_id\tlogin_id\temail\traw_password\n")
+    for item in data:
+        out.write(
+            f"{item.get('boothId','')}\t{item.get('loginId','')}\t{item.get('email','')}\t{item.get('rawPassword','')}\n"
+        )
+PY
+  rm -f "$raw_json_file"
+
+  local created_count
+  created_count=$(tail -n +2 "$BOOTH_ADMIN_TSV_FILE" | wc -l | tr -d ' ')
+  log_ok "부스 관리자 ${created_count}개 생성 완료"
+}
+
+apply_standard_booth_admin_passwords() {
+  if [ ! -f "${BOOTH_ADMIN_TSV_FILE:-}" ]; then
+    log_fail "부스 관리자 계정 파일이 없어 비밀번호 설정을 진행할 수 없습니다"
+    return 1
+  fi
+
+  python3 - "$BOOTH_ADMIN_JSON_FILE" <<'PY'
+import json
+import sys
+
+dst = sys.argv[1]
+with open(dst, "w", encoding="utf-8") as out:
+    json.dump([], out)
+PY
+
+  while IFS=$'\t' read -r booth_id login_id email raw_password; do
+    if [ -z "$booth_id" ] || [ "$booth_id" = "booth_id" ]; then
+      continue
+    fi
+
+    local booth_name final_password password_ready
+    booth_name=$(find_booth_name_by_id "$booth_id")
+    final_password="$raw_password"
+    password_ready="false"
+
+    if [ -n "$raw_password" ]; then
+      final_password="${BOOTH_ADMIN_PASSWORD_PREFIX}${booth_id}"
+      local pwd_resp
+      pwd_resp=$(api_patch "/api/v1/auth/booth-admins/password/initial" \
+        "{\"loginId\":\"${login_id}\",\"oldPassword\":\"${raw_password}\",\"newPassword\":\"${final_password}\"}")
+      parse_response "$pwd_resp"
+
+      if [ "$RESP_CODE" = "200" ]; then
+        password_ready="true"
+      else
+        log_warn "부스 관리자 초기 비밀번호 변경 실패 (boothId=${booth_id}, HTTP ${RESP_CODE})"
+      fi
+    fi
+
+    python3 - "$BOOTH_ADMIN_JSON_FILE" "$booth_id" "$booth_name" "$login_id" "$email" "$final_password" "$password_ready" <<'PY'
+import json
+import sys
+
+dst, booth_id, booth_name, login_id, email, password, ready = sys.argv[1:]
+
+with open(dst, "r", encoding="utf-8") as f:
+    items = json.load(f)
+
+items.append({
+    "boothId": int(booth_id),
+    "boothName": booth_name,
+    "loginId": login_id,
+    "email": email,
+    "password": password,
+    "passwordReady": ready == "true",
+})
+
+with open(dst, "w", encoding="utf-8") as f:
+    json.dump(items, f)
+PY
+  done < "$BOOTH_ADMIN_TSV_FILE"
+
+  local ready_count
+  ready_count=$(python3 - "$BOOTH_ADMIN_JSON_FILE" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    items = json.load(f)
+
+print(sum(1 for item in items if item.get("passwordReady")))
+PY
+)
+  log_ok "부스 관리자 비밀번호 준비 완료 (${ready_count}개)"
 }
 
 # ─── Banner ──────────────────────────────────────────────────────────────────
@@ -181,12 +331,37 @@ BOOTH_IDS_CSV=$(IFS=,; echo "${BOOTH_IDS[*]}")
 log_ok "부스 ${#BOOTH_IDS[@]}개 생성: ${BOOTH_IDS_CSV}"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 3: Entry Code 생성 (API: VU당 1개)
+# Step 3: 부스 관리자 계정 생성
+# ═══════════════════════════════════════════════════════════════════════════════
+
+log_step "3" "부스 관리자 계정 생성"
+
+create_booth_admin_accounts
+apply_standard_booth_admin_passwords
+
+BOOTH_ADMIN_READY_COUNT=$(python3 - "$BOOTH_ADMIN_JSON_FILE" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    items = json.load(f)
+
+print(sum(1 for item in items if item.get("passwordReady")))
+PY
+)
+
+if [ "$BOOTH_ADMIN_READY_COUNT" -lt 1 ]; then
+  log_fail "사용 가능한 부스 관리자 계정이 없습니다"
+  exit 1
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Step 4: Entry Code 생성 (API: VU당 1개)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # VU 1개 = 방문자 1명 — 첫 iteration에서 인증, 이후 토큰 재사용
 # SPIKE_VUS 수만큼 entry code를 생성하면 충분
-log_step "3" "Entry Code ${ENTRY_CODE_POOL}개 생성 (API bulk, VU당 1개)"
+log_step "4" "Entry Code ${ENTRY_CODE_POOL}개 생성 (API bulk, VU당 1개)"
 
 ENTRY_CODES_FILE="/tmp/stress_entry_codes_${EVENT_ID}.json"
 
@@ -216,10 +391,10 @@ CODE_COUNT=$(python3 -c "import json; print(len(json.load(open('${ENTRY_CODES_FI
 log_ok "Entry Code ${CREATED_COUNT}개 생성, ${CODE_COUNT}개 파일 저장 (${ENTRY_CODES_FILE})"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 4: 지도 이미지 업로드 + 행사 OPEN
+# Step 5: 지도 이미지 업로드 + 행사 OPEN
 # ═══════════════════════════════════════════════════════════════════════════════
 
-log_step "4" "지도 이미지 업로드 + 행사 OPEN"
+log_step "5" "지도 이미지 업로드 + 행사 OPEN"
 
 DUMMY_PNG="/tmp/stress_map_${EVENT_ID}.png"
 python3 -c "
@@ -252,12 +427,12 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 5: k6 Stress Test 실행
+# Step 6: k6 Stress Test 실행
 # ═══════════════════════════════════════════════════════════════════════════════
 
-log_step "5" "k6 Stress Test 실행 (peak=${PEAK_VUS}, spike=${SPIKE_VUS}, duration=${TEST_DURATION})"
+log_step "6" "k6 Stress Test 실행 (peak=${PEAK_VUS}, spike=${SPIKE_VUS}, duration=${TEST_DURATION})"
 
-K6_ENV="-e TARGET_URL=${TARGET_URL} -e ADMIN_ID=${ADMIN_ID} -e ADMIN_PW=${ADMIN_PW} -e PRESET_EVENT_ID=${EVENT_ID} -e PRESET_BOOTH_IDS=${BOOTH_IDS_CSV} -e PEAK_VUS=${PEAK_VUS} -e SPIKE_VUS=${SPIKE_VUS} -e TEST_DURATION=${TEST_DURATION} -e OPERATOR_VUS=${OPERATOR_VUS} -e OPERATOR_DURATION=${OPERATOR_DURATION} -e NO_SHOW_RATE=${NO_SHOW_RATE} -e CANCEL_RATE=${CANCEL_RATE} -e POSTPONE_RATE=${POSTPONE_RATE} -e WAITING_JOIN_RATE=${WAITING_JOIN_RATE} -e MIN_STAY_SECONDS=${MIN_STAY_SECONDS} -e MAX_STAY_SECONDS=${MAX_STAY_SECONDS} -e ENTRY_CODES_FILE=/scripts/entry_codes.json"
+K6_ENV="-e TARGET_URL=${TARGET_URL} -e PRESET_EVENT_ID=${EVENT_ID} -e PRESET_BOOTH_IDS=${BOOTH_IDS_CSV} -e PEAK_VUS=${PEAK_VUS} -e SPIKE_VUS=${SPIKE_VUS} -e TEST_DURATION=${TEST_DURATION} -e OPERATOR_VUS=${OPERATOR_VUS} -e OPERATOR_DURATION=${OPERATOR_DURATION} -e NO_SHOW_RATE=${NO_SHOW_RATE} -e CANCEL_RATE=${CANCEL_RATE} -e POSTPONE_RATE=${POSTPONE_RATE} -e WAITING_JOIN_RATE=${WAITING_JOIN_RATE} -e MIN_STAY_SECONDS=${MIN_STAY_SECONDS} -e MAX_STAY_SECONDS=${MAX_STAY_SECONDS} -e ENTRY_CODES_FILE=/scripts/entry_codes.json -e BOOTH_ADMINS_FILE=/scripts/booth_admins.json"
 K6_OUT="--out experimental-prometheus-rw"
 
 K6_OK=false
@@ -266,16 +441,18 @@ if ssh -o ConnectTimeout=5 "${K6_SERVER}" "docker ps --format '{{.Names}}' | gre
   # /scripts는 호스트 바인드 마운트 — 호스트 경로에 직접 복사
   K6_SCRIPTS_HOST=$(ssh "${K6_SERVER}" "docker inspect k6-manager --format '{{range .Mounts}}{{if eq .Destination \"/scripts\"}}{{.Source}}{{end}}{{end}}'" 2>/dev/null)
   scp -q "$ENTRY_CODES_FILE" "${K6_SERVER}:${K6_SCRIPTS_HOST}/entry_codes.json" 2>/dev/null
+  scp -q "$BOOTH_ADMIN_JSON_FILE" "${K6_SERVER}:${K6_SCRIPTS_HOST}/booth_admins.json" 2>/dev/null
   K6_RESULT=$(ssh "${K6_SERVER}" "docker exec k6-manager k6 run ${K6_OUT} ${K6_ENV} /scripts/stress-test.js" 2>&1) || true
   K6_OK=true
 elif command -v k6 &>/dev/null; then
   log_info "로컬 k6로 실행..."
-  K6_ENV="-e TARGET_URL=${TARGET_URL} -e ADMIN_ID=${ADMIN_ID} -e ADMIN_PW=${ADMIN_PW} -e PRESET_EVENT_ID=${EVENT_ID} -e PRESET_BOOTH_IDS=${BOOTH_IDS_CSV} -e PEAK_VUS=${PEAK_VUS} -e SPIKE_VUS=${SPIKE_VUS} -e TEST_DURATION=${TEST_DURATION} -e OPERATOR_VUS=${OPERATOR_VUS} -e OPERATOR_DURATION=${OPERATOR_DURATION} -e NO_SHOW_RATE=${NO_SHOW_RATE} -e CANCEL_RATE=${CANCEL_RATE} -e POSTPONE_RATE=${POSTPONE_RATE} -e WAITING_JOIN_RATE=${WAITING_JOIN_RATE} -e MIN_STAY_SECONDS=${MIN_STAY_SECONDS} -e MAX_STAY_SECONDS=${MAX_STAY_SECONDS} -e ENTRY_CODES_FILE=${ENTRY_CODES_FILE}"
+  K6_ENV="-e TARGET_URL=${TARGET_URL} -e PRESET_EVENT_ID=${EVENT_ID} -e PRESET_BOOTH_IDS=${BOOTH_IDS_CSV} -e PEAK_VUS=${PEAK_VUS} -e SPIKE_VUS=${SPIKE_VUS} -e TEST_DURATION=${TEST_DURATION} -e OPERATOR_VUS=${OPERATOR_VUS} -e OPERATOR_DURATION=${OPERATOR_DURATION} -e NO_SHOW_RATE=${NO_SHOW_RATE} -e CANCEL_RATE=${CANCEL_RATE} -e POSTPONE_RATE=${POSTPONE_RATE} -e WAITING_JOIN_RATE=${WAITING_JOIN_RATE} -e MIN_STAY_SECONDS=${MIN_STAY_SECONDS} -e MAX_STAY_SECONDS=${MAX_STAY_SECONDS} -e ENTRY_CODES_FILE=${ENTRY_CODES_FILE} -e BOOTH_ADMINS_FILE=${BOOTH_ADMIN_JSON_FILE}"
   K6_RESULT=$(k6 run ${K6_ENV} "${SCRIPT_DIR}/stress-test.js" 2>&1) || true
   K6_OK=true
 elif docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^k6-manager$'; then
   log_info "로컬 k6-manager 컨테이너에서 실행..."
   docker cp "$ENTRY_CODES_FILE" k6-manager:/scripts/entry_codes.json 2>/dev/null
+  docker cp "$BOOTH_ADMIN_JSON_FILE" k6-manager:/scripts/booth_admins.json 2>/dev/null
   K6_RESULT=$(docker exec k6-manager k6 run ${K6_OUT} ${K6_ENV} /scripts/stress-test.js 2>&1) || true
   K6_OK=true
 else
@@ -289,13 +466,13 @@ if [ "$K6_OK" = "true" ]; then
   log_ok "k6 Stress Test 완료"
 fi
 
-rm -f "$ENTRY_CODES_FILE"
+rm -f "$ENTRY_CODES_FILE" "$BOOTH_ADMIN_TSV_FILE" "$BOOTH_ADMIN_JSON_FILE"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 6: 행사 CLOSED
+# Step 7: 행사 CLOSED
 # ═══════════════════════════════════════════════════════════════════════════════
 
-log_step "6" "행사 CLOSED"
+log_step "7" "행사 CLOSED"
 
 CLOSE_RESP=$(api_patch "/api/v1/events/${EVENT_ID}" '{"status":"CLOSED"}' "$ADMIN_TOKEN")
 parse_response "$CLOSE_RESP"

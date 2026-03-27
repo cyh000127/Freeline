@@ -21,11 +21,9 @@ import { SharedArray } from "k6/data";
 // ---------------------------------------------------------------------------
 
 const BASE_URL = __ENV.TARGET_URL || "https://j14a207.p.ssafy.io";
-const ADMIN_ID = __ENV.ADMIN_ID || "";
-const ADMIN_PW = __ENV.ADMIN_PW || "";
-
 const PRESET_EVENT_ID = __ENV.PRESET_EVENT_ID || "";
 const PRESET_BOOTH_IDS = __ENV.PRESET_BOOTH_IDS || "";
+const BOOTH_ADMINS_FILE = __ENV.BOOTH_ADMINS_FILE || "/scripts/booth_admins.json";
 
 const PEAK_VUS = parseInt(__ENV.PEAK_VUS || "100", 10);
 const SPIKE_VUS = parseInt(__ENV.SPIKE_VUS || String(PEAK_VUS * 2), 10);
@@ -47,6 +45,9 @@ const MAX_STAY_SECONDS = parseInt(__ENV.MAX_STAY_SECONDS || "40", 10);
 const ENTRY_CODES_FILE = __ENV.ENTRY_CODES_FILE || "/scripts/entry_codes.json";
 const entryCodes = new SharedArray("entryCodes", function () {
   return JSON.parse(open(ENTRY_CODES_FILE));
+});
+const boothAdmins = new SharedArray("boothAdmins", function () {
+  return JSON.parse(open(BOOTH_ADMINS_FILE));
 });
 
 // ---------------------------------------------------------------------------
@@ -209,14 +210,14 @@ function resolveWaitingId(payload) {
   return payload.waitingId || payload.waiting_id || payload.id || null;
 }
 
-function ensureBoothQrCode(boothId, adminToken) {
-  const getRes = apiGet(`/api/v1/qr/booths/${boothId}`, adminToken);
+function ensureBoothQrCode(boothId, token) {
+  const getRes = apiGet(`/api/v1/qr/booths/${boothId}`, token);
   if (getRes.status === 200) {
     const data = extractData(getRes);
     if (data && data.qrCode) return data.qrCode;
   }
 
-  const createRes = apiPost(`/api/v1/qr/booths/${boothId}`, {}, adminToken);
+  const createRes = apiPost(`/api/v1/qr/booths/${boothId}`, {}, token);
   if (createRes.status === 200 || createRes.status === 201) {
     const data = extractData(createRes);
     if (data && data.qrCode) return data.qrCode;
@@ -232,19 +233,8 @@ function ensureBoothQrCode(boothId, adminToken) {
 export function setup() {
   console.log("=== [Setup] Stress Test with queue lifecycle ===");
 
-  if (!PRESET_EVENT_ID || !PRESET_BOOTH_IDS) {
-    console.error("[Setup] PRESET_EVENT_ID/PRESET_BOOTH_IDS is required.");
-    return null;
-  }
-
-  const loginRes = apiPost("/api/v1/auth/login", {
-    id: ADMIN_ID,
-    password: ADMIN_PW,
-  });
-  check(loginRes, { "admin login": (r) => r.status === 200 });
-  const loginData = extractData(loginRes);
-  if (!loginData || !loginData.accessToken) {
-    console.error(`[Setup] admin login failed: ${loginRes.status}`);
+  if (!PRESET_EVENT_ID || !PRESET_BOOTH_IDS || boothAdmins.length === 0) {
+    console.error("[Setup] PRESET_EVENT_ID/PRESET_BOOTH_IDS/BOOTH_ADMINS_FILE is required.");
     return null;
   }
 
@@ -259,8 +249,40 @@ export function setup() {
   }
 
   const boothQrCodes = {};
+  const boothAdminTokens = {};
+  let readyBoothAdminCount = 0;
+
+  for (const boothAdmin of boothAdmins) {
+    if (!boothAdmin || !boothAdmin.boothId || !boothAdmin.loginId || !boothAdmin.passwordReady) {
+      continue;
+    }
+
+    const loginRes = apiPost("/api/v1/auth/login", {
+      id: boothAdmin.loginId,
+      password: boothAdmin.password,
+    });
+    check(loginRes, {
+      [`booth admin login ${boothAdmin.boothId}`]: (r) => r.status === 200,
+    });
+
+    const loginData = extractData(loginRes);
+    if (!loginData || !loginData.accessToken) {
+      console.error(`[Setup] booth admin login failed: boothId=${boothAdmin.boothId}, status=${loginRes.status}`);
+      continue;
+    }
+
+    readyBoothAdminCount += 1;
+    boothAdminTokens[String(boothAdmin.boothId)] = loginData.accessToken;
+  }
+
   for (const boothId of boothIds) {
-    const qrCode = ensureBoothQrCode(boothId, loginData.accessToken);
+    const boothToken = boothAdminTokens[String(boothId)];
+    if (!boothToken) {
+      console.warn(`[Setup] booth admin token unavailable for boothId=${boothId}`);
+      continue;
+    }
+
+    const qrCode = ensureBoothQrCode(boothId, boothToken);
     if (qrCode) {
       boothQrCodes[String(boothId)] = qrCode;
     } else {
@@ -268,15 +290,21 @@ export function setup() {
     }
   }
 
+  const activeBoothIds = boothIds.filter((boothId) => Boolean(boothAdminTokens[String(boothId)]));
+  if (activeBoothIds.length === 0) {
+    console.error("[Setup] no active booth admin tokens available.");
+    return null;
+  }
+
   console.log(
-    `[Setup] eventId=${eventId}, booths=${boothIds.length}, entryCodes=${entryCodes.length}, operators=${OPERATOR_VUS}`
+    `[Setup] eventId=${eventId}, booths=${activeBoothIds.length}/${boothIds.length}, entryCodes=${entryCodes.length}, operators=${OPERATOR_VUS}, boothAdmins=${readyBoothAdminCount}`
   );
 
   return {
-    adminToken: loginData.accessToken,
     eventId,
-    boothIds,
+    boothIds: activeBoothIds,
     boothQrCodes,
+    boothAdminTokens,
   };
 }
 
@@ -539,17 +567,21 @@ export function visitorFlow(data) {
 // ---------------------------------------------------------------------------
 
 export function boothOperatorFlow(data) {
-  if (!data || !data.adminToken || !data.boothIds || data.boothIds.length === 0) {
+  if (!data || !data.boothAdminTokens || !data.boothIds || data.boothIds.length === 0) {
     sleep(1);
     return;
   }
 
-  const adminToken = data.adminToken;
   const boothIndex = (__ITER + __VU - 1) % data.boothIds.length;
   const boothId = data.boothIds[boothIndex];
+  const boothToken = data.boothAdminTokens[String(boothId)];
+  if (!boothToken) {
+    sleep(OPERATOR_LOOP_SLEEP);
+    return;
+  }
 
   // 1) Poll current queue
-  const queueRes = apiGet(`/api/v1/booths/me/queue?boothId=${boothId}`, adminToken);
+  const queueRes = apiGet(`/api/v1/booths/me/queue`, boothToken);
   operatorQueueDuration.add(queueRes.timings.duration);
   if (queueRes.status !== 200) {
     sleep(OPERATOR_LOOP_SLEEP);
@@ -567,8 +599,10 @@ export function boothOperatorFlow(data) {
   }).length;
 
   if (hasWaitingCandidate && frontQueueCount === 0) {
-    const callRes = apiPatch(`/api/v1/booths/me/waitings/call?boothId=${boothId}`, {}, adminToken);
-    const callOk = callRes.status === 200;
+    const callRes = http.post(`${BASE_URL}/api/v1/booth-managers/booths/${boothId}/waitings/call-next`, null, {
+      headers: { Authorization: `Bearer ${boothToken}` },
+    });
+    const callOk = callRes.status === 200 || callRes.status === 201;
     queueCallSuccess.add(callOk);
     if (callOk) {
       queueCalls.add(1);
@@ -576,7 +610,7 @@ export function boothOperatorFlow(data) {
   }
 
   // 3) Re-poll and admit REGISTERED visitors to ENTERED.
-  const refreshRes = apiGet(`/api/v1/booths/me/queue?boothId=${boothId}`, adminToken);
+  const refreshRes = apiGet(`/api/v1/booths/me/queue`, boothToken);
   if (refreshRes.status === 200) {
     const refreshPayload = extractData(refreshRes);
     const refreshQueue = queueListFrom(refreshPayload);
@@ -590,10 +624,12 @@ export function boothOperatorFlow(data) {
         continue;
       }
 
-      const admitRes = apiPatch(
-        `/api/v1/waitings/${waitingId}/admit?boothId=${boothId}`,
-        {},
-        adminToken
+      const admitRes = http.patch(
+        `${BASE_URL}/api/v1/booth-managers/booths/${boothId}/waitings/${waitingId}/admit`,
+        null,
+        {
+          headers: { Authorization: `Bearer ${boothToken}` },
+        }
       );
       const admitOk = admitRes.status === 200;
       admitSuccess.add(admitOk);
