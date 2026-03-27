@@ -39,15 +39,46 @@ export function GlobalModal() {
 
         <div className="pt-12 pb-7 px-7 flex flex-col items-center text-center">
           {/* Content */}
-          <div className="mb-8 w-full">
-            <p className="text-[17px] font-bold text-gray-800 break-keep leading-[1.6] tracking-tight">
-              {message.split('\n').map((line, i) => (
-                <React.Fragment key={i}>
-                  {line}
-                  {i < message.split('\n').length - 1 && <br />}
-                </React.Fragment>
-              ))}
-            </p>
+          <div className="mb-6 w-full text-left">
+            {(() => {
+              const lines = message.split('\n');
+              const elements: React.ReactNode[] = [];
+              let currentList: string[] = [];
+
+              const flushList = (key: number) => {
+                if (currentList.length > 0) {
+                  elements.push(
+                    <ul key={`list-${key}`} className="mt-3 space-y-1.5 px-1">
+                      {currentList.map((item, j) => (
+                        <li key={j} className="flex items-start gap-2.5 text-[14px] text-gray-500 font-medium">
+                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" />
+                          <span className="break-all">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                  currentList = [];
+                }
+              };
+
+              lines.forEach((line, i) => {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('•')) {
+                  currentList.push(trimmed.replace(/^•\s*/, ''));
+                } else {
+                  flushList(i);
+                  if (trimmed) {
+                    elements.push(
+                      <p key={i} className="text-[17px] font-bold text-gray-800 break-keep leading-[1.6] tracking-tight text-center">
+                        {line}
+                      </p>
+                    );
+                  }
+                }
+              });
+              flushList(lines.length);
+              return elements;
+            })()}
           </div>
 
           {/* Action Buttons */}

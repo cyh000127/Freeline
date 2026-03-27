@@ -30,6 +30,14 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    // 409 Conflict: 중복된 데이터 발생 시 한글 메시지 처리
+    if (error.response?.status === 409) {
+      const serverMessage = error.response?.data?.message || error.response?.data?.error?.message;
+      if (!serverMessage) {
+        error.message = "중복된 데이터입니다.";
+      }
+    }
+
     // Handle global API errors here (e.g., 401 Unauthorized, 403 Forbidden)
     if (error.response?.status === 401 || error.response?.status === 403) {
       // Handle logout or redirect to login page

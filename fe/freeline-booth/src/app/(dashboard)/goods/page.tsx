@@ -30,16 +30,27 @@ export default function GoodsPage() {
     if (!boothId) return;
     if (showLoading) setIsLoading(true);
     setIsDataFetching(true);
+    
+    // Fetch goods independently to ensure they show up even if others fail
     try {
-      const [goodsRes, dashRes, queueRes] = await Promise.all([
-        getGoodsList(boothId),
+      const goodsRes = await getGoodsList(boothId);
+      if (goodsRes.success && goodsRes.data) {
+        setGoods(goodsRes.data);
+      }
+    } catch (error: any) {
+      console.error("Failed to fetch goods list:", error);
+      if (error.response?.status === 404) {
+        setGoods([]);
+      }
+    }
+
+    // Fetch dashboard and queue as supplementary info
+    try {
+      const [dashRes, queueRes] = await Promise.all([
         waitingApi.getDashboard(boothId),
         waitingApi.getQueue()
       ]);
 
-      if (goodsRes.success && goodsRes.data) {
-        setGoods(goodsRes.data);
-      }
       if (dashRes.success && dashRes.data) {
         setDashboardData(dashRes.data);
       }
@@ -47,10 +58,7 @@ export default function GoodsPage() {
         setFullQueue(queueRes.data.queueList || []);
       }
     } catch (error: any) {
-      console.error("Failed to fetch data:", error);
-      if (error.response?.status === 404) {
-        setGoods([]);
-      }
+      console.error("Failed to fetch dashboard or queue data (400 errors expected in some contexts):", error);
     } finally {
       setIsLoading(false);
       setIsDataFetching(false);
@@ -143,7 +151,7 @@ export default function GoodsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl font-black tracking-tight text-gray-900">실시간 대기 현황</h1>
+            <h1 className="text-3xl font-black tracking-tight text-gray-900">굿즈 관리</h1>
             {dashboardData?.booth?.emergencyClosed && (
               <span className="px-2 py-1 bg-rose-500 text-white text-[10px] font-black rounded-lg animate-pulse">비상 마감</span>
             )}
