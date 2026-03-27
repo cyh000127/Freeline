@@ -31,9 +31,13 @@ public class JwtProvider {
     }
 
     public String createToken(Long id, String role) {
+        return createToken(id, role, accessTokenExpiration);
+    }
+
+    public String createToken(Long id, String role, long expirationMillis) {
 
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + accessTokenExpiration);
+        Date expiry = new Date(now.getTime() + expirationMillis);
 
         Map<String, Object> claims = new HashMap<>();
 

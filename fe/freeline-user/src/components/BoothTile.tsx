@@ -44,8 +44,10 @@ const styles = StyleSheet.create({
     width: '48%',
     backgroundColor: palette.surface,
     borderRadius: 22,
-    padding: 16,
-    gap: 10,
+    minHeight: 138,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 6,
     borderWidth: 1,
     borderColor: palette.border,
   },
@@ -59,8 +61,9 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
   },
   name: {
-    minHeight: 40,
+    minHeight: 24,
     fontSize: 15,
+    lineHeight: 20,
     fontWeight: '700',
     color: palette.text,
   },
@@ -75,7 +78,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
   },
   stateText: {
     fontSize: 11,
@@ -83,7 +86,8 @@ const styles = StyleSheet.create({
   },
   waiting: {
     color: palette.textMuted,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
+    marginTop: 2,
   },
 });

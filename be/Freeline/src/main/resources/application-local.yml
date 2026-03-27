@@ -43,4 +43,5 @@ auth:
 jwt:
   secret: ${JWT_SECRET:your_local_secret_key_for_freeline_min_32_chars}
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
+  visitor-access-token-expiration: ${JWT_VISITOR_ACCESS_TOKEN_EXPIRATION:86400000}
   refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:1209600000}

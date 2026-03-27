@@ -56,7 +56,8 @@ public class SecurityConfig {
                                     "/api/v1/booths/*",
                                     "/api/v1/booths/*/queue",
                                     "/api/v1/booths/*/waitings/expected-time",
-                                    "/api/v1/visitors/me/waitings"
+                                    "/api/v1/visitors/me/waitings",
+                                    "/api/v1/boothmaps/visitors/me"
                             ).permitAll()
                             .requestMatchers(HttpMethod.POST,
                                     "/api/v1/booths/*/waitings",

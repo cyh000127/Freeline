@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ActionButton';
 import { BrandMark } from '@/components/BrandMark';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -14,13 +15,16 @@ import { WaitingCard } from '@/components/WaitingCard';
 import { useAppData } from '@/features/app-data/context';
 import type { DecoratedWaiting } from '@/features/app-data/types';
 import { useSession } from '@/features/session/context';
+import { useToast } from '@/features/toast/context';
 import { usePageTracking } from '@/features/tracking/use-page-tracking';
 import { palette } from '@/theme/colors';
+import { toUserErrorMessage } from '@/utils/error';
 import { formatQueueStatus } from '@/utils/format';
 
 export default function HomeScreen() {
   usePageTracking('home');
   const { eventProfile, nickname } = useSession();
+  const { showToast } = useToast();
   const {
     currentExperience,
     isLoading,
@@ -34,6 +38,58 @@ export default function HomeScreen() {
     postponeWaiting,
   } = useAppData();
   const [pendingCancel, setPendingCancel] = useState<DecoratedWaiting | null>(null);
+
+  async function handlePostpone(waiting: DecoratedWaiting) {
+    try {
+      await postponeWaiting(waiting);
+      showToast({ type: 'success', message: '순서를 뒤로 미뤘습니다.' });
+    } catch (error) {
+      showToast({
+        type: 'error',
+        message: toUserErrorMessage(error, '순서 미루기에 실패했습니다.'),
+      });
+    }
+  }
+
+  async function handleCancelConfirm() {
+    if (!pendingCancel) {
+      return;
+    }
+
+    try {
+      await cancelWaiting(pendingCancel);
+      showToast({ type: 'success', message: '예약이 취소되었습니다.' });
+      setPendingCancel(null);
+    } catch (error) {
+      showToast({
+        type: 'error',
+        message: toUserErrorMessage(error, '예약 취소에 실패했습니다.'),
+      });
+    }
+  }
+
+  async function handleExit(waiting: DecoratedWaiting) {
+    try {
+      await exitWaiting(waiting);
+      showToast({ type: 'success', message: '체험을 종료했습니다.' });
+    } catch (error) {
+      showToast({
+        type: 'error',
+        message: toUserErrorMessage(error, '체험 종료 처리에 실패했습니다.'),
+      });
+    }
+  }
+
+  async function handleManualRefresh() {
+    try {
+      await refreshAll();
+    } catch (error) {
+      showToast({
+        type: 'error',
+        message: toUserErrorMessage(error, '새로고침에 실패했습니다.'),
+      });
+    }
+  }
 
   if (!eventProfile) {
     return <Screen />;
@@ -54,11 +110,25 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <BrandMark compact />
-            <View style={styles.headerCopy}>
-              <Text style={styles.title}>{nickname ? `${nickname}님, 반가워요` : '줄서잇'}</Text>
-              <Text style={styles.subtitle}>{formatQueueStatus(queueStatus)}</Text>
+            <View style={styles.headerIdentity}>
+              <BrandMark compact />
+              <View style={styles.headerCopy}>
+                <Text style={styles.title}>{nickname ? `${nickname}님, 반가워요` : '줄서잇'}</Text>
+                <Text style={styles.subtitle}>{formatQueueStatus(queueStatus)}</Text>
+              </View>
             </View>
+            <Pressable
+              disabled={isRefreshing}
+              onPress={() => void handleManualRefresh()}
+              style={({ pressed }) => [
+                styles.refreshButton,
+                pressed ? styles.refreshButtonPressed : null,
+                isRefreshing ? styles.refreshButtonDisabled : null,
+              ]}
+            >
+              <Feather color={palette.ink} name="refresh-cw" size={16} />
+              <Text style={styles.refreshLabel}>{isRefreshing ? '갱신 중' : '새로고침'}</Text>
+            </Pressable>
           </View>
 
           <HeroEventCard
@@ -113,7 +183,7 @@ export default function HomeScreen() {
           {currentExperience ? (
             <WaitingCard
               onCancel={() => {}}
-              onExit={() => void exitWaiting(currentExperience)}
+              onExit={() => void handleExit(currentExperience)}
               onOpen={() => {
                 if (currentExperience.boothId) {
                   router.push(`/booths/${currentExperience.boothId}`);
@@ -148,7 +218,7 @@ export default function HomeScreen() {
               }}
               onPostpone={
                 waiting.postpone_available
-                  ? () => void postponeWaiting(waiting)
+                  ? () => void handlePostpone(waiting)
                   : undefined
               }
               onScan={
@@ -178,11 +248,7 @@ export default function HomeScreen() {
           body={`${pendingCancel?.booth_name ?? '이 부스'} 예약을 취소할까요? 취소 후에는 다시 대기를 등록해야 합니다.`}
           confirmLabel="예약 취소하기"
           onClose={() => setPendingCancel(null)}
-          onConfirm={() => {
-            if (pendingCancel) {
-              void cancelWaiting(pendingCancel).finally(() => setPendingCancel(null));
-            }
-          }}
+          onConfirm={() => void handleCancelConfirm()}
           title="예약을 취소할까요?"
           visible={!!pendingCancel}
         />
@@ -215,6 +281,12 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  headerIdentity: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 16,
   },
   headerCopy: {
@@ -228,6 +300,26 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 13,
     color: palette.textMuted,
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: palette.surface,
+  },
+  refreshButtonPressed: {
+    opacity: 0.82,
+  },
+  refreshButtonDisabled: {
+    opacity: 0.55,
+  },
+  refreshLabel: {
+    color: palette.ink,
+    fontSize: 13,
+    fontWeight: '800',
   },
   loading: {
     color: palette.textMuted,

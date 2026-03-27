@@ -59,6 +59,7 @@ public class WaitingConverter {
     ) {
         return VisitorWaitingResDto.builder()
                 .waitingId(waiting.getId())
+                .boothId(waiting.getBoothId())
                 .boothName(waiting.getBooth() != null ? waiting.getBooth().getName() : null)
                 .status(waiting.getStatus().name())
                 .myRank(myRank)

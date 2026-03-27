@@ -84,6 +84,9 @@ public class AuthService {
     @Value("${jwt.refresh-token-expiration}")
     private long refreshTokenExpiration;
 
+    @Value("${jwt.visitor-access-token-expiration:86400000}")
+    private long visitorAccessTokenExpiration;
+
     /**
      * 아이디(이메일) 중복 확인
      */
@@ -438,7 +441,7 @@ public class AuthService {
                 .orElseGet(() -> resolveInactiveOrMissingVisitor(req.entryCode()));
 
         visitor.updateActive(false);
-        String token = jwtProvider.createToken(visitor.getId(), Role.VISITOR.name());
+        String token = jwtProvider.createToken(visitor.getId(), Role.VISITOR.name(), visitorAccessTokenExpiration);
         log.info("[Auth] Visitor entered, visitorId: {}", visitor.getId());
         return authConverter.toLoginResDto(token, null, Role.VISITOR, null);
     }

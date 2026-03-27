@@ -7,6 +7,7 @@ export type EventProfile = {
   dayLabel: string;
   venueLabel: string;
   bannerImage: string | number | null;
+  mapImageUrl: string | null;
 };
 
 const defaultEvent = {
@@ -15,6 +16,7 @@ const defaultEvent = {
   dayLabel: '2일차',
   venueLabel: '서울 코엑스',
   bannerImage: require('../../assets/events/event_banner.png'),
+  mapImageUrl: null,
 };
 
 export function parseEventIdFromEntryCode(entryCode: string) {
@@ -60,6 +62,7 @@ export function toEventProfile(event: VisitorEventDetail): EventProfile {
     dayLabel: formatDayLabel(event.startDate, event.endDate),
     venueLabel: event.locationAddress || defaultEvent.venueLabel,
     bannerImage: event.thumbnailImageUrl || defaultEvent.bannerImage,
+    mapImageUrl: event.mapImageUrl,
   };
 }
 

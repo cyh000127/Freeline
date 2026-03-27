@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -54,6 +55,16 @@ public class BoothMapController {
             @PathVariable final Long eventId
     ) {
         final BoothMapResDto response = boothMapService.getBoothMap(eventId);
+        return ResponseUtils.ok(response);
+    }
+
+    @Operation(summary = "관람객 행사 지도 조회", description = "관람객이 현재 참가 중인 행사의 지도 이미지와 부스 영역 정보를 조회합니다.")
+    @GetMapping("/visitors/me")
+    public ResponseEntity<BaseResponse<BoothMapResDto>> getVisitorBoothMap(
+            final Authentication authentication
+    ) {
+        final Long visitorId = Long.valueOf(authentication.getName());
+        final BoothMapResDto response = boothMapService.getVisitorBoothMap(visitorId);
         return ResponseUtils.ok(response);
     }
 
