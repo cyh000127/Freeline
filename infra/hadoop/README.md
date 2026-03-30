@@ -18,6 +18,54 @@
   Hive (Metastore + HiveServer2)
 ```
 
+## Hadoop에 적재되는 로그 범위
+
+Hadoop/HDFS로 적재되는 것은 전체 애플리케이션 로그가 아니라 모바일 앱 행동 로그만이다.
+
+- 모바일 앱이 `POST /api/v1/logs/actions`로 전송한 벌크 행동 로그만 적재된다.
+- 백엔드는 이 요청을 `ACTION_LOG` 전용 파일 appender에 TSV 한 줄씩 기록한다.
+- Flume은 이 전용 action log 파일의 시간별 롤링 결과만 읽어 HDFS로 적재한다.
+- 일반 Spring Boot 애플리케이션 로그, 콘솔 로그, 에러 로그, Booth/Super 웹앱 로그는 이 파이프라인 대상이 아니다.
+
+행동 로그 한 줄에는 아래 값이 순서대로 저장된다.
+
+```text
+eventId, visitorId, action, targetType, targetId, metadata, clientTimestamp, sessionId
+```
+
+## flume-spool-mover 역할
+
+`flume-spool-mover`는 백엔드 원본 로그 볼륨과 Flume `spooldir` 사이의 중계 컨테이너다.
+
+- 원본 로그 위치: `/var/log/action/source`
+- Flume 입력 위치: `/var/log/action/spool`
+- 60초마다 원본 로그 디렉토리를 확인한다.
+- `action.YYYY-MM-DD-HH.log` 패턴의 롤링 파일만 이동한다.
+- `-mmin +5` 조건으로 5분 이상 수정되지 않은 파일만 옮겨, 아직 쓰는 중인 파일을 제외한다.
+- 현재 쓰기 중인 `action.log`는 직접 옮기지 않는다.
+
+이 분리가 필요한 이유는 Flume `spooldir` source가 "이미 완전히 닫혀 더 이상 변경되지 않는 파일"을 안정적으로 처리하는 용도이기 때문이다.
+
+## 현재 적재되는 행동 로그 종류
+
+현재 모바일 앱 코드 기준으로 HDFS에 적재되는 액션은 아래와 같다.
+
+| action | 의미 | 대표 예시 |
+|--------|------|-----------|
+| `APP_OPEN` | 앱 포그라운드 진입 | 앱 실행 후 첫 진입 |
+| `PAGE_VIEW` | 페이지 진입 | `home`, `map`, `reservations`, `my`, `search`, `qr-scan`, `booth-detail`, `goods` |
+| `BOOTH_VIEW` | 부스 상세 조회 | 부스 상세 정보 조회 |
+| `WAITING_REGISTER` | 대기 등록 | 부스 대기 등록 완료 |
+| `WAITING_CANCEL` | 대기 취소 | 예약 취소 |
+| `WAITING_COMPLETE` | 호출 응답 완료 | 체험 입장 처리 |
+| `GOODS_VIEW` | 굿즈 목록 조회 | 굿즈 목록 버튼 클릭 또는 굿즈 페이지 진입 |
+| `MAP_INTERACTION` | 지도 관련 상호작용 | 부스 시트 열기, 검색 결과 선택, 순서 미루기, QR 스캔 |
+
+참고:
+
+- `PUSH_CLICK` 타입은 정의돼 있지만 현재 모바일 앱에서 실제 전송 코드는 없어, 지금 기준으로는 HDFS에 적재되지 않는다.
+- `metadata`에는 액션별 세부 정보가 들어간다. 예: `booth_name`, `location_code`, `waiting_id`, `interaction`, `query`, `goods_count`
+
 ## 컴포넌트
 
 | 컨테이너 | 이미지 | 포트 | 역할 |
