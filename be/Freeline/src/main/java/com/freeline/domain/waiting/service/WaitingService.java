@@ -38,6 +38,7 @@ import com.freeline.domain.waiting.dto.response.WaitingExpectedTimeResDto;
 import com.freeline.domain.waiting.dto.response.WaitingPostponeResDto;
 import com.freeline.domain.waiting.dto.response.WaitingQueueItemDto;
 import com.freeline.domain.waiting.exception.WaitingException;
+import com.freeline.domain.waiting.service.WaitingPolicyResolver.WaitingCallPolicy;
 
 @Slf4j
 @Service
@@ -137,8 +138,14 @@ public class WaitingService {
     }
 
     public WaitingCallResDto callNextWaiting(final Long boothId) {
-        validateEventIsOpen(getBoothEntity(boothId));
-        final int remainingCallSlots = resolveRemainingCallSlots(boothId);
+        final Booth booth = getBoothEntity(boothId);
+        validateEventIsOpen(booth);
+        final WaitingCallPolicy callPolicy = waitingPolicyResolver.resolveCallPolicy(
+                booth,
+                DEFAULT_CALL_COUNT,
+                DEFAULT_CALL_VALID_TIME_SECONDS
+        );
+        final int remainingCallSlots = resolveRemainingCallSlots(boothId, callPolicy.callCount());
         if (remainingCallSlots <= 0) {
             throw new WaitingException(ErrorCode.FRONT_QUEUE_FULL);
         }
@@ -152,7 +159,7 @@ public class WaitingService {
             throw new WaitingException(ErrorCode.CALL_CANDIDATE_NOT_FOUND);
         }
 
-        final int callValidTimeSeconds = resolveCallValidTimeSeconds(boothId);
+        final int callValidTimeSeconds = callPolicy.callValidTimeSeconds();
         final LocalDateTime calledAt = TimeUtils.nowDateTime();
         final LocalDateTime callExpiresAt = calledAt.plusSeconds(callValidTimeSeconds);
 
@@ -446,12 +453,7 @@ public class WaitingService {
         return waitingPolicyResolver.resolveDeferLimit(boothId, DEFAULT_DEFER_LIMIT);
     }
 
-    private int resolveCallValidTimeSeconds(final Long boothId) {
-        return waitingPolicyResolver.resolveCallValidTimeSeconds(boothId, DEFAULT_CALL_VALID_TIME_SECONDS);
-    }
-
-    private int resolveRemainingCallSlots(final Long boothId) {
-        final int callCount = waitingPolicyResolver.resolveCallCount(boothId, DEFAULT_CALL_COUNT);
+    private int resolveRemainingCallSlots(final Long boothId, final int callCount) {
         final long currentFrontQueueCount = boothWaitingRepository.countByBoothIdAndStatusIn(
                 boothId,
                 FRONT_QUEUE_STATUSES

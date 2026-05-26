@@ -71,9 +71,50 @@ public class WaitingPolicyResolver {
                 .orElse(defaultValue);
     }
 
+    public WaitingCallPolicy resolveCallPolicy(
+            final Booth booth,
+            final int defaultCallCount,
+            final int defaultCallValidTimeSeconds
+    ) {
+        final Optional<BoothPolicy> boothPolicy = boothPolicyRepository.findByBoothId(booth.getId());
+        Integer callCount = boothPolicy
+                .map(BoothPolicy::getCallCount)
+                .filter(value -> value > 0)
+                .orElse(null);
+        Integer callValidTimeSeconds = boothPolicy
+                .map(BoothPolicy::getCallValidTime)
+                .filter(value -> value > 0)
+                .orElse(null);
+
+        if (callCount == null || callValidTimeSeconds == null) {
+            final Optional<EventPolicy> eventPolicy = eventPolicyRepository.findByEvent_Id(booth.getEventId());
+            if (callCount == null) {
+                callCount = eventPolicy
+                        .map(EventPolicy::getDefaultCallCount)
+                        .filter(value -> value > 0)
+                        .orElse(defaultCallCount);
+            }
+
+            if (callValidTimeSeconds == null) {
+                callValidTimeSeconds = eventPolicy
+                        .map(EventPolicy::getDefaultCallTtl)
+                        .filter(value -> value > 0)
+                        .orElse(defaultCallValidTimeSeconds);
+            }
+        }
+
+        return new WaitingCallPolicy(callCount, callValidTimeSeconds);
+    }
+
     private Optional<EventPolicy> findEventPolicy(final Long boothId) {
         return boothRepository.findById(boothId)
                 .map(Booth::getEventId)
                 .flatMap(eventPolicyRepository::findByEvent_Id);
+    }
+
+    public record WaitingCallPolicy(
+            int callCount,
+            int callValidTimeSeconds
+    ) {
     }
 }
