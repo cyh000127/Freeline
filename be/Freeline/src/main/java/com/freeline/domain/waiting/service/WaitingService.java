@@ -143,18 +143,10 @@ public class WaitingService {
             throw new WaitingException(ErrorCode.FRONT_QUEUE_FULL);
         }
 
-        final List<BoothWaiting> calledWaitings = boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
-                        boothId,
-                        List.of(WaitingStatus.WAITING)
-                )
-                .stream()
-                .filter(candidate -> !boothWaitingRepository.existsByVisitorIdAndBoothIdNotAndStatusIn(
-                        candidate.getVisitorId(),
-                        boothId,
-                        OTHER_BOOTH_FRONT_QUEUE_STATUSES
-                ))
-                .limit(remainingCallSlots)
-                .toList();
+        final List<BoothWaiting> calledWaitings = boothWaitingRepository.findCallableCandidatesForCall(
+                boothId,
+                remainingCallSlots
+        );
 
         if (calledWaitings.isEmpty()) {
             throw new WaitingException(ErrorCode.CALL_CANDIDATE_NOT_FOUND);

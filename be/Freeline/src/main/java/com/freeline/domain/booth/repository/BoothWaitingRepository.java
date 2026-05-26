@@ -40,6 +40,26 @@ public interface BoothWaitingRepository extends JpaRepository<BoothWaiting, Long
             final Collection<WaitingStatus> statuses
     );
 
+    @Query(value = """
+            SELECT bw.*
+            FROM booth_waiting bw
+            WHERE bw.booth_id = :boothId
+              AND bw.status = 'WAITING'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM booth_waiting other
+                  WHERE other.visitor_id = bw.visitor_id
+                    AND other.booth_id <> :boothId
+                    AND other.status IN ('CALLED', 'REGISTERED', 'ENTERED')
+              )
+            ORDER BY bw.waiting_number ASC
+            LIMIT :candidateLimit
+            """, nativeQuery = true)
+    List<BoothWaiting> findCallableCandidatesForCall(
+            @Param("boothId") final Long boothId,
+            @Param("candidateLimit") final int candidateLimit
+    );
+
     @Query("""
             select w
             from BoothWaiting w
