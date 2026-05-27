@@ -726,6 +726,8 @@ CREATE TABLE IF NOT EXISTS problem_spot_results
 CREATE INDEX IF NOT EXISTS idx_booth_qr_booth_status ON booth_qr (booth_id, status);
 CREATE INDEX IF NOT EXISTS idx_fcm_token_visitor_id ON fcm_token (visitor_id);
 CREATE INDEX IF NOT EXISTS idx_waiting_booth_visitor_status ON booth_waiting (booth_id, visitor_id, status);
+CREATE INDEX IF NOT EXISTS idx_waiting_booth_status_number ON booth_waiting (booth_id, status, waiting_number);
+CREATE INDEX IF NOT EXISTS idx_waiting_visitor_status_booth ON booth_waiting (visitor_id, status, booth_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_booths_event_name_normalized ON booths (event_id, LOWER(TRIM(name)));
 CREATE INDEX IF NOT EXISTS idx_evt_summary_event_id ON event_summary_results (event_id);
 CREATE INDEX IF NOT EXISTS idx_booth_perf_event_id ON booth_performance_results (event_id);

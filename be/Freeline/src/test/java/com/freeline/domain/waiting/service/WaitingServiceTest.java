@@ -290,20 +290,8 @@ class WaitingServiceTest {
 
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
         Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, FRONT_QUEUE_STATUSES)).thenReturn(0L);
-        Mockito.when(boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
-                12L,
-                List.of(WaitingStatus.WAITING)
-        )).thenReturn(List.of(firstWaiting, secondWaiting));
-        Mockito.when(boothWaitingRepository.existsByVisitorIdAndBoothIdNotAndStatusIn(
-                21L,
-                12L,
-                OTHER_BOOTH_FRONT_QUEUE_STATUSES
-        )).thenReturn(true);
-        Mockito.when(boothWaitingRepository.existsByVisitorIdAndBoothIdNotAndStatusIn(
-                22L,
-                12L,
-                OTHER_BOOTH_FRONT_QUEUE_STATUSES
-        )).thenReturn(false);
+        Mockito.when(boothWaitingRepository.findCallableCandidatesForCall(12L, 1))
+                .thenReturn(List.of(secondWaiting));
         Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
                 BoothPolicy.builder()
                         .id(1L)
@@ -333,10 +321,8 @@ class WaitingServiceTest {
 
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
         Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, FRONT_QUEUE_STATUSES)).thenReturn(0L);
-        Mockito.when(boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
-                12L,
-                List.of(WaitingStatus.WAITING)
-        )).thenReturn(List.of());
+        Mockito.when(boothWaitingRepository.findCallableCandidatesForCall(12L, 1))
+                .thenReturn(List.of());
 
         Assertions.assertThatThrownBy(() -> waitingService.callNextWaiting(12L))
                 .isInstanceOf(WaitingException.class)
@@ -352,15 +338,8 @@ class WaitingServiceTest {
 
         Mockito.when(boothRepository.findById(12L)).thenReturn(Optional.of(booth));
         Mockito.when(boothWaitingRepository.countByBoothIdAndStatusIn(12L, FRONT_QUEUE_STATUSES)).thenReturn(0L);
-        Mockito.when(boothWaitingRepository.findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
-                12L,
-                List.of(WaitingStatus.WAITING)
-        )).thenReturn(List.of(firstWaiting, secondWaiting, thirdWaiting));
-        Mockito.when(boothWaitingRepository.existsByVisitorIdAndBoothIdNotAndStatusIn(
-                ArgumentMatchers.anyLong(),
-                ArgumentMatchers.eq(12L),
-                ArgumentMatchers.eq(OTHER_BOOTH_FRONT_QUEUE_STATUSES)
-        )).thenReturn(false);
+        Mockito.when(boothWaitingRepository.findCallableCandidatesForCall(12L, 2))
+                .thenReturn(List.of(firstWaiting, secondWaiting));
         Mockito.when(boothPolicyRepository.findByBoothId(12L)).thenReturn(Optional.of(
                 BoothPolicy.builder()
                         .id(1L)
@@ -399,9 +378,9 @@ class WaitingServiceTest {
                 .isInstanceOf(WaitingException.class)
                 .hasMessage(ErrorCode.FRONT_QUEUE_FULL.getMessage());
 
-        Mockito.verify(boothWaitingRepository, Mockito.never()).findAllByBoothIdAndStatusInOrderByWaitingNumberAsc(
+        Mockito.verify(boothWaitingRepository, Mockito.never()).findCallableCandidatesForCall(
                 ArgumentMatchers.anyLong(),
-                ArgumentMatchers.anyCollection()
+                ArgumentMatchers.anyInt()
         );
     }
 
