@@ -119,6 +119,25 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.withType(Test).configureEach {
     systemProperty 'file.encoding', 'UTF-8'
+    System.getProperties().each { key, value ->
+        if (key.toString().startsWith('benchmark.')) {
+            systemProperty key.toString(), value
+        }
+    }
+    [
+            'benchmark.entry-code-bulk'        : 'benchmarkEntryCodeBulk',
+            'benchmark.stage'                  : 'benchmarkStage',
+            'benchmark.existing.visitor.count' : 'benchmarkExistingVisitorCount',
+            'benchmark.create.quantity'        : 'benchmarkCreateQuantity',
+            'benchmark.warm.up'                : 'benchmarkWarmUp',
+            'benchmark.iterations'             : 'benchmarkIterations',
+            'benchmark.output'                 : 'benchmarkOutput',
+            'benchmark.output.dir'             : 'benchmarkOutputDir'
+    ].each { systemPropertyName, projectPropertyName ->
+        if (project.hasProperty(projectPropertyName)) {
+            systemProperty systemPropertyName, project.property(projectPropertyName)
+        }
+    }
 }
 
 tasks.named('check') {
