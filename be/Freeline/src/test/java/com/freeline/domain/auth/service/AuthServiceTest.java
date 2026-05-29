@@ -34,6 +34,7 @@ import com.freeline.domain.auth.repository.BoothAdminRepository;
 import com.freeline.domain.auth.repository.EventAdminRepository;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.repository.BoothRepository;
+import com.freeline.domain.booth.repository.VisitorEntryCodeBatchRepository;
 import com.freeline.domain.booth.repository.VisitorRepository;
 import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.repository.EventRepository;
@@ -76,6 +77,9 @@ class AuthServiceTest {
     @Mock
     private JavaMailSender mailSender;
 
+    @Mock
+    private VisitorEntryCodeBatchRepository visitorEntryCodeBatchRepository;
+
     private AuthService authService;
 
     @BeforeEach
@@ -91,7 +95,8 @@ class AuthServiceTest {
                 jwtProvider,
                 redisTemplate,
                 new AuthConverter(),
-                mailSender
+                mailSender,
+                visitorEntryCodeBatchRepository
         );
         ReflectionTestUtils.setField(authService, "refreshTokenExpiration", 120000L);
         org.mockito.Mockito.lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);

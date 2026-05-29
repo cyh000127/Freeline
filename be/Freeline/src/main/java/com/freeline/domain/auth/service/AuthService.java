@@ -1,7 +1,6 @@
 package com.freeline.domain.auth.service;
 
 import java.security.SecureRandom;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -49,6 +48,7 @@ import com.freeline.domain.auth.repository.EventAdminRepository;
 import com.freeline.domain.booth.entity.Booth;
 import com.freeline.domain.booth.entity.Visitor;
 import com.freeline.domain.booth.repository.BoothRepository;
+import com.freeline.domain.booth.repository.VisitorEntryCodeBatchRepository;
 import com.freeline.domain.booth.repository.VisitorRepository;
 import com.freeline.domain.event.entity.Event;
 import com.freeline.domain.event.repository.EventRepository;
@@ -80,6 +80,7 @@ public class AuthService {
     private final StringRedisTemplate redisTemplate;
     private final AuthConverter authConverter;
     private final JavaMailSender mailSender;
+    private final VisitorEntryCodeBatchRepository visitorEntryCodeBatchRepository;
 
     @Value("${jwt.refresh-token-expiration}")
     private long refreshTokenExpiration;
@@ -389,44 +390,35 @@ public class AuthService {
             final Long userId,
             final EntryCodeBulkCreateReqDto request
     ) {
-        validateEventOwnership(userId, request.eventId());
+        getOwnedEventForUpdate(userId, request.eventId());
 
         final int quantity = request.quantity();
-        long nextSequence = visitorRepository.countByEventId(request.eventId()) + 1;
-        final List<Visitor> visitorsToCreate = new ArrayList<>(quantity);
-
-        while (visitorsToCreate.size() < quantity) {
-            final String entryCode = formatEntryCode(request.eventId(), nextSequence++);
-            if (visitorRepository.existsByEntryCode(entryCode)) {
-                continue;
-            }
-
-            visitorsToCreate.add(Visitor.builder()
-                    .eventId(request.eventId())
-                    .entryCode(entryCode)
-                    .name(null)
-                    .active(true)
-                    .build());
-        }
-
-        final List<Visitor> savedVisitors = visitorRepository.saveAll(visitorsToCreate);
+        final long nextSequence = visitorRepository.countByEventId(request.eventId()) + 1;
+        final List<VisitorEntryCodeBatchRepository.CreatedEntryCode> createdEntryCodes =
+                visitorEntryCodeBatchRepository.insertEntryCodes(
+                        request.eventId(),
+                        nextSequence,
+                        quantity,
+                        ENTRY_CODE_PREFIX,
+                        ENTRY_CODE_SEQUENCE_LENGTH
+                );
 
         log.info(
                 "[Auth] Entry codes bulk created {eventId: {}, requestedCount: {}, createdCount: {}}",
                 request.eventId(),
                 quantity,
-                savedVisitors.size()
+                createdEntryCodes.size()
         );
 
         return EntryCodeBulkCreateResDto.builder()
                 .eventId(request.eventId())
                 .requestedCount(quantity)
-                .createdCount(savedVisitors.size())
-                .entryCodes(savedVisitors.stream()
-                        .map(visitor -> EntryCodeBulkCreateResDto.EntryCodeItem.builder()
-                                .visitorId(visitor.getId())
-                                .entryCode(visitor.getEntryCode())
-                                .active(visitor.isActive())
+                .createdCount(createdEntryCodes.size())
+                .entryCodes(createdEntryCodes.stream()
+                        .map(createdEntryCode -> EntryCodeBulkCreateResDto.EntryCodeItem.builder()
+                                .visitorId(createdEntryCode.visitorId())
+                                .entryCode(createdEntryCode.entryCode())
+                                .active(createdEntryCode.active())
                                 .build())
                         .toList())
                 .build();
@@ -455,8 +447,15 @@ public class AuthService {
         }
     }
 
-    private String formatEntryCode(final Long eventId, final long sequence) {
-        return String.format("%s%d-%0" + ENTRY_CODE_SEQUENCE_LENGTH + "d", ENTRY_CODE_PREFIX, eventId, sequence);
+    private Event getOwnedEventForUpdate(final Long eventAdminId, final Long eventId) {
+        final Event event = eventRepository.findByIdForUpdate(eventId)
+                .orElseThrow(() -> new AuthException(ErrorCode.EVENT_NOT_FOUND));
+
+        if (!event.getEventAdminId().equals(eventAdminId)) {
+            throw new AuthException(ErrorCode.ACCESS_DENIED);
+        }
+
+        return event;
     }
 
     private LoginResDto buildPasswordChangeRequiredResponse(final BoothAdmin boothAdmin) {
