@@ -26,7 +26,7 @@ public class WaitingFcmDelayedConsumer {
 
     @RabbitListener(
             queues = "${app.rabbitmq.waiting.fcm-delayed-queue:waiting.fcm.delayed.queue}",
-            containerFactory = "waitingRabbitListenerContainerFactory"
+            containerFactory = "waitingDelayedFcmRabbitListenerContainerFactory"
     )
     public void consume(final WaitingFcmTaskMessage message) {
         if (message.waitingId() == null || message.notificationType() == null) {

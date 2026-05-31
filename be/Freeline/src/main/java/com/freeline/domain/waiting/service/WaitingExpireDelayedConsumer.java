@@ -20,7 +20,7 @@ public class WaitingExpireDelayedConsumer {
 
     @RabbitListener(
             queues = "${app.rabbitmq.waiting.expire-delayed-queue:waiting.expire.delayed.queue}",
-            containerFactory = "waitingRabbitListenerContainerFactory"
+            containerFactory = "waitingExpireRabbitListenerContainerFactory"
     )
     public void consume(final WaitingExpireTaskMessage message) {
         if (message.waitingId() == null || message.expiresAt() == null) {

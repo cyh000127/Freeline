@@ -35,7 +35,7 @@ public class WaitingFcmEventConsumer {
 
     @RabbitListener(
             queues = "${app.rabbitmq.waiting.fcm-queue:waiting.fcm.queue}",
-            containerFactory = "waitingRabbitListenerContainerFactory"
+            containerFactory = "waitingFcmRabbitListenerContainerFactory"
     )
     public void consume(final WaitingEventMessage message) {
         if (!message.eventType().isFcmTarget() || message.waitingId() == null) {

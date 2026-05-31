@@ -27,4 +27,17 @@ public class RabbitMqWaitingProperties {
     private String fcmDelayedRoutingKey = "waiting.fcm.delayed";
     private String expireDelayedRoutingKey = "waiting.expire.delayed";
     private int consumerMaxAttempts = 3;
+    private ConsumerTuning sseConsumer = new ConsumerTuning();
+    private ConsumerTuning fcmConsumer = new ConsumerTuning();
+    private ConsumerTuning delayedFcmConsumer = new ConsumerTuning();
+    private ConsumerTuning expireConsumer = new ConsumerTuning();
+
+    @Getter
+    @Setter
+    public static class ConsumerTuning {
+
+        private Integer concurrentConsumers;
+        private Integer maxConcurrentConsumers;
+        private Integer prefetchCount;
+    }
 }
