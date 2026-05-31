@@ -73,6 +73,10 @@ app:
       fcm-routing-key-pattern: waiting.fcm.*
       fcm-delayed-routing-key: waiting.fcm.delayed
       consumer-max-attempts: 3 # 최대 재전송 횟수 제한
+      fcm-consumer:
+        concurrent-consumers: 4
+        max-concurrent-consumers: 8
+        prefetch-count: 5
 
 hdfs:
   webhdfs-url: ${HDFS_WEBHDFS_URL:http://namenode:9870}
