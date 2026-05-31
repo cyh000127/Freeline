@@ -62,7 +62,7 @@ class WaitingFcmConsumerBottleneckBenchmarkTest {
         );
         final Path output = Path.of(setting(
                 "benchmark.rabbitmq-fcm-consumer.output",
-                "benchmark/rabbitmq-consumer-bottleneck/measurements/" + stage + ".csv"
+                "build/measurements/rabbitmq-fcm-consumer/" + stage + ".csv"
         ));
 
         Files.createDirectories(output.getParent());
