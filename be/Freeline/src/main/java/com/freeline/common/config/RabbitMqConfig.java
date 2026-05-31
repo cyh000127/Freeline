@@ -19,6 +19,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.freeline.common.config.properties.RabbitMqWaitingProperties;
+import com.freeline.common.config.properties.RabbitMqWaitingProperties.ConsumerTuning;
 
 @Configuration
 @EnableConfigurationProperties(RabbitMqWaitingProperties.class)
@@ -121,11 +122,107 @@ public class RabbitMqConfig {
             final MessageConverter rabbitMqMessageConverter,
             final Advice waitingRabbitRetryInterceptor
     ) {
+        return createWaitingRabbitListenerContainerFactory(
+                connectionFactory,
+                rabbitMqMessageConverter,
+                waitingRabbitRetryInterceptor,
+                new ConsumerTuning()
+        );
+    }
+
+    @Bean
+    public SimpleRabbitListenerContainerFactory waitingSseRabbitListenerContainerFactory(
+            final ConnectionFactory connectionFactory,
+            final MessageConverter rabbitMqMessageConverter,
+            final Advice waitingRabbitRetryInterceptor,
+            final RabbitMqWaitingProperties properties
+    ) {
+        return createWaitingRabbitListenerContainerFactory(
+                connectionFactory,
+                rabbitMqMessageConverter,
+                waitingRabbitRetryInterceptor,
+                properties.getSseConsumer()
+        );
+    }
+
+    @Bean
+    public SimpleRabbitListenerContainerFactory waitingFcmRabbitListenerContainerFactory(
+            final ConnectionFactory connectionFactory,
+            final MessageConverter rabbitMqMessageConverter,
+            final Advice waitingRabbitRetryInterceptor,
+            final RabbitMqWaitingProperties properties
+    ) {
+        return createWaitingRabbitListenerContainerFactory(
+                connectionFactory,
+                rabbitMqMessageConverter,
+                waitingRabbitRetryInterceptor,
+                properties.getFcmConsumer()
+        );
+    }
+
+    @Bean
+    public SimpleRabbitListenerContainerFactory waitingDelayedFcmRabbitListenerContainerFactory(
+            final ConnectionFactory connectionFactory,
+            final MessageConverter rabbitMqMessageConverter,
+            final Advice waitingRabbitRetryInterceptor,
+            final RabbitMqWaitingProperties properties
+    ) {
+        return createWaitingRabbitListenerContainerFactory(
+                connectionFactory,
+                rabbitMqMessageConverter,
+                waitingRabbitRetryInterceptor,
+                properties.getDelayedFcmConsumer()
+        );
+    }
+
+    @Bean
+    public SimpleRabbitListenerContainerFactory waitingExpireRabbitListenerContainerFactory(
+            final ConnectionFactory connectionFactory,
+            final MessageConverter rabbitMqMessageConverter,
+            final Advice waitingRabbitRetryInterceptor,
+            final RabbitMqWaitingProperties properties
+    ) {
+        return createWaitingRabbitListenerContainerFactory(
+                connectionFactory,
+                rabbitMqMessageConverter,
+                waitingRabbitRetryInterceptor,
+                properties.getExpireConsumer()
+        );
+    }
+
+    private SimpleRabbitListenerContainerFactory createWaitingRabbitListenerContainerFactory(
+            final ConnectionFactory connectionFactory,
+            final MessageConverter rabbitMqMessageConverter,
+            final Advice waitingRabbitRetryInterceptor,
+            final ConsumerTuning consumerTuning
+    ) {
         final SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(rabbitMqMessageConverter);
         factory.setDefaultRequeueRejected(false);
         factory.setAdviceChain(waitingRabbitRetryInterceptor);
+        applyConsumerTuning(factory, consumerTuning);
         return factory;
+    }
+
+    private void applyConsumerTuning(
+            final SimpleRabbitListenerContainerFactory factory,
+            final ConsumerTuning consumerTuning
+    ) {
+        if (consumerTuning == null) {
+            return;
+        }
+
+        if (consumerTuning.getConcurrentConsumers() != null) {
+            factory.setConcurrentConsumers(consumerTuning.getConcurrentConsumers());
+        }
+
+        if (consumerTuning.getMaxConcurrentConsumers() != null) {
+            factory.setMaxConcurrentConsumers(consumerTuning.getMaxConcurrentConsumers());
+        }
+
+        if (consumerTuning.getPrefetchCount() != null) {
+            factory.setPrefetchCount(consumerTuning.getPrefetchCount());
+        }
     }
 }

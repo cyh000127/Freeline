@@ -22,7 +22,7 @@ public class BoothManagerWaitingEventConsumer {
 
     @RabbitListener(
             queues = "${app.rabbitmq.waiting.sse-queue:waiting.sse.queue}",
-            containerFactory = "waitingRabbitListenerContainerFactory"
+            containerFactory = "waitingSseRabbitListenerContainerFactory"
     )
     public void consume(final WaitingEventMessage message) {
         if (!message.eventType().isSseTarget()) {
